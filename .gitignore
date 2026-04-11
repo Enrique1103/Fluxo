@@ -14,3 +14,10 @@ Zcuentas/
 fluxo_2026-*.pdf
 C.png
 favicon/
+
+# Documentación interna (no va al repo)
+contexto/
+contexto antiguo/
+bancos/
+CLAUDE.md
+Resumen.md
