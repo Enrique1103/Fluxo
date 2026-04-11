@@ -1,0 +1,21 @@
+FECHA,HORA,TIPO,CONCEPTO,DESCRIPCIÓN,MONTO,MONEDA,SALDO,ESTADO,COMERCIO,ID_TRANSACCION
+15/03/2026,14:35,Consumo,Supermercado,Disco - Compras varias,850.00,UYU,25000.00,Completado,Disco Supermercado,MDN-001
+15/03/2026,10:20,Recarga,Recarga,Desde cuenta BROU,5000.00,UYU,30000.00,Completado,BROU Transferencia,MDN-002
+16/03/2026,16:45,Transferencia,Transferencia,Hacia BROU cuenta corriente,1500.00,UYU,28500.00,Completado,BROU,MDN-003
+17/03/2026,09:15,Consumo,Farmacia,Farmashop - Medicinas,250.50,UYU,28249.50,Completado,Farmashop,MDN-004
+18/03/2026,13:50,Retiro,Efectivo,Retiro ATM Banred,1000.00,UYU,27249.50,Completado,Banred ATM,MDN-005
+19/03/2026,15:20,Consumo,Compra Online,Amazon US - Teclado mecánico,250.00,USD,499.00,Completado,Amazon,MDN-006
+20/03/2026,11:30,Consumo,Servicios,Factura UTE - Electricidad,780.00,UYU,26469.50,Completado,UTE,MDN-007
+21/03/2026,08:45,Consumo,Restaurante,Pizzería Don Pepe,420.00,UYU,26049.50,Completado,Don Pepe,MDN-008
+22/03/2026,14:15,Recarga,Recarga,Desde tarjeta Visa,2000.00,UYU,28049.50,Completado,Visa ****1234,MDN-009
+23/03/2026,12:00,Consumo,Transporte,Uber - Viaje a aeropuerto,350.00,UYU,27699.50,Completado,Uber,MDN-010
+24/03/2026,16:50,Transferencia,Transferencia,A Itaú cuenta xxx,2500.00,UYU,25199.50,Completado,Itaú,MDN-011
+25/03/2026,13:20,Consumo,Entretenimiento,Netflix - Suscripción mensual,199.99,UYU,24999.51,Completado,Netflix,MDN-012
+26/03/2026,10:45,Recarga,Recarga,Transferencia bancaria BROU,3000.00,UYU,27999.51,Completado,BROU,MDN-013
+27/03/2026,15:30,Consumo,Compras,Tienda Ropa - Pantalones,800.00,UYU,27199.51,Completado,Tienda Ropa,MDN-014
+28/03/2026,09:30,Consumo,Supermercado,Disco - Frutas y verduras,450.00,UYU,26749.51,Completado,Disco Supermercado,MDN-015
+29/03/2026,14:00,Devolución,Compras,Devolución - Pantalones defectuosos,800.00,UYU,27549.51,Completado,Tienda Ropa,MDN-016
+30/03/2026,11:15,Consumo,Farmacia,Farmashop - Shampoo,120.00,UYU,27429.51,Completado,Farmashop,MDN-017
+31/03/2026,16:45,Transferencia,Transferencia,Hacia cuenta amigo Luis,500.00,UYU,26929.51,Completado,Luis García,MDN-018
+01/04/2026,13:50,Recarga,Recarga,Desde Mercado Pago,1500.00,UYU,28429.51,Completado,Mercado Pago,MDN-019
+02/04/2026,10:20,Consumo,Compra Online,MercadoLibre - Adaptador USB,180.00,UYU,28249.51,Completado,MercadoLibre,MDN-020

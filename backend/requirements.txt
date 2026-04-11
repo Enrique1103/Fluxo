@@ -1,0 +1,54 @@
+# ── Web framework ─────────────────────────────────────────────────────────────
+fastapi==0.128.0
+starlette==0.50.0
+uvicorn==0.40.0
+python-multipart==0.0.20
+
+# ── Database ───────────────────────────────────────────────────────────────────
+SQLAlchemy==2.0.46
+psycopg2-binary==2.9.11
+alembic==1.18.4
+greenlet==3.3.2
+
+# ── Auth & Security ────────────────────────────────────────────────────────────
+bcrypt==5.0.0
+python-jose==3.5.0
+cryptography>=42.0.0
+ecdsa==0.19.1
+pyasn1==0.6.2
+rsa==4.9.1
+
+# ── Validation & Serialization ─────────────────────────────────────────────────
+pydantic==2.12.5
+pydantic_core==2.41.5
+pydantic[email]
+annotated-types==0.7.0
+email-validator>=2.0.0
+typing_extensions==4.15.0
+typing-inspection==0.4.2
+
+# ── Data Processing ────────────────────────────────────────────────────────────
+pandas>=2.0.0
+openpyxl>=3.1.0
+pdfplumber>=0.11.0
+python-dateutil>=2.8.0
+six==1.17.0
+
+# ── Visualization ──────────────────────────────────────────────────────────────
+plotly>=5.0.0
+
+# ── Config & Utils ────────────────────────────────────────────────────────────
+python-dotenv==1.2.1
+PyYAML==6.0.3
+click==8.3.1
+Mako==1.3.10
+MarkupSafe==3.0.3
+
+# ── Async & HTTP internals ────────────────────────────────────────────────────
+anyio==4.12.0
+h11==0.16.0
+httptools==0.7.1
+idna==3.11
+watchfiles==1.1.1
+websockets==15.0.1
+colorama==0.4.6

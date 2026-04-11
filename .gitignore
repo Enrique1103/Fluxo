@@ -1,0 +1,16 @@
+__pycache__/
+.venv/
+venv/
+.env
+*.pyc
+.vscode/
+test_endpoints.py
+
+# Archivos locales / privados
+.claude/
+Zcuentas/
+*.xlsx
+*.xls
+fluxo_2026-*.pdf
+C.png
+favicon/

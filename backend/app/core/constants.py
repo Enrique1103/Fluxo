@@ -1,0 +1,86 @@
+# Categorías y conceptos que se crean automáticamente al registrar un nuevo usuario.
+# is_system=True → no se puede borrar ni renombrar la categoría.
+# La categoría "Sin clasificar" es el fallback para transacciones huérfanas.
+
+INITIAL_USER_CATEGORIES = [
+    {
+        "name": "Sueldo Nominal",
+        "slug": "sueldo-nominal",
+        "icon": "briefcase",
+        "color": "#06B6D4",
+        "is_system": False,
+        "concepts": ["Sueldo Base", "Aguinaldo", "Salario Vacacional", "Horas Extras"],
+    },
+    {
+        "name": "Sueldo En Negro",
+        "slug": "sueldo-en-negro",
+        "icon": "banknote",
+        "color": "#67E8F9",
+        "is_system": False,
+        "concepts": ["Jornada Extra", "Propina"],
+    },
+    {
+        "name": "Otros Ingresos",
+        "slug": "otros-ingresos",
+        "icon": "plus-circle",
+        "color": "#22C55E",
+        "is_system": False,
+        "concepts": ["Regalo", "Reintegro"],
+    },
+    {
+        "name": "Alimentación",
+        "slug": "alimentacion",
+        "icon": "utensils",
+        "color": "#F97316",
+        "is_system": False,
+        "concepts": ["Supermercado", "Delivery", "Feria"],
+    },
+    {
+        "name": "Vivienda",
+        "slug": "vivienda",
+        "icon": "home",
+        "color": "#8B5CF6",
+        "is_system": False,
+        "concepts": ["Alquiler", "Luz", "Agua", "Gastos Comunes"],
+    },
+    {
+        "name": "Transporte",
+        "slug": "transporte",
+        "icon": "car",
+        "color": "#3B82F6",
+        "is_system": False,
+        "concepts": ["Ómnibus", "Uber/Taxi", "Combustible"],
+    },
+    {
+        "name": "Ocio",
+        "slug": "ocio",
+        "icon": "gamepad",
+        "color": "#10B981",
+        "is_system": False,
+        "concepts": ["Restaurante"],
+    },
+    {
+        "name": "Salud",
+        "slug": "salud",
+        "icon": "heart",
+        "color": "#EF4444",
+        "is_system": False,
+        "concepts": ["Farmacia", "Psicólogo", "Consulta Médica"],
+    },
+    {
+        "name": "Suscripciones",
+        "slug": "suscripciones",
+        "icon": "repeat",
+        "color": "#7C3AED",
+        "is_system": False,
+        "concepts": ["Internet", "Netflix", "Spotify", "Gimnasio", "Compra en Temu"],
+    },
+    {
+        "name": "Sin clasificar",
+        "slug": "sin-clasificar",
+        "icon": "help-circle",
+        "color": "#6B7280",
+        "is_system": True,
+        "concepts": ["Transferencia", "Ajuste de Saldo", "Pago de Tarjeta"],
+    },
+]

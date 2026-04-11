@@ -1,0 +1,21 @@
+FECHA,HORA,TIPO,DESCRIPCIÓN,REFERENCIA,DÉBITO,CRÉDITO,SALDO,MONEDA,NÚMERO_CUENTA,ESTADO
+01/03/2026,08:15,Depósito,Depósito salario - Empresa ABC,DEP-001,,50000.00,50000.00,UYU,12345678,Completado
+02/03/2026,10:30,Retiro,Retiro en ATM Scotiabank,ATM-001,5000.00,,45000.00,UYU,12345678,Completado
+03/03/2026,14:45,Pago,Pago de factura UTE,UTE-2026,750.00,,44250.00,UYU,12345678,Completado
+04/03/2026,09:20,Transferencia,Transferencia a BROU - Préstamo,TRF-001,2500.00,,41750.00,UYU,12345678,Completado
+05/03/2026,16:50,Compra,Compra Supermercado Disco,DBT-001,850.00,,40900.00,UYU,12345678,Completado
+06/03/2026,11:15,Comisión,Comisión bancaria mensual,COM-001,100.00,,40800.00,UYU,12345678,Completado
+07/03/2026,13:40,Transferencia,Transferencia desde Itaú,TRF-002,,3000.00,43800.00,UYU,12345678,Completado
+08/03/2026,15:25,Depósito,Depósito en efectivo,DEP-002,,2000.00,45800.00,UYU,12345678,Completado
+09/03/2026,10:05,Pago,Pago tarjeta de crédito Visa,PAG-001,1500.00,,44300.00,UYU,12345678,Completado
+10/03/2026,14:30,Compra,Compra farmacia Farmashop,DBT-002,250.00,,44050.00,UYU,12345678,Completado
+11/03/2026,09:45,Transferencia,Transferencia a Mi Banco - Cuenta Ahorro,TRF-003,5000.00,,39050.00,UYU,12345678,Completado
+12/03/2026,16:15,Compra,Compra online Amazon,DBT-003,250.00,,38800.00,USD,12345678,Completado
+13/03/2026,12:00,Interés,Interés ganado en cuenta,INT-001,,50.00,39045.00,UYU,12345678,Completado
+14/03/2026,11:20,Retiro,Retiro en ATM Banred,ATM-002,2000.00,,37045.00,UYU,12345678,Completado
+15/03/2026,15:50,Pago,Pago de servicios OSE,OSE-001,650.00,,36395.00,UYU,12345678,Completado
+16/03/2026,10:30,Compra,Compra Restaurante Don Pepe,DBT-004,420.00,,35975.00,UYU,12345678,Completado
+17/03/2026,14:10,Transferencia,Transferencia a amigo Luis García,TRF-004,500.00,,35475.00,UYU,12345678,Completado
+18/03/2026,09:35,Compra,Compra transporte Uber,DBT-005,350.00,,35125.00,UYU,12345678,Completado
+19/03/2026,13:25,Devolución,Devolución compra Tienda Ropa,DEV-001,,800.00,35925.00,UYU,12345678,Completado
+20/03/2026,16:45,Depósito,Depósito por transferencia bancaria,DEP-003,,4000.00,39925.00,UYU,12345678,Completado

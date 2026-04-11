@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Environment variables (never copy secrets into the image)
+.env
+
+# Alembic compiled cache
+alembic/__pycache__/
+alembic/versions/__pycache__/
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
