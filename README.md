@@ -1,6 +1,44 @@
-# Fluxo — Gestor de Finanzas Personales
+# Fluxo
 
-Aplicación web fullstack para el seguimiento de ingresos, gastos, metas y finanzas grupales (hogares). Incluye importación de extractos bancarios, análisis por categorías y dashboard mensual.
+**Aplicación de finanzas personales** construida con FastAPI y React. Seguimiento de ingresos y gastos, análisis mensual, importación de extractos bancarios, metas financieras y finanzas grupales — todo en una sola app instalable como PWA.
+
+---
+
+## Funcionalidades
+
+### Dashboards
+- **Global** — patrimonio neto, activos, deudas, balance del mes, evolución histórica y metas financieras
+- **Análisis mensual** — distribución de gastos por categoría, heatmap de actividad diaria, comparativa con el mes anterior y exportación a PDF
+- **Hogares** — finanzas grupales con aportes proporcionales al ingreso, balance por miembro y liquidación automática de deudas
+
+### Transacciones
+- Alta, edición y eliminación de ingresos, gastos y transferencias
+- Clasificación por categoría, concepto y método de pago (efectivo, débito, crédito, transferencia, billetera digital)
+- Soporte para cuotas — registro de planes de cuotas en tarjeta de crédito
+
+### Importación bancaria
+Parseo automático de extractos con detección de duplicados y asignación de conceptos en revisión:
+
+| Banco | Formato |
+|---|---|
+| Itaú | CSV |
+| Santander | CSV |
+| BROU | CSV |
+| Mercado Pago | CSV |
+| Ualá | CSV |
+| OCA | PDF |
+| Prex | Excel |
+| Zcuentas | Excel |
+
+### Cuentas y configuración
+- Tipos: efectivo, débito, crédito — en UYU o USD
+- Tasas de cambio configurables para conversión automática
+- Categorías y conceptos propios por usuario
+- Modo claro / oscuro
+- Exportación del reporte mensual a PDF (gráfico de dona + tabla + movimientos)
+
+### PWA
+Instalable desde el navegador en Android e iOS, sin pasar por tiendas de aplicaciones.
 
 ---
 
@@ -9,12 +47,13 @@ Aplicación web fullstack para el seguimiento de ingresos, gastos, metas y finan
 | Capa | Tecnología |
 |---|---|
 | Frontend | React 19 + TypeScript + Vite + Tailwind CSS v4 |
-| Backend | FastAPI (Python) |
-| Base de datos | PostgreSQL (Supabase) |
+| Backend | FastAPI (Python 3.12) |
+| Base de datos | PostgreSQL |
 | ORM | SQLAlchemy 2.0 + Alembic |
-| Auth | JWT (python-jose) + bcrypt |
-| Charts | Plotly (servidor) + react-plotly.js (cliente) |
-| Deploy | Render (backend) · Vercel (frontend) · Supabase (DB) |
+| Autenticación | JWT (python-jose) + bcrypt |
+| Gráficos | Plotly + react-plotly.js |
+| PDF | jsPDF + jspdf-autotable |
+| Deploy | Render · Vercel · Supabase |
 
 ---
 
@@ -24,29 +63,40 @@ Aplicación web fullstack para el seguimiento de ingresos, gastos, metas y finan
 Fluxo/
 ├── backend/
 │   ├── app/
-│   │   ├── api/          # Routers + inyección de dependencias
-│   │   ├── core/         # DB session, JWT, bcrypt, constantes
-│   │   ├── crud/         # Operaciones atómicas de BD (sin lógica de negocio)
+│   │   ├── api/          # Routers FastAPI + dependencias (get_current_user)
+│   │   ├── core/         # Sesión DB, JWT, bcrypt, constantes
+│   │   ├── crud/         # Operaciones atómicas de BD sin lógica de negocio
 │   │   ├── exceptions/   # Excepciones de dominio por entidad
 │   │   ├── models/       # Modelos SQLAlchemy (DeclarativeBase)
-│   │   ├── schemas/      # Schemas Pydantic v2 (request/response)
-│   │   └── services/     # Lógica de negocio
-│   ├── alembic/          # Migraciones
+│   │   ├── schemas/      # Schemas Pydantic v2 (request / response)
+│   │   └── services/     # Lógica de negocio — único lugar con db.commit()
+│   ├── alembic/          # Migraciones de base de datos
 │   └── requirements.txt
 └── frontend/
-    ├── src/
-    │   ├── api/          # Clientes axios por dominio
-    │   ├── components/   # Componentes reutilizables
-    │   ├── pages/        # Páginas principales
-    │   └── hooks/        # Custom hooks (useTheme, etc.)
-    └── package.json
+    ├── public/           # Íconos PWA, favicons
+    └── src/
+        ├── api/          # Clientes axios por dominio
+        ├── components/   # Componentes reutilizables + modales
+        ├── pages/        # DashboardPage, StatsDashboardPage, HouseholdPage
+        ├── lib/          # exportPDF, queryClient
+        └── hooks/        # useTheme, useHouseholdEvents
 ```
 
 ---
 
-## Setup local
+## Desarrollo local
 
-### Backend
+### Opción A — Docker (recomendado)
+
+```bash
+docker compose up
+```
+
+Levanta PostgreSQL y el backend en `http://localhost:8000`. Las migraciones se aplican automáticamente.
+
+### Opción B — Manual
+
+**Backend**
 
 ```bash
 cd backend
@@ -56,6 +106,7 @@ pip install -r requirements.txt
 ```
 
 Crear `backend/.env`:
+
 ```env
 DATABASE_URL=postgresql://user:pass@host/dbname
 SECRET_KEY=tu-clave-secreta
@@ -64,24 +115,16 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
 ```bash
-alembic upgrade head             # aplicar migraciones
-uvicorn app.main:app --reload    # servidor en http://localhost:8000
+alembic upgrade head
+uvicorn app.main:app --reload   # http://localhost:8000
 ```
 
-### Frontend
+**Frontend**
 
 ```bash
 cd frontend
 npm install
-```
-
-Crear `frontend/.env`:
-```env
-VITE_API_URL=http://localhost:8000/api
-```
-
-```bash
-npm run dev                      # http://localhost:5173
+npm run dev                     # http://localhost:5173
 ```
 
 ---
@@ -89,7 +132,7 @@ npm run dev                      # http://localhost:5173
 ## Migraciones
 
 ```bash
-# Generar migración desde cambios en modelos
+# Generar desde cambios en modelos
 alembic revision --autogenerate -m "descripción"
 
 # Aplicar
@@ -101,13 +144,21 @@ alembic downgrade -1
 
 ---
 
-## Funcionalidades
+## Tests
 
-- **Dashboard mensual** — resumen de ingresos/gastos, balance, evolución, top categorías
-- **Dashboard global** — análisis histórico, comparativa entre periodos
-- **Transacciones** — alta/baja/edición con concepto, categoría y método de pago
-- **Importación bancaria** — parseo de extractos Excel/CSV/PDF (Prex, BROU, Itaú, Santander, OCA, Mercado Pago, Ualá), detección de duplicados, asignación de conceptos en revisión
-- **Hogares** — finanzas grupales con contribuciones, liquidación de deudas y gastos compartidos
-- **Categorías y conceptos** — etiquetas propias por usuario
-- **Cuentas** — efectivo, débito, crédito en UYU o USD
-- **Modo claro/oscuro**
+```bash
+cd backend
+pytest
+```
+
+---
+
+## Despliegue
+
+| Servicio | Uso |
+|---|---|
+| Supabase | PostgreSQL gestionado |
+| Render | Backend (detecta el Dockerfile automáticamente) |
+| Vercel | Frontend estático |
+
+El `Dockerfile` del backend expone `${PORT}` para compatibilidad con Render.
