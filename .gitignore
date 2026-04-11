@@ -21,3 +21,9 @@ contexto antiguo/
 bancos/
 CLAUDE.md
 Resumen.md
+
+# Capturas y archivos temporales
+*.png
+*.PDF
+*.pdf
+frontend/.vite/
