@@ -73,10 +73,12 @@ def upgrade() -> None:
     op.add_column('transactions', sa.Column('household_id', sa.UUID(), nullable=True))
     op.drop_index(op.f('ix_transactions_import_hash'), table_name='transactions')
     op.drop_index(op.f('ix_transactions_instalment_plan_id'), table_name='transactions')
-    op.drop_constraint(op.f('transactions_cuenta_origen_id_fkey'), 'transactions', type_='foreignkey')
+    # These columns only exist in databases that went through old local migrations.
+    # Using IF EXISTS so the migration works cleanly on a fresh database too.
+    op.execute("ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_cuenta_origen_id_fkey")
+    op.execute("ALTER TABLE transactions DROP COLUMN IF EXISTS cuenta_origen_id")
+    op.execute("ALTER TABLE transactions DROP COLUMN IF EXISTS referencia_transferencia")
     op.create_foreign_key(None, 'transactions', 'households', ['household_id'], ['id'], ondelete='SET NULL')
-    op.drop_column('transactions', 'cuenta_origen_id')
-    op.drop_column('transactions', 'referencia_transferencia')
     # ### end Alembic commands ###
 
 
