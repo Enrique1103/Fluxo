@@ -220,6 +220,30 @@ class DetectorBanco:
     _COLS_ZCUENTAS = {"Fecha", "Tipo", "Cuenta", "Concepto", "Etiqueta", "Importe"}
     _TIPOS_ZCUENTAS = {"Gasto", "Ingreso", "Transferencia"}
 
+    @staticmethod
+    def _header_row_zcuentas(archivo_bytes: bytes) -> int:
+        """
+        Detecta la fila (0-indexada) que contiene el encabezado del export Zcuentas.
+        Distintas versiones de la app exportan con distinto número de filas de metadata
+        antes del encabezado. Prueba filas 0-9 y retorna la primera que tenga
+        {Fecha, Tipo, Importe}. Lanza ValueError si no encuentra ninguna.
+        """
+        import io
+        for row in range(10):
+            try:
+                df = pd.read_excel(
+                    io.BytesIO(archivo_bytes), engine="openpyxl",
+                    header=row, nrows=3,
+                )
+                if {"Fecha", "Tipo", "Importe"}.issubset(set(df.columns)):
+                    return row
+            except Exception:
+                continue
+        raise ValueError(
+            "No se encontró la fila de encabezado en el archivo. "
+            "Verificá que sea un export de Zcuentas válido."
+        )
+
     @classmethod
     def detectar(cls, archivo_bytes: bytes) -> str:
         """Retorna el id de banco. Lanza ValueError si no puede determinarlo."""
@@ -228,9 +252,10 @@ class DetectorBanco:
         if archivo_bytes[:4] == b"%PDF":
             return "oca"
 
-        # xlsx/xls — Zcuentas primero (tiene header en fila 3)
+        # xlsx/xls — Zcuentas primero (auto-detecta la fila de encabezado)
         try:
-            df_z = pd.read_excel(io.BytesIO(archivo_bytes), engine="openpyxl", header=2, nrows=10)
+            header_row = cls._header_row_zcuentas(archivo_bytes)
+            df_z = pd.read_excel(io.BytesIO(archivo_bytes), engine="openpyxl", header=header_row, nrows=10)
             if cls._COLS_ZCUENTAS.issubset(set(df_z.columns)):
                 tipos = {str(v).strip() for v in df_z["Tipo"].dropna().unique()}
                 if tipos & cls._TIPOS_ZCUENTAS:
@@ -284,7 +309,8 @@ class DetectorBanco:
     def extraer_cuentas_zcuentas(cls, archivo_bytes: bytes) -> list[tuple[str, str]]:
         """Retorna lista de (nombre_cuenta, moneda) únicas del export Zcuentas."""
         import io
-        df = pd.read_excel(io.BytesIO(archivo_bytes), engine="openpyxl", header=2)
+        header_row = cls._header_row_zcuentas(archivo_bytes)
+        df = pd.read_excel(io.BytesIO(archivo_bytes), engine="openpyxl", header=header_row)
         vistas: dict[str, str] = {}
         for _, row in df.iterrows():
             nombre = str(row.get("Cuenta", "") or "").strip()
@@ -1334,10 +1360,11 @@ class ParserZcuentas:
         import io
 
         try:
+            header_row = DetectorBanco._header_row_zcuentas(archivo_bytes)
             df = pd.read_excel(
                 io.BytesIO(archivo_bytes),
                 engine="openpyxl",
-                header=2,       # fila 3 (base-0) contiene los headers
+                header=header_row,
             )
         except Exception as e:
             raise ValueError(f"No se pudo leer el archivo Excel de Zcuentas: {e}")
