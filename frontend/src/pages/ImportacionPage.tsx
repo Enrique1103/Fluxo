@@ -51,6 +51,15 @@ interface RowEdit {
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
+function parseAxiosErr(err: unknown, fallback: string): string {
+  const e = err as any
+  const detail = e?.response?.data?.detail
+  if (!detail) return e?.message || fallback
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) return detail.map((x: any) => x?.msg ?? String(x)).join('. ')
+  return fallback
+}
+
 function estadoBadge(estado: string, isLight = false) {
   if (isLight) {
     switch (estado) {
@@ -411,7 +420,7 @@ export default function ImportacionPage() {
       }
     },
     onError: (err: Error) => {
-      setDetectError(err.message || 'No se pudo detectar el formato del archivo')
+      setDetectError(parseAxiosErr(err, 'No se pudo detectar el formato del archivo'))
       setBanco('')
     },
   })
@@ -440,9 +449,14 @@ export default function ImportacionPage() {
   const confirmarMutation = useMutation({
     mutationFn: () => {
       const movs: MovimientoImportado[] = parseResult!.movimientos
-        .filter((_, i) => seleccionados.has(i))
-        .map((m, i) => {
-          const edit = rowEdits[i]
+        .map((m, origIdx) => ({ m, origIdx }))
+        .filter(({ origIdx }) => seleccionados.has(origIdx))
+        .map(({ m, origIdx }) => {
+          const edit = rowEdits[origIdx]
+          const meta: Record<string, unknown> = { ...m.metadata }
+          if (edit?.transferDestAccountId) {
+            meta.transfer_dest_account_id = edit.transferDestAccountId
+          }
           return {
             ...m,
             estado: 'validado' as const,
@@ -450,9 +464,7 @@ export default function ImportacionPage() {
             categoria: edit?.categoria || null,
             metodo_pago: edit?.metodo_pago || m.metodo_pago || 'otro',
             household_id: edit?.householdId || null,
-            metadata: {
-              ...m.metadata,
-            },
+            metadata: meta,
           }
         })
       return confirmarImportacion({
@@ -638,7 +650,7 @@ export default function ImportacionPage() {
 
             {parseMutation.isError && (
               <p className="mt-3 text-sm text-rose-400 text-center">
-                {(parseMutation.error as Error).message || 'Error al procesar el archivo'}
+                {parseAxiosErr(parseMutation.error, 'Error al procesar el archivo')}
               </p>
             )}
           </div>
@@ -751,7 +763,7 @@ export default function ImportacionPage() {
 
             {parseMutation.isError && (
               <p className="mt-3 text-sm text-rose-400 text-center">
-                {(parseMutation.error as Error).message || 'Error al procesar el archivo'}
+                {parseAxiosErr(parseMutation.error, 'Error al procesar el archivo')}
               </p>
             )}
           </div>
@@ -1004,7 +1016,7 @@ export default function ImportacionPage() {
 
           {confirmarMutation.isError && (
             <p className="mt-3 text-sm text-rose-400 text-right">
-              {(confirmarMutation.error as Error).message || 'Error al confirmar la importación'}
+              {parseAxiosErr(confirmarMutation.error, 'Error al confirmar la importación')}
             </p>
           )}
         </div>
