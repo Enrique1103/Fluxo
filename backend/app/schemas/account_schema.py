@@ -40,6 +40,8 @@ class AccountCreate(BaseModel):
 # --- Actualización ---
 class AccountUpdate(BaseModel):
     name: str | None = Field(None, min_length=2, max_length=100)
+    type: AccountType | None = None
+    currency: CurrencyCode | None = None
     credit_limit: Decimal | None = Field(None, gt=0)
 
 
@@ -53,5 +55,6 @@ class AccountResponse(BaseModel):
     balance: Decimal
     credit_limit: Decimal | None
     is_liability: bool
+    has_transactions: bool = False
 
     model_config = {"from_attributes": True}

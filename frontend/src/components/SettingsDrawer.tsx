@@ -393,6 +393,8 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
 
   const [editingAcct,     setEditingAcct]     = useState<string | null>(null)
   const [editAcctName,    setEditAcctName]    = useState('')
+  const [editAcctType,    setEditAcctType]    = useState('')
+  const [editAcctCurrency, setEditAcctCurrency] = useState('')
   const [editAcctLimit,   setEditAcctLimit]   = useState('')
   const [acctStatus,      setAcctStatus]      = useState<Status>(null)
   const [savingAcct,      setSavingAcct]      = useState(false)
@@ -402,6 +404,8 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
   const startEdit = (acct: Account) => {
     setEditingAcct(acct.id)
     setEditAcctName(acct.name)
+    setEditAcctType(acct.type)
+    setEditAcctCurrency(acct.currency)
     setEditAcctLimit(acct.credit_limit != null ? String(acct.credit_limit) : '')
     setAcctStatus(null)
   }
@@ -410,8 +414,13 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
     if (!editAcctName.trim()) return
     setSavingAcct(true); setAcctStatus(null)
     try {
-      const payload: { name?: string; credit_limit?: number } = { name: editAcctName.trim() }
-      if (acct.type === 'credit' && editAcctLimit) payload.credit_limit = parseFloat(editAcctLimit)
+      const payload: { name?: string; type?: string; currency?: string; credit_limit?: number } = { name: editAcctName.trim() }
+      if (!acct.has_transactions) {
+        if (editAcctType !== acct.type) payload.type = editAcctType
+        if (editAcctCurrency !== acct.currency) payload.currency = editAcctCurrency
+      }
+      const effectiveType = !acct.has_transactions ? editAcctType : acct.type
+      if (effectiveType === 'credit' && editAcctLimit) payload.credit_limit = parseFloat(editAcctLimit)
       await updateAccount(acct.id, payload)
       await invalidateFinancialData(queryClient)
       setEditingAcct(null)
@@ -469,7 +478,30 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
                   onChange={e => setEditAcctName(e.target.value)}
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/60"
                 />
-                {acct.type === 'credit' && (
+                {!acct.has_transactions && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={editAcctType}
+                      onChange={e => setEditAcctType(e.target.value)}
+                      className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/60 cursor-pointer"
+                    >
+                      <option value="cash">Efectivo</option>
+                      <option value="debit">Débito</option>
+                      <option value="credit">Crédito</option>
+                      <option value="investment">Inversión</option>
+                    </select>
+                    <select
+                      value={editAcctCurrency}
+                      onChange={e => setEditAcctCurrency(e.target.value)}
+                      className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/60 cursor-pointer"
+                    >
+                      <option value="UYU">UYU</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                    </select>
+                  </div>
+                )}
+                {((!acct.has_transactions && editAcctType === 'credit') || (acct.has_transactions && acct.type === 'credit')) && (
                   <input
                     type="number"
                     value={editAcctLimit}

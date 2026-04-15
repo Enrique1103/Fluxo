@@ -33,12 +33,21 @@ def create(db: Session, user: User, account_in: AccountCreate) -> Account:
     return db_account
 
 
+def _set_has_transactions(db: Session, account: Account) -> Account:
+    setattr(account, "has_transactions", transaction_crud.has_active_for_account(db, account.id))
+    return account
+
+
 def get_all(db: Session, user: User) -> list[Account]:
-    return account_crud.get_all_by_user(db, user.id)
+    accounts = account_crud.get_all_by_user(db, user.id)
+    for acct in accounts:
+        _set_has_transactions(db, acct)
+    return accounts
 
 
 def get_one(db: Session, user: User, account_id: uuid.UUID) -> Account:
-    return _get_owned(db, account_id, user.id)
+    account = _get_owned(db, account_id, user.id)
+    return _set_has_transactions(db, account)
 
 
 def update(db: Session, user: User, account_id: uuid.UUID, update_data: AccountUpdate) -> Account:
@@ -48,10 +57,21 @@ def update(db: Session, user: User, account_id: uuid.UUID, update_data: AccountU
         if account_crud.get_by_name_and_user(db, update_data.name, user.id):
             raise AccountAlreadyExists("Ya existe una cuenta con ese nombre")
 
+    changing_structural = update_data.type is not None or update_data.currency is not None
+    if changing_structural and transaction_crud.has_active_for_account(db, account.id):
+        raise AccountHasTransactions(
+            "No se puede cambiar el tipo o moneda de una cuenta con movimientos registrados"
+        )
+
+    # Si cambia a un tipo que no es crédito, limpiar credit_limit
+    new_type = update_data.type if update_data.type is not None else account.type
+    if new_type != AccountType.CREDIT:
+        account.credit_limit = None
+
     account_crud.update(db, account, update_data)
     db.commit()
     db.refresh(account)
-    return account
+    return _set_has_transactions(db, account)
 
 
 def delete(db: Session, user: User, account_id: uuid.UUID) -> None:

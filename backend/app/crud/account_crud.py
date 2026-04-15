@@ -46,6 +46,10 @@ def create(db: Session, account_in: AccountCreate, user_id: uuid.UUID) -> Accoun
 def update(db: Session, db_account: Account, update_data: AccountUpdate) -> Account:
     if update_data.name is not None:
         db_account.name = update_data.name
+    if update_data.type is not None:
+        db_account.type = update_data.type
+    if update_data.currency is not None:
+        db_account.currency = update_data.currency
     if update_data.credit_limit is not None:
         db_account.credit_limit = update_data.credit_limit
     db.flush()

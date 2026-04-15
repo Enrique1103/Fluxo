@@ -150,6 +150,7 @@ export interface Account {
   balance: number
   credit_limit: number | null
   is_liability: boolean
+  has_transactions: boolean
 }
 
 export const fetchAccounts = async (): Promise<Account[]> => {
@@ -269,7 +270,7 @@ export const deleteUserAccount = async (password: string): Promise<void> => {
 }
 
 // --- Account management ---
-export const updateAccount = async (id: string, payload: { name?: string; credit_limit?: number }): Promise<Account> => {
+export const updateAccount = async (id: string, payload: { name?: string; type?: string; currency?: string; credit_limit?: number }): Promise<Account> => {
   const { data } = await client.patch<Account>(`/v1/accounts/${id}`, payload)
   return data
 }
