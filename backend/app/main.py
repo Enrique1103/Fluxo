@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from app.core.database import get_db
 
 from app.api.routers import (
     analytics_router,
@@ -74,6 +76,17 @@ from app.exceptions.exchange_rate_exceptions import (
 )
 
 app = FastAPI(title="Fluxo API", version="2.0.0")
+
+
+@app.get("/health")
+def health_check():
+    """Ping a la DB para mantener Supabase activo."""
+    db = next(get_db())
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ok"}
+    finally:
+        db.close()
 
 app.add_middleware(
     CORSMiddleware,
