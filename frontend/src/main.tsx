@@ -9,8 +9,9 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
+// Desregistrar cualquier service worker existente que causa problemas de caché
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(reg => reg.unregister())
   })
 }
