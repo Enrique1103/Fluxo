@@ -108,11 +108,8 @@ function TradingCanvas() {
 // ── Schemas ────────────────────────────────────────────────────────────────────
 
 const loginSchema = z.object({
-  email: z.string().min(1, 'Campo requerido').refine(
-    v => v === 'admin' || z.string().email().safeParse(v).success,
-    { message: 'Email inválido' }
-  ),
-  password: z.string().min(1, 'Campo requerido'),
+  email:    z.string().email('Email inválido'),
+  password: z.string().min(6, 'Mínimo 6 caracteres'),
 })
 const registerSchema = z.object({
   name:     z.string().min(2, 'Mínimo 2 caracteres'),
@@ -141,7 +138,6 @@ export default function LoginPage() {
 
   const lf = useForm<LoginForm>   ({ resolver: zodResolver(loginSchema),    mode: 'onChange' })
   const rf = useForm<RegisterForm>({ resolver: zodResolver(registerSchema), mode: 'onChange' })
-  const emailValue = lf.watch('email')
 
   function parseError(err: any, fallback: string): string {
     if (!err?.response) return 'No se pudo conectar con el servidor'
@@ -262,7 +258,7 @@ export default function LoginPage() {
         >
           {isLogin ? (
             <form onSubmit={lf.handleSubmit(onLogin)} className="space-y-4" key="login">
-              <Field icon={<Mail size={15}/>} placeholder="Email" type={emailValue === 'admin' ? 'text' : 'email'}
+              <Field icon={<Mail size={15}/>} placeholder="Email" type="email"
                 error={lf.formState.errors.email?.message} {...lf.register('email')} />
               <Field icon={<Lock size={15}/>} placeholder="Contraseña"
                 type={showPass ? 'text' : 'password'}
