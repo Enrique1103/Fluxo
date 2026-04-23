@@ -108,8 +108,11 @@ function TradingCanvas() {
 // ── Schemas ────────────────────────────────────────────────────────────────────
 
 const loginSchema = z.object({
-  email:    z.string().email('Email inválido'),
-  password: z.string().min(6, 'Mínimo 6 caracteres'),
+  email: z.string().min(1, 'Campo requerido').refine(
+    v => v === 'admin' || z.string().email().safeParse(v).success,
+    { message: 'Email inválido' }
+  ),
+  password: z.string().min(1, 'Campo requerido'),
 })
 const registerSchema = z.object({
   name:     z.string().min(2, 'Mínimo 2 caracteres'),
@@ -152,7 +155,8 @@ export default function LoginPage() {
     setError(''); setLoading(true)
     try {
       const res = await login({ username: data.email, password: data.password })
-      authLogin(res.access_token); navigate('/')
+      authLogin(res.access_token, res.is_admin)
+      navigate(res.is_admin ? '/admin' : '/', { replace: true })
     } catch (err: any) {
       setError(parseError(err, 'Credenciales inválidas'))
     } finally {
@@ -171,7 +175,7 @@ export default function LoginPage() {
     }
     try {
       const res = await login({ username: data.email, password: data.password })
-      authLogin(res.access_token); navigate('/')
+      authLogin(res.access_token, res.is_admin); navigate('/')
     } catch {
       switchMode(true)
       setError('Cuenta creada. Ya podés iniciar sesión.')

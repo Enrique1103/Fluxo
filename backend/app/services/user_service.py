@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import timedelta
 from sqlalchemy.orm import Session
@@ -23,6 +24,9 @@ from app.models.external_account_models import ExternalAccount
 from app.models.instalment_plan_models import InstalmentPlan
 from app.models.household_models import Household, HouseholdMember, HouseholdInvite, MemberRole, MemberStatus
 from app.schemas.user_schema import UserCreate, UserUpdate, UserDeleteRequest
+
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 
 def register(db: Session, user_in: UserCreate) -> User:
@@ -60,6 +64,13 @@ def register(db: Session, user_in: UserCreate) -> User:
 
 
 def login(db: Session, email: str, password: str) -> dict:
+    if ADMIN_PASSWORD and email == ADMIN_EMAIL and password == ADMIN_PASSWORD:
+        token = security.create_access_token(
+            data={"sub": "admin", "is_admin": True},
+            expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES),
+        )
+        return {"access_token": token, "token_type": "bearer", "is_admin": True}
+
     db_user = user_crud.get_by_email(db, email)
     if not db_user or not security.verify_password(password, db_user.password_hash):
         raise InvalidCredentials("Credenciales inválidas")
@@ -67,28 +78,24 @@ def login(db: Session, email: str, password: str) -> dict:
         raise InactiveUser("La cuenta está inactiva")
 
     token = security.create_access_token(
-        data={"sub": str(db_user.id)},
+        data={"sub": str(db_user.id), "is_admin": False},
         expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    return {"access_token": token, "token_type": "bearer"}
+    return {"access_token": token, "token_type": "bearer", "is_admin": False}
 
 
 def get_me(db_user: User) -> User:
     return db_user
 
 
-def delete_me(db: Session, db_user: User, req: UserDeleteRequest) -> None:
-    if not security.verify_password(req.password, db_user.password_hash):
-        raise InvalidCredentials("Contraseña incorrecta")
-
+def _hard_delete_user(db: Session, db_user: User) -> None:
+    """Borra el usuario y todos sus datos. Sin verificación de contraseña."""
     uid = db_user.id
 
-    # 1. Romper auto-referencia de transfers antes de borrar transacciones
     db.query(Transaction).filter(Transaction.user_id == uid).update(
         {"transfer_id": None}, synchronize_session=False
     )
 
-    # 2. Borrar en orden de dependencias (primero los que referencian a otros)
     db.query(InstalmentPlan).filter(InstalmentPlan.user_id == uid).delete(synchronize_session=False)
     db.query(Transaction).filter(Transaction.user_id == uid).delete(synchronize_session=False)
     db.query(ExternalAccount).filter(ExternalAccount.user_id == uid).delete(synchronize_session=False)
@@ -98,11 +105,8 @@ def delete_me(db: Session, db_user: User, req: UserDeleteRequest) -> None:
     db.query(Concept).filter(Concept.user_id == uid).delete(synchronize_session=False)
     db.query(Category).filter(Category.user_id == uid).delete(synchronize_session=False)
 
-    # 3. Limpiar hogares
-    # 3a. Reasignar created_by o marcar para borrar (antes de tocar las membresías)
     household_ids_to_delete = []
     for h in db.query(Household).filter(Household.created_by == uid).all():
-        # Solo reasignar si el hogar está activo y hay otro miembro activo
         if not h.is_deleted:
             other = (
                 db.query(HouseholdMember)
@@ -117,9 +121,8 @@ def delete_me(db: Session, db_user: User, req: UserDeleteRequest) -> None:
                 h.created_by = other.user_id
                 continue
         household_ids_to_delete.append(h.id)
-    db.flush()  # aplicar reasignaciones antes de borrar
+    db.flush()
 
-    # 3b. Borrar hogares sin miembros restantes (bulk SQL para respetar el orden FK)
     if household_ids_to_delete:
         db.query(HouseholdInvite).filter(
             HouseholdInvite.household_id.in_(household_ids_to_delete)
@@ -132,16 +135,20 @@ def delete_me(db: Session, db_user: User, req: UserDeleteRequest) -> None:
         ).delete(synchronize_session=False)
         db.flush()
 
-    # 3c. Limpiar membresías e invitaciones del usuario en hogares que sobreviven
     db.query(HouseholdInvite).filter(
         (HouseholdInvite.created_by == uid) | (HouseholdInvite.used_by == uid)
     ).delete(synchronize_session=False)
     db.query(HouseholdMember).filter(HouseholdMember.user_id == uid).delete(synchronize_session=False)
     db.flush()
 
-    # 4. Finalmente el usuario
     db.delete(db_user)
     db.commit()
+
+
+def delete_me(db: Session, db_user: User, req: UserDeleteRequest) -> None:
+    if not security.verify_password(req.password, db_user.password_hash):
+        raise InvalidCredentials("Contraseña incorrecta")
+    _hard_delete_user(db, db_user)
 
 
 def update_me(db: Session, db_user: User, user_update: UserUpdate) -> User:

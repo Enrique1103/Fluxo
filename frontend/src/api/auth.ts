@@ -14,6 +14,7 @@ export interface RegisterPayload {
 export interface TokenResponse {
   access_token: string
   token_type: string
+  is_admin: boolean
 }
 
 export const login = async (payload: LoginPayload): Promise<TokenResponse> => {

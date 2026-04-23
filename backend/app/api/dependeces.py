@@ -20,12 +20,13 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Rechazar tokens revocados (logout)
     if revoked_token_crud.is_revoked(db, token):
         raise credentials_exception
 
     try:
         payload = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+        if payload.get("is_admin"):
+            raise credentials_exception
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
@@ -43,3 +44,12 @@ def get_current_user(
         )
 
     return user
+
+
+def require_admin(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+        if not payload.get("is_admin"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso solo para administradores")
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")

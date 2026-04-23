@@ -5,6 +5,7 @@ from sqlalchemy import text
 from app.core.database import get_db
 
 from app.api.routers import (
+    admin_router,
     analytics_router,
     auth_router,
     users_router,
@@ -318,6 +319,7 @@ async def handle_instalment_plan_tx_edit(r: Request, exc: InstalmentPlanTransact
 
 API_PREFIX = "/api/v1"
 
+app.include_router(admin_router.router, prefix=API_PREFIX)
 app.include_router(analytics_router.router, prefix=API_PREFIX)
 app.include_router(auth_router.router, prefix=API_PREFIX)
 app.include_router(users_router.router, prefix=API_PREFIX)
