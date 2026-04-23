@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Users, Trash2, TrendingUp, LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getUsers, deleteUser, AdminUser } from '../api/admin'
+import { getUsers, deleteUser } from '../api/admin'
+import type { AdminUser } from '../api/admin'
 import { useAuthStore } from '../store/authStore'
 
 export default function AdminPage() {
