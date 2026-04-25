@@ -57,10 +57,17 @@ def update(db: Session, user: User, account_id: uuid.UUID, update_data: AccountU
         if account_crud.get_by_name_and_user(db, update_data.name, user.id):
             raise AccountAlreadyExists("Ya existe una cuenta con ese nombre")
 
+    has_txns = transaction_crud.has_active_for_account(db, account.id)
+
     changing_structural = update_data.type is not None or update_data.currency is not None
-    if changing_structural and transaction_crud.has_active_for_account(db, account.id):
+    if changing_structural and has_txns:
         raise AccountHasTransactions(
             "No se puede cambiar el tipo o moneda de una cuenta con movimientos registrados"
+        )
+
+    if update_data.balance is not None and has_txns:
+        raise AccountHasTransactions(
+            "No se puede modificar el saldo de una cuenta con movimientos registrados"
         )
 
     # Si cambia a un tipo que no es crédito, limpiar credit_limit

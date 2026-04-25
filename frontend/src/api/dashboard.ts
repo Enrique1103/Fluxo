@@ -270,7 +270,7 @@ export const deleteUserAccount = async (password: string): Promise<void> => {
 }
 
 // --- Account management ---
-export const updateAccount = async (id: string, payload: { name?: string; type?: string; currency?: string; credit_limit?: number }): Promise<Account> => {
+export const updateAccount = async (id: string, payload: { name?: string; type?: string; currency?: string; credit_limit?: number; balance?: number }): Promise<Account> => {
   const { data } = await client.patch<Account>(`/v1/accounts/${id}`, payload)
   return data
 }

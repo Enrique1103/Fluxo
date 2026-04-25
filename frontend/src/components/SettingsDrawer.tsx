@@ -396,6 +396,7 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
   const [editAcctType,    setEditAcctType]    = useState('')
   const [editAcctCurrency, setEditAcctCurrency] = useState('')
   const [editAcctLimit,   setEditAcctLimit]   = useState('')
+  const [editAcctBalance, setEditAcctBalance] = useState('')
   const [acctStatus,      setAcctStatus]      = useState<Status>(null)
   const [savingAcct,      setSavingAcct]      = useState(false)
   const [deletingAcct,    setDeletingAcct]    = useState<string | null>(null)
@@ -407,6 +408,7 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
     setEditAcctType(acct.type)
     setEditAcctCurrency(acct.currency)
     setEditAcctLimit(acct.credit_limit != null ? String(acct.credit_limit) : '')
+    setEditAcctBalance(String(acct.balance))
     setAcctStatus(null)
   }
 
@@ -414,10 +416,12 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
     if (!editAcctName.trim()) return
     setSavingAcct(true); setAcctStatus(null)
     try {
-      const payload: { name?: string; type?: string; currency?: string; credit_limit?: number } = { name: editAcctName.trim() }
+      const payload: { name?: string; type?: string; currency?: string; credit_limit?: number; balance?: number } = { name: editAcctName.trim() }
       if (!acct.has_transactions) {
         if (editAcctType !== acct.type) payload.type = editAcctType
         if (editAcctCurrency !== acct.currency) payload.currency = editAcctCurrency
+        const newBalance = parseFloat(editAcctBalance)
+        if (!isNaN(newBalance) && newBalance !== acct.balance) payload.balance = newBalance
       }
       const effectiveType = !acct.has_transactions ? editAcctType : acct.type
       if (effectiveType === 'credit' && editAcctLimit) payload.credit_limit = parseFloat(editAcctLimit)
@@ -500,6 +504,15 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
                       <option value="EUR">EUR</option>
                     </select>
                   </div>
+                )}
+                {!acct.has_transactions && (
+                  <input
+                    type="number"
+                    value={editAcctBalance}
+                    onChange={e => setEditAcctBalance(e.target.value)}
+                    placeholder="Saldo inicial"
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/60"
+                  />
                 )}
                 {((!acct.has_transactions && editAcctType === 'credit') || (acct.has_transactions && acct.type === 'credit')) && (
                   <input

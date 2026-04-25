@@ -43,6 +43,7 @@ class AccountUpdate(BaseModel):
     type: AccountType | None = None
     currency: CurrencyCode | None = None
     credit_limit: Decimal | None = Field(None, gt=0)
+    balance: Decimal | None = None
 
 
 # --- Respuesta al frontend ---

@@ -52,6 +52,8 @@ def update(db: Session, db_account: Account, update_data: AccountUpdate) -> Acco
         db_account.currency = update_data.currency
     if update_data.credit_limit is not None:
         db_account.credit_limit = update_data.credit_limit
+    if update_data.balance is not None:
+        db_account.balance = update_data.balance
     db.flush()
     return db_account
 
