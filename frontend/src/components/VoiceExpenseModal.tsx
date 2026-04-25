@@ -55,7 +55,9 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState('')
 
-  const recRef = useRef<any>(null)
+  const recRef        = useRef<any>(null)
+  const lastInterimRef = useRef('')
+  const appliedRef     = useRef(false)
 
   // Default household when available
   useEffect(() => {
@@ -90,24 +92,36 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     rec.interimResults = true
     recRef.current = rec
 
-    rec.onstart  = () => setListening(true)
-    rec.onend    = () => setListening(false)
-    rec.onerror  = (e: any) => {
-      setListening(false)
-      if (e.error !== 'no-speech') setSpeechError('No se pudo iniciar el micrófono')
-    }
+    lastInterimRef.current = ''
+    appliedRef.current     = false
+
+    rec.onstart = () => setListening(true)
 
     rec.onresult = (e: any) => {
       let final = '', inter = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript
-        e.results[i].isFinal ? (final += t) : (inter += t)
+        const txt = e.results[i][0].transcript
+        e.results[i].isFinal ? (final += txt) : (inter += txt)
       }
-      setInterim(inter)
+      if (inter) { lastInterimRef.current = inter; setInterim(inter) }
       if (final) {
+        appliedRef.current = true
         rec.stop()
         applyTranscript(final.trim())
       }
+    }
+
+    // Fallback: en mobile Chrome el isFinal a veces no llega — usamos el último interim
+    rec.onend = () => {
+      setListening(false)
+      if (!appliedRef.current && lastInterimRef.current.trim()) {
+        applyTranscript(lastInterimRef.current.trim())
+      }
+    }
+
+    rec.onerror = (e: any) => {
+      setListening(false)
+      if (e.error !== 'no-speech') setSpeechError('No se pudo iniciar el micrófono')
     }
 
     rec.start()
@@ -131,8 +145,14 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       setUnmatchedConcept(parsed.conceptName)
     }
 
+    // Limpiar accountName: sacar artículos y palabras genéricas antes del fuzzy match
+    const cleanedAccountName = parsed.accountName
+      ?.replace(/\b(la|el|mi|un|una|de|del|tarjeta|cuenta|credito|debito|credit|debit)\b/gi, '')
+      ?.replace(/\s+/g, ' ')
+      ?.trim() || parsed.accountName
+
     // Account fuzzy match
-    const matchedAccount = fuzzyMatch(parsed.accountName, accounts as { name: string; id: string }[])
+    const matchedAccount = fuzzyMatch(cleanedAccountName, accounts as { name: string; id: string }[])
     if (matchedAccount) {
       setAccountId(matchedAccount.id)
       setUnmatchedAccount(null)

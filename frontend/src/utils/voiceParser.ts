@@ -78,9 +78,9 @@ export function parseVoiceExpense(transcript: string): ParsedVoice {
   const isHousehold = /del hogar|para el hogar|\bhogar\b|compartido/.test(t)
   t = t.replace(/del hogar|para el hogar|\bhogar\b|compartido/g, '').replace(/\s+/g, ' ').trim()
 
-  // 2. Account: everything after "desde" (optionally "la/mi cuenta")
+  // 2. Account: everything after "desde" — consume artículos y palabras genéricas como prefijo
   let accountName: string | null = null
-  const acctMatch = t.match(/\bdesde\s+(?:(?:la|mi)\s+cuenta\s+)?(.+)$/)
+  const acctMatch = t.match(/\bdesde\s+(?:(?:la|el|mi)\s+(?:tarjeta|cuenta)(?:\s+de\s+(?:credito|debito))?\s+)?(.+)$/)
   if (acctMatch) {
     accountName = acctMatch[1].trim() || null
     t = t.slice(0, acctMatch.index!).replace(/\s+/g, ' ').trim()
