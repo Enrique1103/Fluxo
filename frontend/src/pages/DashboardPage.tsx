@@ -28,6 +28,7 @@ import SettingsDrawer, { type Section as SettingsSection } from '../components/S
 import GoalModal from '../components/GoalModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import TransactionModal from '../components/TransactionModal'
+import VoiceExpenseModal from '../components/VoiceExpenseModal'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -880,6 +881,7 @@ export default function DashboardPage() {
   const [goalModalOpen,    setGoalModalOpen]    = useState(false)
   const [editGoal,         setEditGoal]         = useState<FinGoal | undefined>(undefined)
   const [txModalOpen,      setTxModalOpen]      = useState(false)
+  const [voiceOpen,        setVoiceOpen]        = useState(false)
   const [confirmDeleteGoalId, setConfirmDeleteGoalId] = useState<string | null>(null)
   const [deletingGoalId,   setDeletingGoalId]   = useState<string | null>(null)
   const [monthsAhead,   setMonthsAhead]   = useState(24)
@@ -2034,6 +2036,13 @@ export default function DashboardPage() {
 
     {/* FAB — registrar movimiento */}
     <button
+      onClick={() => setVoiceOpen(true)}
+      title="Registrar con voz"
+      className="fixed bottom-24 right-6 z-30 w-11 h-11 bg-slate-800 hover:bg-slate-700 border border-slate-600 hover:border-emerald-500/50 text-emerald-400 rounded-2xl shadow-lg flex items-center justify-center transition-all active:scale-95 hover:scale-105"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+    </button>
+    <button
       onClick={() => setTxModalOpen(true)}
       className="fixed bottom-6 right-6 z-30 w-14 h-14 bg-gradient-to-br from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center transition-all active:scale-95"
       title="Registrar Movimiento"
@@ -2067,6 +2076,7 @@ export default function DashboardPage() {
       open={txModalOpen}
       onClose={() => setTxModalOpen(false)}
     />
+    <VoiceExpenseModal open={voiceOpen} onClose={() => setVoiceOpen(false)} />
     </>
   )
 }
