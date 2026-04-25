@@ -1,10 +1,12 @@
 export interface ParsedVoice {
   amount: number | null
   currency: 'UYU' | 'USD' | 'EUR' | null
-  conceptName: string | null
-  accountName: string | null
+  matchedAccountId: string | null
+  matchedConceptId: string | null
   isHousehold: boolean
   rawTranscript: string
+  spokenAccountText: string | null
+  spokenConceptText: string | null
 }
 
 const HUNDREDS: Record<string, number> = {
@@ -34,10 +36,19 @@ const ONES: Record<string, number> = {
   cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9,
 }
 
-function norm(text: string): string {
+// Words that should be excluded before entity scanning to avoid false matches
+const NUMBER_WORDS = new Set([
+  ...Object.keys(HUNDREDS),
+  ...Object.keys(TENS),
+  ...Object.keys(ONES),
+  'mil', 'y',
+])
+
+export function norm(text: string): string {
   return text
     .toLowerCase()
-    .replace(/[.,;:!?¿¡]/g, ' ')           // remove punctuation
+    .replace(/[$€£¥]/g, ' ')
+    .replace(/[.,;:!?¿¡]/g, ' ')
     .replace(/[áàä]/g, 'a').replace(/[éèë]/g, 'e')
     .replace(/[íìï]/g, 'i').replace(/[óòö]/g, 'o')
     .replace(/[úùü]/g, 'u').replace(/ñ/g, 'n')
@@ -63,94 +74,144 @@ function parseWrittenNumber(text: string): number | null {
     } else if (ONES[w] !== undefined) {
       found = true; current += ONES[w]
     }
-    // unknown word → stop consuming (don't return null yet, keep what we have)
   }
 
   total += current
   return found && total > 0 ? total : null
 }
 
-export function parseVoiceExpense(transcript: string): ParsedVoice {
+// Returns 0–4: 0=no match, 1=word overlap, 2=substring, 3=prefix, 4=exact
+function matchScore(query: string, target: string): number {
+  const q = norm(query)
+  const t = norm(target)
+  if (!q || q.length < 2) return 0
+  if (q === t) return 4
+  if (t.startsWith(q) || q.startsWith(t)) return 3
+  if (t.includes(q) || q.includes(t)) return 2
+  const qw = q.split(' ').filter(w => w.length > 2)
+  const tw = t.split(' ')
+  if (qw.length > 0 && qw.some(qwi => tw.some(twi => twi.includes(qwi) || qwi.includes(twi)))) return 1
+  return 0
+}
+
+interface EntityMatch<T> {
+  entity: T
+  startIdx: number
+  endIdx: number
+  score: number
+}
+
+function findBestEntity<T extends { id: string; name: string }>(
+  words: string[],
+  entities: T[],
+  maxN = 4,
+  minScore = 2,
+): EntityMatch<T> | null {
+  let best: EntityMatch<T> | null = null
+
+  for (let n = Math.min(maxN, words.length); n >= 1; n--) {
+    for (let i = 0; i <= words.length - n; i++) {
+      const ngram = words.slice(i, i + n).join(' ')
+      for (const entity of entities) {
+        const score = matchScore(ngram, entity.name)
+        if (score < minScore) continue
+        const span = n
+        const bestSpan = best ? best.endIdx - best.startIdx : 0
+        if (!best || span > bestSpan || (span === bestSpan && score > best.score)) {
+          best = { entity, startIdx: i, endIdx: i + n, score }
+        }
+      }
+    }
+  }
+  return best
+}
+
+// Strips number words and trigger verbs so they don't accidentally match entity names
+function prepareForEntityScan(normalized: string): string[] {
+  return normalized
+    .split(' ')
+    .filter(w =>
+      w.length >= 2 &&
+      !NUMBER_WORDS.has(w) &&
+      !/^(gaste|gasto|pague|pago|compre|cobre|recibi|desde|hasta|para|con)$/.test(w)
+    )
+}
+
+export function parseVoiceExpense(
+  transcript: string,
+  accounts: { id: string; name: string; currency: string }[],
+  concepts: { id: string; name: string }[],
+): ParsedVoice {
   const rawTranscript = transcript
   let t = norm(transcript)
 
-  // 1. Household keyword (anywhere in phrase)
+  // 1. Household flag
   const isHousehold = /del hogar|para el hogar|\bhogar\b|compartido/.test(t)
   t = t.replace(/del hogar|para el hogar|\bhogar\b|compartido/g, '').replace(/\s+/g, ' ').trim()
 
-  // 2. Account: everything after "desde" — consume artículos y palabras genéricas como prefijo
-  let accountName: string | null = null
-  const acctMatch = t.match(/\bdesde\s+(?:(?:la|el|mi)\s+(?:tarjeta|cuenta)(?:\s+de\s+(?:credito|debito))?\s+)?(.+)$/)
-  if (acctMatch) {
-    accountName = acctMatch[1].trim() || null
-    t = t.slice(0, acctMatch.index!).replace(/\s+/g, ' ').trim()
-  }
-
-  // 3. Currency (before removing words, so we can detect it)
-  let currency: 'UYU' | 'USD' | 'EUR' | null = null
-  if (/\bdolar(?:es)?\b|\busd\b/.test(t))    currency = 'USD'
-  else if (/\beuro(?:s)?\b|\beur\b/.test(t)) currency = 'EUR'
-  else if (/\bpeso(?:s)?\b|\buyu\b/.test(t)) currency = 'UYU'
-  t = t.replace(/\b(pesos?|dolares?|dolar|euros?|uyu|usd|eur)\b/g, '').replace(/\s+/g, ' ').trim()
-
-  // 4. Amount: digit number first (scan the whole remaining string)
+  // 2. Amount — extract from normalized text before entity scanning
   let amount: number | null = null
   const digitMatch = t.match(/\d+(?:[.,]\d+)?/)
   if (digitMatch) {
     amount = parseFloat(digitMatch[0].replace(',', '.'))
     t = t.replace(digitMatch[0], '').replace(/\s+/g, ' ').trim()
   } else {
-    // Written number: grab the segment before the first prep keyword "en/de/para"
-    const noTrigger = t
-      .replace(/^(?:gaste|gasto|pague|pago|compre|cobre|recibi|cobré|recibí)\s+/i, '')
-      .trim()
+    const noTrigger = t.replace(/\b(gaste|gasto|pague|pago|compre|cobre|recibi)\b/gi, '').trim()
     const prepIdx = noTrigger.search(/\b(?:en|de|para)\b/)
     const candidate = prepIdx >= 0 ? noTrigger.slice(0, prepIdx).trim() : noTrigger
-    if (candidate) {
-      amount = parseWrittenNumber(candidate)
-      if (amount !== null) {
-        t = t.replace(candidate, '').replace(/\s+/g, ' ').trim()
-      }
+    if (candidate) amount = parseWrittenNumber(candidate)
+  }
+
+  // 3. Currency from voice keywords (overridden later if account is matched)
+  let voiceCurrency: 'UYU' | 'USD' | 'EUR' | null = null
+  if (/\bdolar(?:es)?\b|\busd\b/.test(t))    voiceCurrency = 'USD'
+  else if (/\beuro(?:s)?\b|\beur\b/.test(t)) voiceCurrency = 'EUR'
+  else if (/\bpeso(?:s)?\b|\buyu\b/.test(t)) voiceCurrency = 'UYU'
+  // Remove currency words so they don't interfere with entity scanning
+  t = t.replace(/\b(pesos?|dolares?|dolar|euros?|uyu|usd|eur)\b/g, '').replace(/\s+/g, ' ').trim()
+
+  // 4. Entity scanning — scan words stripped of numbers/triggers/currency
+  const scanWords = prepareForEntityScan(t)
+
+  let matchedAccountId: string | null = null
+  let spokenAccountText: string | null = null
+  let currency: 'UYU' | 'USD' | 'EUR' | null = voiceCurrency
+  const usedIndices = new Set<number>()
+
+  if (accounts.length > 0) {
+    const acctResult = findBestEntity(scanWords, accounts, 4, 2)
+    if (acctResult) {
+      matchedAccountId = acctResult.entity.id
+      spokenAccountText = scanWords.slice(acctResult.startIdx, acctResult.endIdx).join(' ')
+      // Account currency always wins over voice keyword currency
+      const c = acctResult.entity.currency?.toUpperCase()
+      if (c === 'USD') currency = 'USD'
+      else if (c === 'EUR') currency = 'EUR'
+      else if (c === 'UYU') currency = 'UYU'
+      for (let i = acctResult.startIdx; i < acctResult.endIdx; i++) usedIndices.add(i)
     }
   }
 
-  // 5. Concept: after first "en"/"de"/"para"
-  let conceptName: string | null = null
-  const prepMatch =
-    t.match(/\ben\s+(.+?)$/) ||
-    t.match(/\bde\s+(.+?)$/) ||
-    t.match(/\bpara\s+(.+?)$/)
-  if (prepMatch) {
-    conceptName = prepMatch[1].trim() || null
-  } else {
-    const leftover = t
-      .replace(/^(?:gaste|gasto|pague|pago|compre|cobre|recibi)\s*/i, '')
-      .trim()
-    if (leftover.length > 1) conceptName = leftover
+  let matchedConceptId: string | null = null
+  let spokenConceptText: string | null = null
+
+  if (concepts.length > 0) {
+    const remainingWords = scanWords.filter((_, i) => !usedIndices.has(i))
+    const conceptResult = findBestEntity(remainingWords, concepts, 4, 2)
+    if (conceptResult) {
+      matchedConceptId = conceptResult.entity.id
+      spokenConceptText = remainingWords.slice(conceptResult.startIdx, conceptResult.endIdx).join(' ')
+    }
   }
 
-  return { amount, currency, conceptName, accountName, isHousehold, rawTranscript }
-}
-
-export function fuzzyMatch<T extends { name: string; id: string }>(
-  query: string | null,
-  items: T[],
-): T | null {
-  if (!query || items.length === 0) return null
-  const q = norm(query.trim())
-
-  const exact = items.find(i => norm(i.name) === q)
-  if (exact) return exact
-
-  const starts = items.find(i => norm(i.name).startsWith(q) || q.startsWith(norm(i.name)))
-  if (starts) return starts
-
-  const contains = items.find(i => norm(i.name).includes(q) || q.includes(norm(i.name)))
-  if (contains) return contains
-
-  const qWords = q.split(' ').filter(w => w.length > 2)
-  return items.find(i => {
-    const nWords = norm(i.name).split(' ')
-    return qWords.some(qw => nWords.some(nw => nw.includes(qw) || qw.includes(nw)))
-  }) ?? null
+  return {
+    amount,
+    currency,
+    matchedAccountId,
+    matchedConceptId,
+    isHousehold,
+    rawTranscript,
+    spokenAccountText,
+    spokenConceptText,
+  }
 }

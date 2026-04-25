@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Mic, X, Home, AlertCircle, Loader2, RotateCcw } from 'lucide-react'
-import { parseVoiceExpense, fuzzyMatch } from '../utils/voiceParser'
+import { parseVoiceExpense } from '../utils/voiceParser'
 import { fetchAccounts, fetchCategories, fetchConcepts, createTransaction } from '../api/dashboard'
 import { fetchHouseholds } from '../api/households'
 import { invalidateFinancialData } from '../lib/queryClient'
@@ -129,41 +129,34 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
 
   function applyTranscript(transcript: string) {
     setRawText(transcript)
-    const parsed = parseVoiceExpense(transcript)
+    const parsed = parseVoiceExpense(
+      transcript,
+      accounts as { id: string; name: string; currency: string }[],
+      concepts as { id: string; name: string }[],
+    )
 
     if (parsed.amount !== null) setAmount(String(parsed.amount))
     if (parsed.currency)        setCurrency(parsed.currency)
     setIsHousehold(parsed.isHousehold)
 
-    // Concept fuzzy match
-    const matchedConcept = fuzzyMatch(parsed.conceptName, concepts as { name: string; id: string }[])
-    if (matchedConcept) {
-      setConceptId(matchedConcept.id)
+    if (parsed.matchedConceptId) {
+      setConceptId(parsed.matchedConceptId)
       setUnmatchedConcept(null)
-    } else if (parsed.conceptName) {
+    } else if (parsed.spokenConceptText) {
       setConceptId('')
-      setUnmatchedConcept(parsed.conceptName)
+      setUnmatchedConcept(parsed.spokenConceptText)
     }
 
-    // Limpiar accountName: sacar artículos y palabras genéricas antes del fuzzy match
-    const cleanedAccountName = parsed.accountName
-      ?.replace(/\b(la|el|mi|un|una|de|del|tarjeta|cuenta|credito|debito|credit|debit)\b/gi, '')
-      ?.replace(/\s+/g, ' ')
-      ?.trim() || parsed.accountName
-
-    // Account fuzzy match
-    const matchedAccount = fuzzyMatch(cleanedAccountName, accounts as { name: string; id: string }[])
-    if (matchedAccount) {
-      setAccountId(matchedAccount.id)
+    if (parsed.matchedAccountId) {
+      setAccountId(parsed.matchedAccountId)
       setUnmatchedAccount(null)
-    } else if (parsed.accountName) {
+    } else if (parsed.spokenAccountText) {
       setAccountId(accounts[0]?.id ?? '')
-      setUnmatchedAccount(parsed.accountName)
+      setUnmatchedAccount(parsed.spokenAccountText)
     } else {
       setAccountId(accounts[0]?.id ?? '')
     }
 
-    setDescription(parsed.conceptName ?? '')
     setPhase('review')
   }
 
