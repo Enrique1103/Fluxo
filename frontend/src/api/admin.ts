@@ -46,6 +46,10 @@ export const toggleUserActive = async (userId: string): Promise<{ id: string; is
   return data
 }
 
+export const resetPassword = async (userId: string, newPassword: string): Promise<void> => {
+  await client.post(`/v1/admin/users/${userId}/reset-password`, { new_password: newPassword })
+}
+
 export const deleteUser = async (userId: string): Promise<void> => {
   await client.delete(`/v1/admin/users/${userId}`)
 }

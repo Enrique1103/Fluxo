@@ -147,6 +147,14 @@ def toggle_active(db: Session, user_id: str) -> dict:
     return {"id": str(db_user.id), "is_active": db_user.is_active}
 
 
+def reset_password(db: Session, user_id: str, new_password: str) -> None:
+    from app.core import security
+    uid = _to_uid(user_id)
+    db_user = _get_user(db, uid)
+    db_user.password_hash = security.hash_password(new_password)
+    db.commit()
+
+
 def delete_user(db: Session, user_id: str) -> None:
     uid = _to_uid(user_id)
     db_user = _get_user(db, uid)

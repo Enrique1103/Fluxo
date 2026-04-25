@@ -3,12 +3,32 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users, Trash2, TrendingUp, LogOut, Search, X,
   ToggleLeft, ToggleRight, ChevronRight,
-  UserPlus, Activity, BarChart2,
+  UserPlus, Activity, BarChart2, Download, KeyRound, Check,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getUsers, getStats, getUserDetail, toggleUserActive, deleteUser } from '../api/admin'
+import { getUsers, getStats, getUserDetail, toggleUserActive, resetPassword, deleteUser } from '../api/admin'
 import type { AdminUser } from '../api/admin'
 import { useAuthStore } from '../store/authStore'
+
+function exportCSV(users: AdminUser[]) {
+  const headers = ['Nombre', 'Email', 'Registro', 'Última actividad', 'Transacciones', 'Estado']
+  const rows = users.map(u => [
+    `"${u.name}"`,
+    u.email,
+    new Date(u.created_at).toLocaleDateString('es-UY'),
+    u.last_activity ? new Date(u.last_activity).toLocaleDateString('es-UY') : 'Sin actividad',
+    u.tx_count,
+    u.is_active ? 'Activo' : 'Inactivo',
+  ])
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
+  const blob = new Blob(['﻿' + csv, ''], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `fluxo-usuarios-${new Date().toISOString().split('T')[0]}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 type Filter = 'all' | 'active' | 'inactive'
 
@@ -34,8 +54,26 @@ function BarChart({ data, color }: { data: { month: string; count: number }[]; c
 function DetailModal({ userId, onClose }: { userId: string; onClose: () => void }) {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-user-detail', userId],
-    queryFn: () => getUserDetail(userId),
+    queryFn:  () => getUserDetail(userId),
   })
+
+  const [showReset,   setShowReset]   = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [resetDone,   setResetDone]   = useState(false)
+  const [resetError,  setResetError]  = useState('')
+
+  const handleReset = async () => {
+    if (newPassword.length < 6) { setResetError('Mínimo 6 caracteres'); return }
+    setResetError('')
+    try {
+      await resetPassword(userId, newPassword)
+      setResetDone(true)
+      setNewPassword('')
+      setTimeout(() => { setResetDone(false); setShowReset(false) }, 2000)
+    } catch {
+      setResetError('No se pudo resetear la contraseña')
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -71,7 +109,7 @@ function DetailModal({ userId, onClose }: { userId: string; onClose: () => void 
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3 mb-5">
               {[
                 { label: 'Transacciones', value: data.tx_count },
                 { label: 'Cuentas',       value: data.account_count },
@@ -83,6 +121,44 @@ function DetailModal({ userId, onClose }: { userId: string; onClose: () => void 
                 </div>
               ))}
             </div>
+
+            {/* Reset password */}
+            {!showReset ? (
+              <button
+                onClick={() => setShowReset(true)}
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <KeyRound size={13} /> Resetear contraseña
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="Nueva contraseña (mín. 6 caracteres)"
+                  className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/60"
+                  autoFocus
+                />
+                {resetError && <p className="text-xs text-rose-400">{resetError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleReset}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                  >
+                    {resetDone ? <><Check size={13} /> Listo</> : <><KeyRound size={13} /> Confirmar</>}
+                  </button>
+                  <button
+                    onClick={() => { setShowReset(false); setNewPassword(''); setResetError('') }}
+                    className="px-4 py-2 rounded-xl text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                    style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -144,9 +220,19 @@ export default function AdminPage() {
             <p className="text-slate-500 text-xs">Gestión de usuarios</p>
           </div>
         </div>
-        <button onClick={handleLogout} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors">
-          <LogOut size={16} /> Salir
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => exportCSV(users)}
+            disabled={users.length === 0}
+            className="flex items-center gap-2 text-slate-400 hover:text-emerald-400 disabled:opacity-30 text-sm transition-colors"
+            title="Exportar CSV"
+          >
+            <Download size={16} /> CSV
+          </button>
+          <button onClick={handleLogout} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors">
+            <LogOut size={16} /> Salir
+          </button>
+        </div>
       </div>
 
       {/* Stats cards — row 1 */}

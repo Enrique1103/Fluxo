@@ -1,9 +1,14 @@
 from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.dependeces import require_admin
 from app.core.database import get_db
 from app.services import admin_service
+
+
+class ResetPasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=6)
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -34,6 +39,16 @@ def toggle_active(
     _: None = Depends(require_admin),
 ):
     return admin_service.toggle_active(db, user_id)
+
+
+@router.post("/users/{user_id}/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+def reset_password(
+    user_id: str,
+    body: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    admin_service.reset_password(db, user_id, body.new_password)
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
