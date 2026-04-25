@@ -36,12 +36,20 @@ const ONES: Record<string, number> = {
   cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9,
 }
 
-// Words that should be excluded before entity scanning to avoid false matches
+// Words excluded from entity scanning to avoid false matches
 const NUMBER_WORDS = new Set([
   ...Object.keys(HUNDREDS),
   ...Object.keys(TENS),
   ...Object.keys(ONES),
   'mil', 'y',
+])
+
+// Spanish function words that will never be entity names
+const STOPWORDS = new Set([
+  'de', 'del', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas',
+  'en', 'a', 'al', 'por', 'para', 'con', 'sin', 'sobre', 'ante', 'bajo',
+  'desde', 'hasta', 'mi', 'tu', 'su', 'nos', 'les', 'se', 'me', 'te',
+  'y', 'o', 'ni', 'que', 'si', 'como', 'mas', 'pero', 'tambien',
 ])
 
 export function norm(text: string): string {
@@ -84,7 +92,7 @@ function parseWrittenNumber(text: string): number | null {
 function matchScore(query: string, target: string): number {
   const q = norm(query)
   const t = norm(target)
-  if (!q || q.length < 2) return 0
+  if (!q || q.length < 3) return 0  // require at least 3 chars to avoid false matches
   if (q === t) return 4
   if (t.startsWith(q) || q.startsWith(t)) return 3
   if (t.includes(q) || q.includes(t)) return 2
@@ -126,14 +134,15 @@ function findBestEntity<T extends { id: string; name: string }>(
   return best
 }
 
-// Strips number words and trigger verbs so they don't accidentally match entity names
+// Strips number words, stopwords, and trigger verbs — leaves only content words
 function prepareForEntityScan(normalized: string): string[] {
   return normalized
     .split(' ')
     .filter(w =>
-      w.length >= 2 &&
+      w.length >= 3 &&
       !NUMBER_WORDS.has(w) &&
-      !/^(gaste|gasto|pague|pago|compre|cobre|recibi|desde|hasta|para|con)$/.test(w)
+      !STOPWORDS.has(w) &&
+      !/^(gaste|gasto|pague|pago|compre|cobre|recibi|cobro|cobrar)$/.test(w)
     )
 }
 
@@ -149,9 +158,10 @@ export function parseVoiceExpense(
   const isHousehold = /del hogar|para el hogar|\bhogar\b|compartido/.test(t)
   t = t.replace(/del hogar|para el hogar|\bhogar\b|compartido/g, '').replace(/\s+/g, ' ').trim()
 
-  // 2. Amount — extract from normalized text before entity scanning
+  // 2. Amount — scan normalized text first, then raw transcript as fallback
+  //    (raw fallback handles edge cases where special chars survive norm())
   let amount: number | null = null
-  const digitMatch = t.match(/\d+(?:[.,]\d+)?/)
+  const digitMatch = t.match(/\d+(?:[.,]\d+)?/) ?? rawTranscript.match(/\d+(?:[.,]\d+)?/)
   if (digitMatch) {
     amount = parseFloat(digitMatch[0].replace(',', '.'))
     t = t.replace(digitMatch[0], '').replace(/\s+/g, ' ').trim()
