@@ -34,16 +34,18 @@ const ONES: Record<string, number> = {
   cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9,
 }
 
-function normalize(text: string): string {
+function norm(text: string): string {
   return text
     .toLowerCase()
+    .replace(/[.,;:!?¿¡]/g, ' ')           // remove punctuation
     .replace(/[áàä]/g, 'a').replace(/[éèë]/g, 'e')
     .replace(/[íìï]/g, 'i').replace(/[óòö]/g, 'o')
     .replace(/[úùü]/g, 'u').replace(/ñ/g, 'n')
+    .replace(/\s+/g, ' ').trim()
 }
 
 function parseWrittenNumber(text: string): number | null {
-  const words = normalize(text).split(/\s+/)
+  const words = norm(text).split(' ').filter(Boolean)
   let total = 0
   let current = 0
   let found = false
@@ -61,6 +63,7 @@ function parseWrittenNumber(text: string): number | null {
     } else if (ONES[w] !== undefined) {
       found = true; current += ONES[w]
     }
+    // unknown word → stop consuming (don't return null yet, keep what we have)
   }
 
   total += current
@@ -69,52 +72,60 @@ function parseWrittenNumber(text: string): number | null {
 
 export function parseVoiceExpense(transcript: string): ParsedVoice {
   const rawTranscript = transcript
-  const text = normalize(transcript).trim()
+  let t = norm(transcript)
 
-  const isHousehold = /del hogar|para el hogar|\bhogar\b|compartido/.test(text)
-  let clean = text.replace(/del hogar|para el hogar|\bhogar\b|compartido/g, '').trim()
+  // 1. Household keyword (anywhere in phrase)
+  const isHousehold = /del hogar|para el hogar|\bhogar\b|compartido/.test(t)
+  t = t.replace(/del hogar|para el hogar|\bhogar\b|compartido/g, '').replace(/\s+/g, ' ').trim()
 
-  // Account: after "desde" (optionally "la/mi cuenta")
+  // 2. Account: everything after "desde" (optionally "la/mi cuenta")
   let accountName: string | null = null
-  const acctMatch = clean.match(/desde\s+(?:(?:la|mi)\s+cuenta\s+)?(.+)$/)
+  const acctMatch = t.match(/\bdesde\s+(?:(?:la|mi)\s+cuenta\s+)?(.+)$/)
   if (acctMatch) {
     accountName = acctMatch[1].trim() || null
-    clean = clean.slice(0, acctMatch.index!).trim()
+    t = t.slice(0, acctMatch.index!).replace(/\s+/g, ' ').trim()
   }
 
-  // Currency
+  // 3. Currency (before removing words, so we can detect it)
   let currency: 'UYU' | 'USD' | 'EUR' | null = null
-  if (/dolar(?:es)?|usd/.test(clean))   currency = 'USD'
-  else if (/euro(?:s)?|eur/.test(clean)) currency = 'EUR'
-  else if (/peso(?:s)?|uyu/.test(clean)) currency = 'UYU'
-  clean = clean.replace(/\b(pesos?|dolares?|dolar|euros?|uyu|usd|eur)\b/g, '').trim()
+  if (/\bdolar(?:es)?\b|\busd\b/.test(t))    currency = 'USD'
+  else if (/\beuro(?:s)?\b|\beur\b/.test(t)) currency = 'EUR'
+  else if (/\bpeso(?:s)?\b|\buyu\b/.test(t)) currency = 'UYU'
+  t = t.replace(/\b(pesos?|dolares?|dolar|euros?|uyu|usd|eur)\b/g, '').replace(/\s+/g, ' ').trim()
 
-  // Amount: digit first, then written
+  // 4. Amount: digit number first (scan the whole remaining string)
   let amount: number | null = null
-  const digitMatch = clean.match(/\d+(?:[.,]\d+)?/)
+  const digitMatch = t.match(/\d+(?:[.,]\d+)?/)
   if (digitMatch) {
     amount = parseFloat(digitMatch[0].replace(',', '.'))
-    clean = clean.replace(digitMatch[0], ' ').replace(/\s+/, ' ').trim()
+    t = t.replace(digitMatch[0], '').replace(/\s+/g, ' ').trim()
   } else {
-    const beforeEn = clean.split(/\ben\b/)[0]
-    const withoutTrigger = beforeEn.replace(/^(?:gaste|gasto|pague|pago|compre|gaste|cobre|cobré|recibi)\s*/i, '').trim()
-    amount = parseWrittenNumber(withoutTrigger)
-    if (amount !== null) {
-      clean = clean.replace(withoutTrigger, '').replace(/\s+/, ' ').trim()
+    // Written number: grab the segment before the first prep keyword "en/de/para"
+    const noTrigger = t
+      .replace(/^(?:gaste|gasto|pague|pago|compre|cobre|recibi|cobré|recibí)\s+/i, '')
+      .trim()
+    const prepIdx = noTrigger.search(/\b(?:en|de|para)\b/)
+    const candidate = prepIdx >= 0 ? noTrigger.slice(0, prepIdx).trim() : noTrigger
+    if (candidate) {
+      amount = parseWrittenNumber(candidate)
+      if (amount !== null) {
+        t = t.replace(candidate, '').replace(/\s+/g, ' ').trim()
+      }
     }
   }
 
-  // Concept: after "en" / "de" / "para"
+  // 5. Concept: after first "en"/"de"/"para"
   let conceptName: string | null = null
-  const conceptMatch =
-    clean.match(/\ben\s+(.+)$/) ||
-    clean.match(/\bde\s+(.+)$/) ||
-    clean.match(/\bpara\s+(.+)$/)
-  if (conceptMatch) {
-    conceptName = conceptMatch[1].trim() || null
+  const prepMatch =
+    t.match(/\ben\s+(.+?)$/) ||
+    t.match(/\bde\s+(.+?)$/) ||
+    t.match(/\bpara\s+(.+?)$/)
+  if (prepMatch) {
+    conceptName = prepMatch[1].trim() || null
   } else {
-    // Fallback: whatever remains after removing trigger word
-    const leftover = clean.replace(/^(?:gaste|gasto|pague|pago|compre|gaste|cobre|recibi)\s*/i, '').trim()
+    const leftover = t
+      .replace(/^(?:gaste|gasto|pague|pago|compre|cobre|recibi)\s*/i, '')
+      .trim()
     if (leftover.length > 1) conceptName = leftover
   }
 
@@ -126,20 +137,20 @@ export function fuzzyMatch<T extends { name: string; id: string }>(
   items: T[],
 ): T | null {
   if (!query || items.length === 0) return null
-  const q = normalize(query.trim())
+  const q = norm(query.trim())
 
-  const exact = items.find(i => normalize(i.name) === q)
+  const exact = items.find(i => norm(i.name) === q)
   if (exact) return exact
 
-  const starts = items.find(i => normalize(i.name).startsWith(q) || q.startsWith(normalize(i.name)))
+  const starts = items.find(i => norm(i.name).startsWith(q) || q.startsWith(norm(i.name)))
   if (starts) return starts
 
-  const contains = items.find(i => normalize(i.name).includes(q) || q.includes(normalize(i.name)))
+  const contains = items.find(i => norm(i.name).includes(q) || q.includes(norm(i.name)))
   if (contains) return contains
 
-  const qWords = q.split(/\s+/).filter(w => w.length > 2)
+  const qWords = q.split(' ').filter(w => w.length > 2)
   return items.find(i => {
-    const nWords = normalize(i.name).split(/\s+/)
+    const nWords = norm(i.name).split(' ')
     return qWords.some(qw => nWords.some(nw => nw.includes(qw) || qw.includes(nw)))
   }) ?? null
 }

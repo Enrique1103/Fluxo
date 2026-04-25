@@ -323,25 +323,23 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
               />
             </div>
 
-            {/* Household toggle */}
-            {households.length > 0 && (
-              <div
-                className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors"
-                style={{
-                  background: isHousehold ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${isHousehold ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.07)'}`,
-                }}
-                onClick={() => setIsHousehold(v => !v)}
-              >
-                <Home size={16} className={isHousehold ? 'text-indigo-400' : 'text-slate-500'} />
-                <span className={`text-sm flex-1 ${isHousehold ? 'text-indigo-300' : 'text-slate-400'}`}>
-                  ¿Del hogar?
-                </span>
-                <div className={`w-9 h-5 rounded-full transition-colors relative ${isHousehold ? 'bg-indigo-500' : 'bg-slate-700'}`}>
-                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isHousehold ? 'left-[18px]' : 'left-0.5'}`} />
-                </div>
+            {/* Household toggle — always visible */}
+            <div
+              className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors"
+              style={{
+                background: isHousehold ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${isHousehold ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.07)'}`,
+              }}
+              onClick={() => setIsHousehold(v => !v)}
+            >
+              <Home size={16} className={isHousehold ? 'text-indigo-400' : 'text-slate-500'} />
+              <span className={`text-sm flex-1 ${isHousehold ? 'text-indigo-300' : 'text-slate-400'}`}>
+                ¿Del hogar?
+              </span>
+              <div className={`w-9 h-5 rounded-full transition-colors relative ${isHousehold ? 'bg-indigo-500' : 'bg-slate-700'}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isHousehold ? 'left-[18px]' : 'left-0.5'}`} />
               </div>
-            )}
+            </div>
 
             {/* Household selector */}
             {isHousehold && households.length > 1 && (
