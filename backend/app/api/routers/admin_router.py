@@ -8,6 +8,11 @@ from app.services import admin_service
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
+@router.get("/stats")
+def get_stats(db: Session = Depends(get_db), _: None = Depends(require_admin)):
+    return admin_service.get_stats(db)
+
+
 @router.get("/users")
 def list_users(db: Session = Depends(get_db), _: None = Depends(require_admin)):
     return admin_service.list_users(db)

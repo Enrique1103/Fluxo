@@ -7,11 +7,28 @@ export interface AdminUser {
   created_at: string
   is_active: boolean
   tx_count: number
+  last_activity: string | null
 }
 
 export interface AdminUserDetail extends AdminUser {
   account_count: number
   category_count: number
+}
+
+export interface AdminStats {
+  total_users: number
+  active_users: number
+  inactive_users: number
+  new_users_30d: number
+  total_transactions: number
+  transactions_30d: number
+  users_by_month: { month: string; count: number }[]
+  transactions_by_month: { month: string; count: number }[]
+}
+
+export const getStats = async (): Promise<AdminStats> => {
+  const { data } = await client.get<AdminStats>('/v1/admin/stats')
+  return data
 }
 
 export const getUsers = async (): Promise<AdminUser[]> => {

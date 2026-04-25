@@ -1,13 +1,36 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Trash2, TrendingUp, LogOut, Search, X, ToggleLeft, ToggleRight, ChevronRight } from 'lucide-react'
+import {
+  Users, Trash2, TrendingUp, LogOut, Search, X,
+  ToggleLeft, ToggleRight, ChevronRight,
+  UserPlus, Activity, BarChart2,
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getUsers, getUserDetail, toggleUserActive, deleteUser } from '../api/admin'
+import { getUsers, getStats, getUserDetail, toggleUserActive, deleteUser } from '../api/admin'
 import type { AdminUser } from '../api/admin'
 import { useAuthStore } from '../store/authStore'
 
 type Filter = 'all' | 'active' | 'inactive'
 
+// ── Mini bar chart ────────────────────────────────────────────────────────────
+function BarChart({ data, color }: { data: { month: string; count: number }[]; color: string }) {
+  const max = Math.max(...data.map(d => d.count), 1)
+  return (
+    <div className="flex items-end gap-1.5 h-16">
+      {data.map(({ month, count }) => (
+        <div key={month} className="flex-1 flex flex-col items-center gap-1">
+          <div
+            className="w-full rounded-sm transition-all"
+            style={{ height: `${Math.max((count / max) * 52, count > 0 ? 4 : 2)}px`, background: color, opacity: count > 0 ? 1 : 0.2 }}
+          />
+          <span className="text-slate-500 text-[10px] leading-none">{month}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── User detail modal ─────────────────────────────────────────────────────────
 function DetailModal({ userId, onClose }: { userId: string; onClose: () => void }) {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-user-detail', userId],
@@ -41,13 +64,18 @@ function DetailModal({ userId, onClose }: { userId: string; onClose: () => void 
               <p className="text-slate-500 text-xs mt-1">
                 Registrado el {new Date(data.created_at).toLocaleDateString('es-UY', { day: '2-digit', month: 'long', year: 'numeric' })}
               </p>
+              {data.last_activity && (
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Última actividad: {new Date(data.last_activity).toLocaleDateString('es-UY', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-3">
               {[
                 { label: 'Transacciones', value: data.tx_count },
-                { label: 'Cuentas', value: data.account_count },
-                { label: 'Categorías', value: data.category_count },
+                { label: 'Cuentas',       value: data.account_count },
+                { label: 'Categorías',    value: data.category_count },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                   <p className="text-xl font-bold">{value}</p>
@@ -62,32 +90,27 @@ function DetailModal({ userId, onClose }: { userId: string; onClose: () => void 
   )
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const navigate = useNavigate()
-  const logout = useAuthStore((s) => s.logout)
-  const qc = useQueryClient()
+  const navigate  = useNavigate()
+  const logout    = useAuthStore((s) => s.logout)
+  const qc        = useQueryClient()
 
-  const [confirmId, setConfirmId]   = useState<string | null>(null)
-  const [detailId, setDetailId]     = useState<string | null>(null)
-  const [search, setSearch]         = useState('')
-  const [filter, setFilter]         = useState<Filter>('all')
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [detailId,  setDetailId]  = useState<string | null>(null)
+  const [search,    setSearch]    = useState('')
+  const [filter,    setFilter]    = useState<Filter>('all')
 
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: getUsers,
-  })
+  const { data: users = [], isLoading } = useQuery({ queryKey: ['admin-users'], queryFn: getUsers })
+  const { data: stats }                 = useQuery({ queryKey: ['admin-stats'], queryFn: getStats })
 
   const toggleMutation = useMutation({
     mutationFn: toggleUserActive,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   })
-
   const deleteMutation = useMutation({
     mutationFn: deleteUser,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-users'] })
-      setConfirmId(null)
-    },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); setConfirmId(null) },
   })
 
   const filtered = useMemo(() => {
@@ -102,9 +125,6 @@ export default function AdminPage() {
   }, [users, filter, search])
 
   const handleLogout = () => { logout(); navigate('/login', { replace: true }) }
-
-  const activeCount   = users.filter(u => u.is_active).length
-  const inactiveCount = users.filter(u => !u.is_active).length
 
   return (
     <div className="force-dark min-h-screen bg-[#020817] text-white p-6">
@@ -129,15 +149,16 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      {/* Stats cards — row 1 */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
         {[
-          { label: 'Total usuarios', value: users.length, icon: <Users size={18} className="text-emerald-400" />, color: 'emerald' },
-          { label: 'Activos',        value: activeCount,  icon: <ToggleRight size={18} className="text-sky-400" />,     color: 'sky' },
-          { label: 'Inactivos',      value: inactiveCount, icon: <ToggleLeft size={18} className="text-rose-400" />,   color: 'rose' },
-        ].map(({ label, value, icon, color }) => (
+          { label: 'Total usuarios',      value: stats?.total_users        ?? users.length, icon: <Users    size={17} className="text-emerald-400" />, accent: 'emerald' },
+          { label: 'Activos',             value: stats?.active_users       ?? users.filter(u=>u.is_active).length, icon: <ToggleRight size={17} className="text-sky-400" />,     accent: 'sky'     },
+          { label: 'Nuevos (30 días)',     value: stats?.new_users_30d      ?? '—',          icon: <UserPlus  size={17} className="text-violet-400" />, accent: 'violet'  },
+          { label: 'Transacciones (30d)', value: stats?.transactions_30d   ?? '—',          icon: <Activity  size={17} className="text-amber-400"  />, accent: 'amber'   },
+        ].map(({ label, value, icon, accent }) => (
           <div key={label} className="rounded-2xl p-4 flex items-center gap-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <div className={`w-9 h-9 rounded-xl bg-${color}-500/10 flex items-center justify-center shrink-0`}>{icon}</div>
+            <div className={`w-9 h-9 rounded-xl bg-${accent}-500/10 flex items-center justify-center shrink-0`}>{icon}</div>
             <div>
               <p className="text-xl font-bold leading-none">{value}</p>
               <p className="text-slate-500 text-xs mt-0.5">{label}</p>
@@ -145,6 +166,25 @@ export default function AdminPage() {
           </div>
         ))}
       </div>
+
+      {/* Charts row */}
+      {stats && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          {[
+            { title: 'Usuarios nuevos por mes',    data: stats.users_by_month,        color: 'rgba(52,211,153,0.7)',  icon: <Users   size={14} className="text-emerald-400" /> },
+            { title: 'Transacciones por mes',      data: stats.transactions_by_month, color: 'rgba(99,179,237,0.7)',  icon: <BarChart2 size={14} className="text-sky-400" />  },
+          ].map(({ title, data, color, icon }) => (
+            <div key={title} className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                {icon}
+                <span className="text-xs text-slate-400 font-medium">{title}</span>
+                <span className="ml-auto text-slate-500 text-xs">últimos 6 meses</span>
+              </div>
+              <BarChart data={data} color={color} />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Search + Filter */}
       <div className="flex gap-3 mb-4">
@@ -177,7 +217,7 @@ export default function AdminPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="rounded-2xl overflow-x-auto" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
         {isLoading ? (
           <div className="p-8 text-center text-slate-500">Cargando usuarios…</div>
         ) : filtered.length === 0 ? (
@@ -186,11 +226,12 @@ export default function AdminPage() {
           <table className="w-full text-sm">
             <thead style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
               <tr>
-                <th className="text-left px-5 py-3 text-slate-400 font-medium">Nombre</th>
-                <th className="text-left px-5 py-3 text-slate-400 font-medium">Email</th>
-                <th className="text-left px-5 py-3 text-slate-400 font-medium">Registro</th>
-                <th className="text-right px-5 py-3 text-slate-400 font-medium">Transacciones</th>
-                <th className="text-center px-5 py-3 text-slate-400 font-medium">Estado</th>
+                <th className="text-left px-5 py-3 text-slate-400 font-medium whitespace-nowrap">Nombre</th>
+                <th className="text-left px-5 py-3 text-slate-400 font-medium whitespace-nowrap">Email</th>
+                <th className="text-left px-5 py-3 text-slate-400 font-medium whitespace-nowrap">Registro</th>
+                <th className="text-left px-5 py-3 text-slate-400 font-medium whitespace-nowrap">Última actividad</th>
+                <th className="text-right px-5 py-3 text-slate-400 font-medium whitespace-nowrap">Transacciones</th>
+                <th className="text-center px-5 py-3 text-slate-400 font-medium whitespace-nowrap">Estado</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
@@ -203,15 +244,21 @@ export default function AdminPage() {
                   <td className="px-5 py-4">
                     <button
                       onClick={() => setDetailId(u.id)}
-                      className="flex items-center gap-1 font-medium hover:text-emerald-400 transition-colors group"
+                      className="flex items-center gap-1 font-medium hover:text-emerald-400 transition-colors group whitespace-nowrap"
                     >
                       {u.name}
                       <ChevronRight size={13} className="text-slate-600 group-hover:text-emerald-400 transition-colors" />
                     </button>
                   </td>
-                  <td className="px-5 py-4 text-slate-400">{u.email}</td>
-                  <td className="px-5 py-4 text-slate-400">
+                  <td className="px-5 py-4 text-slate-400 whitespace-nowrap">{u.email}</td>
+                  <td className="px-5 py-4 text-slate-400 whitespace-nowrap">
                     {new Date(u.created_at).toLocaleDateString('es-UY', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </td>
+                  <td className="px-5 py-4 whitespace-nowrap">
+                    {u.last_activity
+                      ? <span className="text-slate-300">{new Date(u.last_activity).toLocaleDateString('es-UY', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                      : <span className="text-slate-600 text-xs">Sin actividad</span>
+                    }
                   </td>
                   <td className="px-5 py-4 text-right text-slate-400">{u.tx_count}</td>
                   <td className="px-5 py-4 text-center">
@@ -223,11 +270,11 @@ export default function AdminPage() {
                     >
                       {u.is_active
                         ? <ToggleRight size={22} className="text-emerald-400 hover:text-emerald-300 transition-colors" />
-                        : <ToggleLeft size={22} className="text-slate-600 hover:text-slate-400 transition-colors" />
+                        : <ToggleLeft  size={22} className="text-slate-600 hover:text-slate-400 transition-colors" />
                       }
                     </button>
                   </td>
-                  <td className="px-5 py-4 text-right">
+                  <td className="px-5 py-4 text-right whitespace-nowrap">
                     {confirmId === u.id ? (
                       <div className="flex items-center justify-end gap-2">
                         <span className="text-xs text-slate-400">¿Confirmar?</span>
