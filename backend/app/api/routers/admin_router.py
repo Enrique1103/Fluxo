@@ -13,6 +13,24 @@ def list_users(db: Session = Depends(get_db), _: None = Depends(require_admin)):
     return admin_service.list_users(db)
 
 
+@router.get("/users/{user_id}")
+def get_user_detail(
+    user_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    return admin_service.get_user_detail(db, user_id)
+
+
+@router.patch("/users/{user_id}/toggle-active")
+def toggle_active(
+    user_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    return admin_service.toggle_active(db, user_id)
+
+
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     user_id: str,
