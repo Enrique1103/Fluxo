@@ -167,17 +167,20 @@ export function parseVoiceExpense(
   const isHousehold = /del hogar|para el hogar|\bhogar\b|compartido/.test(t)
   t = t.replace(/del hogar|para el hogar|\bhogar\b|compartido/g, '').replace(/\s+/g, ' ').trim()
 
-  // 2. Amount — strip everything except digits and decimal separators from raw transcript,
-  //    then take the first numeric token. This handles $100, US$100, "cien" fallback, etc.
+  // 2. Amount — scan each word in raw transcript, strip leading/trailing non-digit chars,
+  //    accept the first word that parses as a positive finite number.
+  //    Handles: $100, US$100, 100pesos, 1.500, 150,50, etc.
   let amount: number | null = null
-  const digitTokens = rawTranscript
-    .replace(/[^\d.,\s]/g, ' ')
-    .split(/\s+/)
-    .filter(s => /^\d+(?:[.,]\d+)?$/.test(s) && s.length > 0)
-
-  if (digitTokens.length > 0) {
-    amount = parseFloat(digitTokens[0].replace(',', '.'))
-    t = t.replace(digitTokens[0], '').replace(/\s+/g, ' ').trim()
+  let amountStr: string | null = null
+  for (const word of rawTranscript.split(/\s+/)) {
+    const cleaned = word.replace(/^[^\d]*/, '').replace(/[^\d.,]*$/, '')
+    if (/^\d+(?:[.,]\d+)?$/.test(cleaned)) {
+      const n = parseFloat(cleaned.replace(',', '.'))
+      if (isFinite(n) && n > 0) { amount = n; amountStr = cleaned; break }
+    }
+  }
+  if (amountStr) {
+    t = t.replace(amountStr, '').replace(/\s+/g, ' ').trim()
   } else {
     // Fallback: written Spanish number ("cien", "doscientos", etc.)
     const noTrigger = t.replace(/\b(gaste|gasto|pague|pago|compre|cobre|recibi)\b/gi, '').trim()

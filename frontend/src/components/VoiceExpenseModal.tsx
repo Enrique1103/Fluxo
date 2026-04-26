@@ -135,7 +135,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       concepts as { id: string; name: string }[],
     )
 
-    if (parsed.amount !== null) setAmount(String(parsed.amount))
+    if (parsed.amount !== null && !isNaN(parsed.amount)) setAmount(String(parsed.amount))
     if (parsed.currency)        setCurrency(parsed.currency)
     setIsHousehold(parsed.isHousehold)
 
@@ -272,7 +272,8 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
               <label className="text-xs text-slate-400 mb-1 block">Monto</label>
               <div className="flex gap-2">
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
                   placeholder="0"
