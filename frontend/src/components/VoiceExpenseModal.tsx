@@ -23,9 +23,17 @@ const isSpeechSupported = !!(
   (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
 )
 
-const selectCls = 'w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-emerald-500/60 transition-colors'
-const inputCls  = 'w-full border border-slate-700 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-emerald-500/60 transition-colors'
-const inputStyle = { backgroundColor: '#1e293b', color: '#e2e8f0', WebkitAppearance: 'none' } as const
+const baseCls   = 'border border-slate-700 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-emerald-500/60 transition-colors'
+const selectCls = 'w-full ' + baseCls + ' bg-slate-800 text-slate-200'
+const inputCls  = 'w-full ' + baseCls
+// Inline style wins over browser UA overrides (Chrome mobile rewrites <input> backgrounds)
+const inputStyle = {
+  backgroundColor: '#1e293b',
+  color: '#e2e8f0',
+  WebkitTextFillColor: '#e2e8f0',
+  WebkitBoxShadow: '0 0 0 30px #1e293b inset',
+  WebkitAppearance: 'none' as const,
+}
 
 export default function VoiceExpenseModal({ open, onClose }: Props) {
   const qc = useQueryClient()
@@ -281,7 +289,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   style={inputStyle}
                   className={inputCls + ' flex-1'}
                 />
-                <select value={currency} onChange={e => setCurrency(e.target.value)} className={selectCls + ' w-24'}>
+                <select value={currency} onChange={e => setCurrency(e.target.value)} className={baseCls + ' w-24 bg-slate-800 text-slate-200'}>
                   <option value="UYU">UYU</option>
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
