@@ -172,20 +172,35 @@ export function parseVoiceExpense(
   const isHousehold = /del hogar|para el hogar|\bhogar\b|compartido/.test(t)
   t = t.replace(/del hogar|para el hogar|\bhogar\b|compartido/g, '').replace(/\s+/g, ' ').trim()
 
-  // 2. Amount — scan each word in raw transcript, strip leading/trailing non-digit chars,
-  //    accept the first word that parses as a positive finite number.
-  //    Handles: $100, US$100, 100pesos, 1.500, 150,50, etc.
+  // 2. Amount — merge spaced thousands groups first ("58 000" → "58000", "1 500 000" → "1500000"),
+  //    then scan each word for the first positive finite number.
+  //    Handles: $100, US$100, 100pesos, 1.500, 58 000, 1 500 000, 150,50, etc.
+  function mergeThousands(s: string): string {
+    let prev = ''
+    while (prev !== s) { prev = s; s = s.replace(/(\d+)\s(\d{3})(?!\d)/g, '$1$2') }
+    return s
+  }
+  const amountSource = mergeThousands(rawTranscript)
+  t = mergeThousands(t)
+
   let amount: number | null = null
   let amountStr: string | null = null
-  for (const word of rawTranscript.split(/\s+/)) {
+  for (const word of amountSource.split(/\s+/)) {
     const cleaned = word.replace(/^[^\d]*/, '').replace(/[^\d.,]*$/, '')
-    if (/^\d+(?:[.,]\d+)?$/.test(cleaned)) {
-      const n = parseFloat(cleaned.replace(',', '.'))
+    if (!cleaned) continue
+    // "1.500" / "1,500" with exactly 3 decimal digits = thousands separator (Spanish notation)
+    const numStr = /^\d+[.,]\d{3}$/.test(cleaned)
+      ? cleaned.replace(/[.,]/, '')
+      : cleaned.replace(',', '.')
+    if (/^\d+(?:\.\d+)?$/.test(numStr)) {
+      const n = parseFloat(numStr)
       if (isFinite(n) && n > 0) { amount = n; amountStr = cleaned; break }
     }
   }
   if (amountStr) {
-    t = t.replace(amountStr, '').replace(/\s+/g, ' ').trim()
+    // amountStr may have had thousands separator stripped — remove both forms from t
+    const amountNorm = amountStr.replace(/[.,]/, '')
+    t = t.replace(amountNorm, '').replace(amountStr, '').replace(/\s+/g, ' ').trim()
   } else {
     // Fallback: written Spanish number ("cien", "doscientos", etc.)
     const noTrigger = t.replace(/\b(gaste|gasto|pague|pago|compre|cobre|recibi)\b/gi, '').trim()
