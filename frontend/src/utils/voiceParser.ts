@@ -108,7 +108,7 @@ interface EntityMatch<T> {
   score: number
 }
 
-function findBestEntity<T extends { id: string; name: string }>(
+function findBestEntity<T extends { id: string; name: string; frequency_score?: number }>(
   words: string[],
   entities: T[],
   maxN = 4,
@@ -124,10 +124,13 @@ function findBestEntity<T extends { id: string; name: string }>(
         if (score < minScore) continue
         const span = n
         const bestSpan = best ? best.endIdx - best.startIdx : 0
-        // Higher score wins; longer span only breaks ties
+        const bestFreq = best?.entity.frequency_score ?? 0
+        const freq = entity.frequency_score ?? 0
+        // Priority: score > span > frequency_score (most-used concept wins ties)
         const isBetter = !best
           || score > best.score
           || (score === best.score && span > bestSpan)
+          || (score === best.score && span === bestSpan && freq > bestFreq)
         if (isBetter) {
           best = { entity, startIdx: i, endIdx: i + n, score }
         }
@@ -158,7 +161,7 @@ export interface VoiceAccount {
 export function parseVoiceExpense(
   transcript: string,
   accounts: VoiceAccount[],
-  concepts: { id: string; name: string }[],
+  concepts: { id: string; name: string; frequency_score?: number }[],
 ): ParsedVoice {
   const rawTranscript = transcript
   let t = norm(transcript)

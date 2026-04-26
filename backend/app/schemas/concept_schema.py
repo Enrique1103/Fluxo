@@ -16,6 +16,7 @@ class ConceptUpdate(BaseModel):
 class ConceptResponse(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
+    category_id: uuid.UUID
     name: str
     frequency_score: int
     is_system: bool
