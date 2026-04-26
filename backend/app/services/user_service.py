@@ -38,7 +38,7 @@ def register(db: Session, user_in: UserCreate) -> User:
 
     seen_concepts: set[str] = set()
     for cat_data in INITIAL_USER_CATEGORIES:
-        category_crud.create(
+        db_cat = category_crud.create(
             db,
             user_id=db_user.id,
             name=cat_data["name"],
@@ -56,6 +56,7 @@ def register(db: Session, user_in: UserCreate) -> User:
                     user_id=db_user.id,
                     name=normalized,
                     is_system=cat_data["is_system"],
+                    category_id=db_cat.id,
                 )
 
     db.commit()

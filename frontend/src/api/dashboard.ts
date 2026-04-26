@@ -170,7 +170,7 @@ export interface Category {
   id: string; name: string; color: string | null; icon: string | null; is_system: boolean
 }
 export interface Concept {
-  id: string; name: string; frequency_score: number; is_system: boolean
+  id: string; name: string; category_id: string | null; frequency_score: number; is_system: boolean
 }
 
 export const fetchCategories = async (): Promise<Category[]> => {

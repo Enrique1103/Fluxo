@@ -173,6 +173,8 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     if (parsed.matchedConceptId) {
       setConceptId(parsed.matchedConceptId)
       setUnmatchedConcept(null)
+      const matched = latestConcepts.find(c => c.id === parsed.matchedConceptId)
+      if (matched?.category_id) setCategoryId(matched.category_id)
     } else if (parsed.spokenConceptText) {
       setConceptId('')
       setUnmatchedConcept(parsed.spokenConceptText)
@@ -368,7 +370,12 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   <AlertCircle size={12} /> No encontré "{unmatchedConcept}", elegí uno:
                 </div>
               )}
-              <select value={conceptId} onChange={e => setConceptId(e.target.value)} className={selectCls + (conceptId ? '' : ' border-amber-500/50')}>
+              <select value={conceptId} onChange={e => {
+                const id = e.target.value
+                setConceptId(id)
+                const c = (concepts as Concept[]).find(x => x.id === id)
+                if (c?.category_id) setCategoryId(c.category_id)
+              }} className={selectCls + (conceptId ? '' : ' border-amber-500/50')}>
                 <option value="">— Elegir concepto —</option>
                 {(concepts as Concept[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>

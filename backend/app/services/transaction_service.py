@@ -177,6 +177,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
                 external_account_id=tx_in.external_account_id,
             )
             concept_crud.increment_frequency(db, concept)
+            concept_crud.update_category(db, concept, category_id)
             db.commit()
             db.refresh(source_tx)
             return source_tx
@@ -229,6 +230,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         db.flush()
 
         concept_crud.increment_frequency(db, concept)
+        concept_crud.update_category(db, concept, category_id)
         db.commit()
         db.refresh(source_tx)
         return source_tx
@@ -265,6 +267,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         household_id=resolved_household_id,
     )
     concept_crud.increment_frequency(db, concept)
+    concept_crud.update_category(db, concept, category_id)
     db.commit()
     db.refresh(db_tx)
     return db_tx

@@ -58,12 +58,14 @@ def create(
     user_id: uuid.UUID,
     name: str,
     is_system: bool = False,
+    category_id: uuid.UUID | None = None,
 ) -> Concept:
     db_concept = Concept(
         user_id=user_id,
         name=name,
         frequency_score=0,
         is_system=is_system,
+        category_id=category_id,
     )
     db.add(db_concept)
     db.flush()
@@ -79,6 +81,11 @@ def update(db: Session, db_concept: Concept, fields: dict) -> Concept:
 
 def increment_frequency(db: Session, db_concept: Concept) -> None:
     db_concept.frequency_score += 1
+    db.flush()
+
+
+def update_category(db: Session, db_concept: Concept, category_id: uuid.UUID) -> None:
+    db_concept.category_id = category_id
     db.flush()
 
 
