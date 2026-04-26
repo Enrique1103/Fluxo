@@ -201,8 +201,15 @@ export function parseVoiceExpense(
     return null
   }
 
-  const amountSource = mergeThousands(rawTranscript)
-  t = mergeThousands(t)
+  // "58 mil" → "58000", "2 millones" → "2000000" (Speech API mixes digits + Spanish multiplier words)
+  function expandMilWords(s: string): string {
+    s = s.replace(/(\d+)\s+mill[oó]n(?:es)?/gi, (_, n) => String(parseInt(n, 10) * 1_000_000))
+    s = s.replace(/(\d+)\s+mil\b/gi,             (_, n) => String(parseInt(n, 10) * 1_000))
+    return s
+  }
+
+  const amountSource = expandMilWords(mergeThousands(rawTranscript))
+  t = expandMilWords(mergeThousands(t))
 
   let amount: number | null = null
   let amountStr: string | null = null
