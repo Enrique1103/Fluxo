@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Mic, X, Home, AlertCircle, Loader2, RotateCcw } from 'lucide-react'
-import { parseVoiceExpense } from '../utils/voiceParser'
+import { parseVoiceExpense, type VoiceAccount } from '../utils/voiceParser'
 import { fetchAccounts, fetchCategories, fetchConcepts, createTransaction } from '../api/dashboard'
 import { fetchHouseholds } from '../api/households'
 import { invalidateFinancialData } from '../lib/queryClient'
@@ -131,7 +131,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     setRawText(transcript)
     const parsed = parseVoiceExpense(
       transcript,
-      accounts as { id: string; name: string; currency: string }[],
+      accounts as VoiceAccount[],
       concepts as { id: string; name: string }[],
     )
 

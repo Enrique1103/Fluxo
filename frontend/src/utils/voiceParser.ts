@@ -36,7 +36,6 @@ const ONES: Record<string, number> = {
   cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9,
 }
 
-// Words excluded from entity scanning to avoid false matches
 const NUMBER_WORDS = new Set([
   ...Object.keys(HUNDREDS),
   ...Object.keys(TENS),
@@ -92,7 +91,7 @@ function parseWrittenNumber(text: string): number | null {
 function matchScore(query: string, target: string): number {
   const q = norm(query)
   const t = norm(target)
-  if (!q || q.length < 3) return 0  // require at least 3 chars to avoid false matches
+  if (!q || q.length < 3) return 0
   if (q === t) return 4
   if (t.startsWith(q) || q.startsWith(t)) return 3
   if (t.includes(q) || q.includes(t)) return 2
@@ -125,7 +124,11 @@ function findBestEntity<T extends { id: string; name: string }>(
         if (score < minScore) continue
         const span = n
         const bestSpan = best ? best.endIdx - best.startIdx : 0
-        if (!best || span > bestSpan || (span === bestSpan && score > best.score)) {
+        // Higher score wins; longer span only breaks ties
+        const isBetter = !best
+          || score > best.score
+          || (score === best.score && span > bestSpan)
+        if (isBetter) {
           best = { entity, startIdx: i, endIdx: i + n, score }
         }
       }
@@ -134,7 +137,6 @@ function findBestEntity<T extends { id: string; name: string }>(
   return best
 }
 
-// Strips number words, stopwords, and trigger verbs — leaves only content words
 function prepareForEntityScan(normalized: string): string[] {
   return normalized
     .split(' ')
@@ -146,9 +148,16 @@ function prepareForEntityScan(normalized: string): string[] {
     )
 }
 
+export interface VoiceAccount {
+  id: string
+  name: string
+  currency: string
+  type: string
+}
+
 export function parseVoiceExpense(
   transcript: string,
-  accounts: { id: string; name: string; currency: string }[],
+  accounts: VoiceAccount[],
   concepts: { id: string; name: string }[],
 ): ParsedVoice {
   const rawTranscript = transcript
@@ -158,8 +167,7 @@ export function parseVoiceExpense(
   const isHousehold = /del hogar|para el hogar|\bhogar\b|compartido/.test(t)
   t = t.replace(/del hogar|para el hogar|\bhogar\b|compartido/g, '').replace(/\s+/g, ' ').trim()
 
-  // 2. Amount — scan normalized text first, then raw transcript as fallback
-  //    (raw fallback handles edge cases where special chars survive norm())
+  // 2. Amount — normalized text first, raw transcript as fallback for encoding edge cases
   let amount: number | null = null
   const digitMatch = t.match(/\d+(?:[.,]\d+)?/) ?? rawTranscript.match(/\d+(?:[.,]\d+)?/)
   if (digitMatch) {
@@ -172,28 +180,44 @@ export function parseVoiceExpense(
     if (candidate) amount = parseWrittenNumber(candidate)
   }
 
-  // 3. Currency from voice keywords (overridden later if account is matched)
+  // 3. Detect voice currency keywords before removing them
   let voiceCurrency: 'UYU' | 'USD' | 'EUR' | null = null
   if (/\bdolar(?:es)?\b|\busd\b/.test(t))    voiceCurrency = 'USD'
   else if (/\beuro(?:s)?\b|\beur\b/.test(t)) voiceCurrency = 'EUR'
   else if (/\bpeso(?:s)?\b|\buyu\b/.test(t)) voiceCurrency = 'UYU'
-  // Remove currency words so they don't interfere with entity scanning
   t = t.replace(/\b(pesos?|dolares?|dolar|euros?|uyu|usd|eur)\b/g, '').replace(/\s+/g, ' ').trim()
-
-  // 4. Entity scanning — scan words stripped of numbers/triggers/currency
-  const scanWords = prepareForEntityScan(t)
 
   let matchedAccountId: string | null = null
   let spokenAccountText: string | null = null
   let currency: 'UYU' | 'USD' | 'EUR' | null = voiceCurrency
   const usedIndices = new Set<number>()
 
-  if (accounts.length > 0) {
+  // 4a. Special case: "efectivo" → find cash account, use voice currency to disambiguate
+  if (/\befectivo\b/.test(t)) {
+    const cashAccounts = accounts.filter(a => a.type === 'cash')
+    if (cashAccounts.length > 0) {
+      const picked = voiceCurrency
+        ? (cashAccounts.find(a => a.currency?.toUpperCase() === voiceCurrency) ?? cashAccounts[0])
+        : cashAccounts[0]
+      matchedAccountId = picked.id
+      spokenAccountText = 'efectivo'
+      const c = picked.currency?.toUpperCase()
+      if (c === 'USD') currency = 'USD'
+      else if (c === 'EUR') currency = 'EUR'
+      else if (c === 'UYU') currency = 'UYU'
+    }
+    // Remove "efectivo" from text so it doesn't pollute concept scan
+    t = t.replace(/\befectivo\b/g, '').replace(/\s+/g, ' ').trim()
+  }
+
+  // 4b. General account n-gram scan (skipped if efectivo already matched)
+  const scanWords = prepareForEntityScan(t)
+
+  if (!matchedAccountId && accounts.length > 0) {
     const acctResult = findBestEntity(scanWords, accounts, 4, 2)
     if (acctResult) {
       matchedAccountId = acctResult.entity.id
       spokenAccountText = scanWords.slice(acctResult.startIdx, acctResult.endIdx).join(' ')
-      // Account currency always wins over voice keyword currency
       const c = acctResult.entity.currency?.toUpperCase()
       if (c === 'USD') currency = 'USD'
       else if (c === 'EUR') currency = 'EUR'
@@ -202,6 +226,7 @@ export function parseVoiceExpense(
     }
   }
 
+  // 5. Concept n-gram scan on remaining words
   let matchedConceptId: string | null = null
   let spokenConceptText: string | null = null
 
