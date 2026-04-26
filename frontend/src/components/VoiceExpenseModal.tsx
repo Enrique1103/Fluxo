@@ -279,11 +279,11 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       <div
-        className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl z-10 overflow-hidden"
+        className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl z-10 flex flex-col max-h-[92vh]"
         style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.08)' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
           <div className="flex items-center gap-2">
             <Mic size={18} className="text-emerald-400" />
             <span className="font-semibold text-sm">
@@ -387,7 +387,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
 
         {/* ── REVIEW PHASE ────────────────────────────────── */}
         {phase === 'review' && (
-          <div className="px-5 pb-5 space-y-3">
+          <div className="px-5 pb-5 space-y-3 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:theme(colors.slate.700)_transparent]">
             {/* Transcript */}
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
               <Mic size={13} className="text-slate-500 shrink-0" />
