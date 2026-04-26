@@ -24,7 +24,8 @@ const isSpeechSupported = !!(
 )
 
 const selectCls = 'w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-emerald-500/60 transition-colors'
-const inputCls  = 'w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-emerald-500/60 transition-colors'
+const inputCls  = 'w-full border border-slate-700 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-emerald-500/60 transition-colors'
+const inputStyle = { backgroundColor: '#1e293b', color: '#e2e8f0', WebkitAppearance: 'none' } as const
 
 export default function VoiceExpenseModal({ open, onClose }: Props) {
   const qc = useQueryClient()
@@ -134,8 +135,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       concepts as { id: string; name: string }[],
     )
 
-    // DEBUG: show raw transcript + parsed amount so we can diagnose the extraction
-    setRawText(`${transcript} [monto=${parsed.amount}]`)
+    setRawText(transcript)
     if (parsed.amount !== null && !isNaN(parsed.amount)) setAmount(String(parsed.amount))
     if (parsed.currency)        setCurrency(parsed.currency)
     setIsHousehold(parsed.isHousehold)
@@ -270,7 +270,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
 
             {/* Amount + currency */}
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Monto <span style={{color:'red'}}>[DEBUG state="{amount}"]</span></label>
+              <label className="text-xs text-slate-400 mb-1 block">Monto</label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -278,6 +278,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
                   placeholder="0"
+                  style={inputStyle}
                   className={inputCls + ' flex-1'}
                 />
                 <select value={currency} onChange={e => setCurrency(e.target.value)} className={selectCls + ' w-24'}>
@@ -334,6 +335,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 onChange={e => setDescription(e.target.value)}
                 maxLength={100}
                 placeholder="Descripción del gasto"
+                style={inputStyle}
                 className={inputCls}
               />
             </div>
