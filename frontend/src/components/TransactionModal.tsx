@@ -231,7 +231,15 @@ export default function TransactionModal({ open, onClose }: Props) {
   const { data: households  = [] } = useQuery({ queryKey: ['households'],  queryFn: fetchHouseholds,  enabled: open })
 
   useEffect(() => {
-    if (accounts.length > 0 && !accountId) setAccountId(accounts[0].id)
+    if (accounts.length > 0 && !accountId) {
+      const first = accounts[0]
+      setAccountId(first.id)
+      if (txType === 'expense') {
+        if (first.type === 'cash')   setMetodoPago('efectivo')
+        if (first.type === 'debit')  setMetodoPago('tarjeta_debito')
+        if (first.type === 'credit') setMetodoPago('tarjeta_credito')
+      }
+    }
   }, [accounts])
 
   useEffect(() => {
@@ -444,7 +452,16 @@ export default function TransactionModal({ open, onClose }: Props) {
             <div>
               <label className={labelClass}>Cuenta</label>
               <div className="relative">
-                <select value={accountId} onChange={e => setAccountId(e.target.value)} className={selectClass}>
+                <select value={accountId} onChange={e => {
+                  const id = e.target.value
+                  setAccountId(id)
+                  const acc = accounts.find(a => a.id === id)
+                  if (acc && txType === 'expense') {
+                    if (acc.type === 'cash')   { setMetodoPago('efectivo');       setEnCuotas(false) }
+                    if (acc.type === 'debit')  { setMetodoPago('tarjeta_debito'); setEnCuotas(false) }
+                    if (acc.type === 'credit') { setMetodoPago('tarjeta_credito') }
+                  }
+                }} className={selectClass}>
                   <option value="" disabled>Seleccioná una cuenta</option>
                   {accounts.map(acc => (
                     <option key={acc.id} value={acc.id}>
