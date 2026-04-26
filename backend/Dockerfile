@@ -11,5 +11,5 @@ COPY . .
 
 EXPOSE 8000
 
-# $PORT is injected by Render; fallback to 8000 locally
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Run migrations then start — $PORT is injected by Render; fallback to 8000 locally
+CMD sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
