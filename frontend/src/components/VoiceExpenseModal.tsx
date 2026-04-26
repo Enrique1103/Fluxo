@@ -128,13 +128,14 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   }
 
   function applyTranscript(transcript: string) {
-    setRawText(transcript)
     const parsed = parseVoiceExpense(
       transcript,
       accounts as VoiceAccount[],
       concepts as { id: string; name: string }[],
     )
 
+    // DEBUG: show raw transcript + parsed amount so we can diagnose the extraction
+    setRawText(`${transcript} [monto=${parsed.amount}]`)
     if (parsed.amount !== null && !isNaN(parsed.amount)) setAmount(String(parsed.amount))
     if (parsed.currency)        setCurrency(parsed.currency)
     setIsHousehold(parsed.isHousehold)
