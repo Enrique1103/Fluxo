@@ -163,7 +163,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     )
 
     setDebugInfo(
-      `C:${latestConcepts.length} A:${latestAccounts.length}` +
+      `C:${latestConcepts.length} A:${latestAccounts.length} amt:${parsed.amount ?? 'null'}` +
       ` | concept:${parsed.matchedConceptId ? latestConcepts.find(c=>c.id===parsed.matchedConceptId)?.name ?? parsed.matchedConceptId : (parsed.spokenConceptText ?? 'no match')}` +
       ` | acct:${parsed.matchedAccountId ? latestAccounts.find(a=>a.id===parsed.matchedAccountId)?.name ?? parsed.matchedAccountId : 'no match'}`
     )

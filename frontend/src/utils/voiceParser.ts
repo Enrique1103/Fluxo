@@ -194,7 +194,9 @@ export function parseVoiceExpense(
       const decimal = parts.pop()!
       return parseFloat(parts.join('') + '.' + decimal)
     }
-    // "150,28" — comma as decimal separator
+    // "58,000.28" or "1,500.5" — comma thousands + period decimal (US format)
+    if (/^\d{1,3}(,\d{3})+\.\d+$/.test(s)) return parseFloat(s.replace(/,/g, ''))
+    // "150,28" or "58,5" — comma as decimal separator (1-2 decimal digits)
     if (/^\d+,\d{1,2}$/.test(s)) return parseFloat(s.replace(',', '.'))
     // "150" or "150.28" — plain integer or decimal
     if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s)
