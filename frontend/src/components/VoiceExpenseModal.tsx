@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Mic, X, Home, AlertCircle, Loader2, RotateCcw } from 'lucide-react'
+import { Mic, X, Home, AlertCircle, Loader2, RotateCcw, CreditCard } from 'lucide-react'
 import { parseVoiceExpense, type VoiceAccount } from '../utils/voiceParser'
-import { fetchAccounts, fetchCategories, fetchConcepts, createTransaction } from '../api/dashboard'
+import { fetchAccounts, fetchCategories, fetchConcepts, createTransaction, createInstalmentPlan } from '../api/dashboard'
 import { fetchHouseholds } from '../api/households'
 import { invalidateFinancialData } from '../lib/queryClient'
 import type { Account, Category, Concept } from '../api/dashboard'
@@ -38,10 +38,12 @@ const inputStyle = {
 export default function VoiceExpenseModal({ open, onClose }: Props) {
   const qc = useQueryClient()
 
-  const { data: accounts   = [] } = useQuery({ queryKey: ['accounts'],   queryFn: fetchAccounts,   enabled: open })
-  const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories, enabled: open })
-  const { data: concepts   = [] } = useQuery({ queryKey: ['concepts'],   queryFn: fetchConcepts,   enabled: open })
-  const { data: households = [] } = useQuery({ queryKey: ['households'], queryFn: fetchHouseholds, enabled: open })
+  const { data: accounts   = [], isLoading: loadingAccounts  } = useQuery({ queryKey: ['accounts'],   queryFn: fetchAccounts,   enabled: open })
+  const { data: categories = []                              } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories, enabled: open })
+  const { data: concepts   = [], isLoading: loadingConcepts  } = useQuery({ queryKey: ['concepts'],   queryFn: fetchConcepts,   enabled: open })
+  const { data: households = []                              } = useQuery({ queryKey: ['households'], queryFn: fetchHouseholds, enabled: open })
+
+  const dataReady = !loadingAccounts && !loadingConcepts
 
   const [phase,       setPhase]       = useState<Phase>('listening')
   const [listening,   setListening]   = useState(false)
@@ -61,12 +63,22 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const [unmatchedAccount, setUnmatchedAccount] = useState<string | null>(null)
   const [unmatchedConcept, setUnmatchedConcept] = useState<string | null>(null)
 
+  const [enCuotas,    setEnCuotas]    = useState(false)
+  const [nCuotas,     setNCuotas]     = useState('2')
+
   const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [debugInfo,   setDebugInfo]   = useState('')
 
-  const recRef        = useRef<any>(null)
+  const recRef         = useRef<any>(null)
   const lastInterimRef = useRef('')
   const appliedRef     = useRef(false)
+
+  // Refs always point to latest data — avoids React closure capturing stale empty arrays
+  const accountsRef  = useRef<Account[]>([])
+  const conceptsRef  = useRef<Concept[]>([])
+  useEffect(() => { accountsRef.current  = accounts  as Account[] },  [accounts])
+  useEffect(() => { conceptsRef.current  = concepts  as Concept[] },  [concepts])
 
   // Default household when available
   useEffect(() => {
@@ -83,6 +95,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       setAmount(''); setCurrency('UYU'); setConceptId(''); setCategoryId('')
       setAccountId(''); setDescription(''); setIsHousehold(false)
       setRawText(''); setUnmatchedAccount(null); setUnmatchedConcept(null)
+      setEnCuotas(false); setNCuotas('2')
       setSubmitting(false); setSubmitError('')
     } else {
       recRef.current?.abort()
@@ -137,21 +150,30 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   }
 
   function applyTranscript(transcript: string) {
+    const latestAccounts  = accountsRef.current
+    const latestConcepts  = conceptsRef.current
+
     const parsed = parseVoiceExpense(
       transcript,
-      accounts as VoiceAccount[],
-      (concepts as Concept[]).map(c => ({ id: c.id, name: c.name, frequency_score: c.frequency_score })),
+      latestAccounts as VoiceAccount[],
+      latestConcepts.map(c => ({ id: c.id, name: c.name, frequency_score: c.frequency_score })),
+    )
+
+    setDebugInfo(
+      `C:${latestConcepts.length} A:${latestAccounts.length}` +
+      ` | concept:${parsed.matchedConceptId ? latestConcepts.find(c=>c.id===parsed.matchedConceptId)?.name ?? parsed.matchedConceptId : (parsed.spokenConceptText ?? 'no match')}` +
+      ` | acct:${parsed.matchedAccountId ? latestAccounts.find(a=>a.id===parsed.matchedAccountId)?.name ?? parsed.matchedAccountId : 'no match'}`
     )
 
     setRawText(transcript)
     if (parsed.amount !== null && !isNaN(parsed.amount)) setAmount(String(parsed.amount))
-    if (parsed.currency)        setCurrency(parsed.currency)
+    if (parsed.currency) setCurrency(parsed.currency)
     setIsHousehold(parsed.isHousehold)
 
     if (parsed.matchedConceptId) {
       setConceptId(parsed.matchedConceptId)
       setUnmatchedConcept(null)
-      const cat = (concepts as Concept[]).find(c => c.id === parsed.matchedConceptId)
+      const cat = latestConcepts.find(c => c.id === parsed.matchedConceptId)
       if (cat) setCategoryId(cat.category_id)
     } else if (parsed.spokenConceptText) {
       setConceptId('')
@@ -162,13 +184,24 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       setAccountId(parsed.matchedAccountId)
       setUnmatchedAccount(null)
     } else if (parsed.spokenAccountText) {
-      setAccountId(accounts[0]?.id ?? '')
+      setAccountId(latestAccounts[0]?.id ?? '')
       setUnmatchedAccount(parsed.spokenAccountText)
     } else {
-      setAccountId(accounts[0]?.id ?? '')
+      setAccountId(latestAccounts[0]?.id ?? '')
     }
 
     setPhase('review')
+  }
+
+  const selectedAccount = (accounts as Account[]).find(a => a.id === accountId)
+  const isCredit = selectedAccount?.type === 'credit'
+
+  function derivedMetodoPago(): 'efectivo' | 'tarjeta_credito' | 'tarjeta_debito' | 'transferencia_bancaria' | 'billetera_digital' | 'otro' {
+    if (!selectedAccount) return 'otro'
+    if (selectedAccount.type === 'cash')   return 'efectivo'
+    if (selectedAccount.type === 'credit') return 'tarjeta_credito'
+    if (selectedAccount.type === 'debit')  return 'tarjeta_debito'
+    return 'otro'
   }
 
   async function handleConfirm() {
@@ -177,19 +210,37 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     if (!categoryId) { setSubmitError('Seleccioná una categoría'); return }
     if (!accountId)  { setSubmitError('Seleccioná una cuenta'); return }
 
+    if (isCredit && enCuotas) {
+      const n = parseInt(nCuotas)
+      if (!n || n < 2) { setSubmitError('El número de cuotas debe ser al menos 2'); return }
+    }
+
     setSubmitting(true); setSubmitError('')
     try {
-      await createTransaction({
-        account_id:   accountId,
-        concept_id:   conceptId,
-        category_id:  categoryId,
-        amount:       parseFloat(amount),
-        type:         'expense',
-        date:         today(),
-        description:  description.trim() || undefined,
-        metodo_pago:  'efectivo',
-        ...(isHousehold && householdId ? { household_id: householdId } : {}),
-      })
+      if (isCredit && enCuotas) {
+        await createInstalmentPlan({
+          account_id:   accountId,
+          concept_id:   conceptId,
+          category_id:  categoryId,
+          total_amount: parseFloat(amount),
+          n_cuotas:     parseInt(nCuotas),
+          fecha_inicio: today(),
+          description:  description.trim() || undefined,
+          metodo_pago:  'tarjeta_credito',
+        })
+      } else {
+        await createTransaction({
+          account_id:   accountId,
+          concept_id:   conceptId,
+          category_id:  categoryId,
+          amount:       parseFloat(amount),
+          type:         'expense',
+          date:         today(),
+          description:  description.trim() || undefined,
+          metodo_pago:  derivedMetodoPago(),
+          ...(isHousehold && householdId ? { household_id: householdId } : {}),
+        })
+      }
       await invalidateFinancialData(qc)
       onClose()
     } catch (e: any) {
@@ -242,17 +293,25 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             ) : (
               <button
                 onClick={listening ? () => { recRef.current?.stop(); setListening(false) } : startListening}
+                disabled={!dataReady}
                 className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
-                  listening
-                    ? 'bg-rose-500/20 border-2 border-rose-500 animate-pulse'
-                    : 'bg-emerald-500/20 border-2 border-emerald-500 hover:bg-emerald-500/30'
+                  !dataReady
+                    ? 'border-2 border-slate-600 opacity-50 cursor-wait'
+                    : listening
+                      ? 'bg-rose-500/20 border-2 border-rose-500 animate-pulse'
+                      : 'bg-emerald-500/20 border-2 border-emerald-500 hover:bg-emerald-500/30'
                 }`}
+                style={!dataReady ? { background: 'rgba(255,255,255,0.04)' } : undefined}
               >
-                <Mic size={32} className={listening ? 'text-rose-400' : 'text-emerald-400'} />
+                {!dataReady
+                  ? <Loader2 size={32} className="text-slate-500 animate-spin" />
+                  : <Mic size={32} className={listening ? 'text-rose-400' : 'text-emerald-400'} />
+                }
               </button>
             )}
 
-            {listening && <p className="text-slate-400 text-sm animate-pulse">Escuchando…</p>}
+            {!dataReady && <p className="text-slate-500 text-xs">Cargando cuentas y conceptos…</p>}
+            {dataReady && listening && <p className="text-slate-400 text-sm animate-pulse">Escuchando…</p>}
             {interim && <p className="text-slate-300 text-sm italic text-center">"{interim}"</p>}
             {speechError && (
               <div className="flex items-center gap-2 text-rose-400 text-sm">
@@ -277,6 +336,10 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 <RotateCcw size={13} />
               </button>
             </div>
+            {/* Debug — remove once matching is stable */}
+            {debugInfo && (
+              <p className="text-slate-600 text-xs px-1 break-all">{debugInfo}</p>
+            )}
 
             {/* Amount + currency */}
             <div>
@@ -339,6 +402,42 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 {(accounts as Account[]).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
             </div>
+
+            {/* Cuotas toggle — solo cuentas crédito */}
+            {isCredit && (
+              <div
+                className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors"
+                style={{
+                  background: enCuotas ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${enCuotas ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                }}
+                onClick={() => setEnCuotas(v => !v)}
+              >
+                <CreditCard size={16} className={enCuotas ? 'text-emerald-400' : 'text-slate-500'} />
+                <span className={`text-sm flex-1 ${enCuotas ? 'text-emerald-300' : 'text-slate-400'}`}>
+                  ¿Pagar en cuotas?
+                </span>
+                <div className={`w-9 h-5 rounded-full transition-colors relative ${enCuotas ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${enCuotas ? 'left-[18px]' : 'left-0.5'}`} />
+                </div>
+              </div>
+            )}
+
+            {/* Número de cuotas */}
+            {isCredit && enCuotas && (
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Número de cuotas</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={nCuotas}
+                  onChange={e => setNCuotas(e.target.value)}
+                  placeholder="2"
+                  style={inputStyle}
+                  className={inputCls}
+                />
+              </div>
+            )}
 
             {/* Description */}
             <div>

@@ -147,7 +147,7 @@ function prepareForEntityScan(normalized: string): string[] {
       w.length >= 3 &&
       !NUMBER_WORDS.has(w) &&
       !STOPWORDS.has(w) &&
-      !/^(gaste|gasto|pague|pago|compre|cobre|recibi|cobro|cobrar)$/.test(w)
+      !/^(gaste|gasto|pague|pago|compre|cobre|recibi|cobro|cobrar|cuenta|tarjeta|banco|billetera)$/.test(w)
     )
 }
 
