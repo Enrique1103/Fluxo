@@ -46,6 +46,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const dataReady = !loadingAccounts && !loadingConcepts
 
   const [phase,       setPhase]       = useState<Phase>('listening')
+  const [txType,      setTxType]      = useState<'income' | 'expense' | 'transfer'>('expense')
   const [listening,   setListening]   = useState(false)
   const [interim,     setInterim]     = useState('')
   const [speechError, setSpeechError] = useState('')
@@ -62,6 +63,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const [rawText,     setRawText]     = useState('')
   const [unmatchedAccount, setUnmatchedAccount] = useState<string | null>(null)
   const [unmatchedConcept, setUnmatchedConcept] = useState<string | null>(null)
+  const [destAccountId,    setDestAccountId]    = useState('')
 
   const [enCuotas,    setEnCuotas]    = useState(false)
   const [nCuotas,     setNCuotas]     = useState('2')
@@ -92,8 +94,9 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       setListening(false)
       setInterim('')
       setSpeechError('')
+      setTxType('expense')
       setAmount(''); setCurrency('UYU'); setConceptId(''); setCategoryId('')
-      setAccountId(''); setDescription(''); setIsHousehold(false)
+      setAccountId(''); setDestAccountId(''); setDescription(''); setIsHousehold(false)
       setRawText(''); setUnmatchedAccount(null); setUnmatchedConcept(null)
       setEnCuotas(false); setNCuotas('2')
       setSubmitting(false); setSubmitError('')
@@ -190,6 +193,8 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       setAccountId(latestAccounts[0]?.id ?? '')
     }
 
+    if (parsed.matchedDestAccountId) setDestAccountId(parsed.matchedDestAccountId)
+
     setPhase('review')
   }
 
@@ -206,22 +211,38 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
 
   async function handleConfirm() {
     if (!amount || parseFloat(amount) <= 0) { setSubmitError('El monto debe ser mayor a 0'); return }
-    if (!conceptId)  { setSubmitError('Seleccioná un concepto'); return }
-    if (!categoryId) { setSubmitError('Seleccioná una categoría'); return }
-    if (!accountId)  { setSubmitError('Seleccioná una cuenta'); return }
+    if (!accountId) { setSubmitError('Seleccioná una cuenta'); return }
 
-    if (isCredit && enCuotas) {
+    if (txType === 'transfer') {
+      if (!destAccountId) { setSubmitError('Seleccioná la cuenta destino'); return }
+    } else {
+      if (!conceptId)  { setSubmitError('Seleccioná un concepto'); return }
+      if (!categoryId) { setSubmitError('Seleccioná una categoría'); return }
+    }
+
+    if (txType === 'expense' && isCredit && enCuotas) {
       const n = parseInt(nCuotas)
       if (!n || n < 2) { setSubmitError('El número de cuotas debe ser al menos 2'); return }
     }
 
+    // For transfers, auto-resolve the "Transferencia" concept and "Sin clasificar" category
+    let resolvedConceptId  = conceptId
+    let resolvedCategoryId = categoryId
+    if (txType === 'transfer') {
+      const transferConcept = (concepts as Concept[]).find(c => c.name.toLowerCase() === 'transferencia')
+      const sinClasifCat    = (categories as Category[]).find(c => c.name.toLowerCase() === 'sin clasificar')
+      resolvedConceptId  = transferConcept?.id ?? (concepts as Concept[])[0]?.id ?? ''
+      resolvedCategoryId = sinClasifCat?.id    ?? (categories as Category[])[0]?.id ?? ''
+      if (!resolvedConceptId || !resolvedCategoryId) { setSubmitError('No se encontraron datos necesarios para la transferencia'); return }
+    }
+
     setSubmitting(true); setSubmitError('')
     try {
-      if (isCredit && enCuotas) {
+      if (txType === 'expense' && isCredit && enCuotas) {
         await createInstalmentPlan({
           account_id:   accountId,
-          concept_id:   conceptId,
-          category_id:  categoryId,
+          concept_id:   resolvedConceptId,
+          category_id:  resolvedCategoryId,
           total_amount: parseFloat(amount),
           n_cuotas:     parseInt(nCuotas),
           fecha_inicio: today(),
@@ -231,20 +252,21 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       } else {
         await createTransaction({
           account_id:   accountId,
-          concept_id:   conceptId,
-          category_id:  categoryId,
+          concept_id:   resolvedConceptId,
+          category_id:  resolvedCategoryId,
           amount:       parseFloat(amount),
-          type:         'expense',
+          type:         txType,
           date:         today(),
           description:  description.trim() || undefined,
-          metodo_pago:  derivedMetodoPago(),
-          ...(isHousehold && householdId ? { household_id: householdId } : {}),
+          ...(txType === 'expense' ? { metodo_pago: derivedMetodoPago() } : {}),
+          ...(txType === 'transfer' && destAccountId ? { transfer_to_account_id: destAccountId } : {}),
+          ...(txType === 'expense' && isHousehold && householdId ? { household_id: householdId } : {}),
         })
       }
       await invalidateFinancialData(qc)
       onClose()
     } catch (e: any) {
-      setSubmitError(e?.response?.data?.detail ?? 'No se pudo registrar el gasto')
+      setSubmitError(e?.response?.data?.detail ?? 'No se pudo registrar el movimiento')
     } finally {
       setSubmitting(false)
     }
@@ -265,7 +287,9 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
           <div className="flex items-center gap-2">
             <Mic size={18} className="text-emerald-400" />
             <span className="font-semibold text-sm">
-              {phase === 'listening' ? 'Di tu gasto' : 'Fluxo entendió'}
+              {phase === 'listening'
+                ? txType === 'income' ? 'Di tu ingreso' : txType === 'transfer' ? 'Di tu transferencia' : 'Di tu gasto'
+                : 'Fluxo entendió'}
             </span>
           </div>
           <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
@@ -276,15 +300,55 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
         {/* ── LISTENING PHASE ─────────────────────────────── */}
         {phase === 'listening' && (
           <div className="px-5 pb-6 flex flex-col items-center gap-5">
+            {/* Type toggle */}
+            <div className="w-full grid grid-cols-3 gap-1.5 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              {(['income', 'expense', 'transfer'] as const).map(type => {
+                const labels  = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia' }
+                const colors  = {
+                  income:   'bg-cyan-400/15 border-cyan-400/40 text-cyan-400',
+                  expense:  'bg-rose-400/15 border-rose-400/40 text-rose-400',
+                  transfer: 'bg-amber-400/15 border-amber-400/40 text-amber-400',
+                }
+                const active = txType === type
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setTxType(type)}
+                    className={`py-2 rounded-lg text-xs font-medium border transition-all ${
+                      active ? colors[type] : 'border-transparent text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    {labels[type]}
+                  </button>
+                )
+              })}
+            </div>
+
             {/* Hint */}
             <div className="w-full rounded-xl px-4 py-3 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <p className="text-slate-400 text-xs mb-1">Formato sugerido:</p>
-              <p className="text-slate-300 text-sm">
-                "gasté <span className="text-emerald-400">[monto]</span> en{' '}
-                <span className="text-sky-400">[concepto]</span> desde{' '}
-                <span className="text-violet-400">[cuenta]</span>{' '}
-                <span className="text-amber-400">(del hogar)</span>"
-              </p>
+              {txType === 'expense' && (
+                <p className="text-slate-300 text-sm">
+                  "gasté <span className="text-emerald-400">[monto]</span> en{' '}
+                  <span className="text-sky-400">[concepto]</span> desde{' '}
+                  <span className="text-violet-400">[cuenta]</span>{' '}
+                  <span className="text-amber-400">(del hogar)</span>"
+                </p>
+              )}
+              {txType === 'income' && (
+                <p className="text-slate-300 text-sm">
+                  "cobré <span className="text-emerald-400">[monto]</span> por{' '}
+                  <span className="text-sky-400">[concepto]</span> en{' '}
+                  <span className="text-violet-400">[cuenta]</span>"
+                </p>
+              )}
+              {txType === 'transfer' && (
+                <p className="text-slate-300 text-sm">
+                  "transferí <span className="text-emerald-400">[monto]</span> de{' '}
+                  <span className="text-violet-400">[cuenta origen]</span> a{' '}
+                  <span className="text-amber-400">[cuenta destino]</span>"
+                </p>
+              )}
             </div>
 
             {/* Mic button */}
@@ -362,37 +426,42 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
               </div>
             </div>
 
-            {/* Concept */}
-            <div>
-              <label className="text-xs text-slate-400 mb-1 block">Concepto</label>
-              {unmatchedConcept && (
-                <div className="flex items-center gap-1.5 text-amber-400 text-xs mb-1">
-                  <AlertCircle size={12} /> No encontré "{unmatchedConcept}", elegí uno:
+            {/* Concept + Category — not for transfers */}
+            {txType !== 'transfer' && (
+              <>
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Concepto</label>
+                  {unmatchedConcept && (
+                    <div className="flex items-center gap-1.5 text-amber-400 text-xs mb-1">
+                      <AlertCircle size={12} /> No encontré "{unmatchedConcept}", elegí uno:
+                    </div>
+                  )}
+                  <select value={conceptId} onChange={e => {
+                    const id = e.target.value
+                    setConceptId(id)
+                    const c = (concepts as Concept[]).find(x => x.id === id)
+                    if (c?.category_id) setCategoryId(c.category_id)
+                  }} className={selectCls + (conceptId ? '' : ' border-amber-500/50')}>
+                    <option value="">— Elegir concepto —</option>
+                    {(concepts as Concept[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
                 </div>
-              )}
-              <select value={conceptId} onChange={e => {
-                const id = e.target.value
-                setConceptId(id)
-                const c = (concepts as Concept[]).find(x => x.id === id)
-                if (c?.category_id) setCategoryId(c.category_id)
-              }} className={selectCls + (conceptId ? '' : ' border-amber-500/50')}>
-                <option value="">— Elegir concepto —</option>
-                {(concepts as Concept[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
 
-            {/* Category */}
-            <div>
-              <label className="text-xs text-slate-400 mb-1 block">Categoría</label>
-              <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={selectCls + (categoryId ? '' : ' border-amber-500/50')}>
-                <option value="">— Elegir categoría —</option>
-                {(categories as Category[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Categoría</label>
+                  <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={selectCls + (categoryId ? '' : ' border-amber-500/50')}>
+                    <option value="">— Elegir categoría —</option>
+                    {(categories as Category[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
 
-            {/* Account */}
+            {/* Source account */}
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Cuenta</label>
+              <label className="text-xs text-slate-400 mb-1 block">
+                {txType === 'transfer' ? 'Cuenta origen' : 'Cuenta'}
+              </label>
               {unmatchedAccount && (
                 <div className="flex items-center gap-1.5 text-amber-400 text-xs mb-1">
                   <AlertCircle size={12} /> No encontré "{unmatchedAccount}", elegí una:
@@ -404,8 +473,25 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
               </select>
             </div>
 
-            {/* Cuotas toggle — solo cuentas crédito */}
-            {isCredit && (
+            {/* Dest account — only for transfers */}
+            {txType === 'transfer' && (
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Cuenta destino</label>
+                <select
+                  value={destAccountId}
+                  onChange={e => setDestAccountId(e.target.value)}
+                  className={selectCls + (destAccountId ? '' : ' border-amber-500/50')}
+                >
+                  <option value="">— Elegir cuenta destino —</option>
+                  {(accounts as Account[]).filter(a => a.id !== accountId).map(a => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Cuotas toggle — solo gastos con tarjeta crédito */}
+            {txType === 'expense' && isCredit && (
               <div
                 className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors"
                 style={{
@@ -425,7 +511,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             )}
 
             {/* Número de cuotas */}
-            {isCredit && enCuotas && (
+            {txType === 'expense' && isCredit && enCuotas && (
               <div>
                 <label className="text-xs text-slate-400 mb-1 block">Número de cuotas</label>
                 <input
@@ -448,35 +534,38 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 maxLength={100}
-                placeholder="Descripción del gasto"
+                placeholder={txType === 'income' ? 'Descripción del ingreso' : txType === 'transfer' ? 'Descripción de la transferencia' : 'Descripción del gasto'}
                 style={inputStyle}
                 className={inputCls}
               />
             </div>
 
-            {/* Household toggle — always visible */}
-            <div
-              className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors"
-              style={{
-                background: isHousehold ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${isHousehold ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.07)'}`,
-              }}
-              onClick={() => setIsHousehold(v => !v)}
-            >
-              <Home size={16} className={isHousehold ? 'text-indigo-400' : 'text-slate-500'} />
-              <span className={`text-sm flex-1 ${isHousehold ? 'text-indigo-300' : 'text-slate-400'}`}>
-                ¿Del hogar?
-              </span>
-              <div className={`w-9 h-5 rounded-full transition-colors relative ${isHousehold ? 'bg-indigo-500' : 'bg-slate-700'}`}>
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isHousehold ? 'left-[18px]' : 'left-0.5'}`} />
-              </div>
-            </div>
+            {/* Household toggle — solo para gastos */}
+            {txType === 'expense' && (
+              <>
+                <div
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors"
+                  style={{
+                    background: isHousehold ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${isHousehold ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                  }}
+                  onClick={() => setIsHousehold(v => !v)}
+                >
+                  <Home size={16} className={isHousehold ? 'text-indigo-400' : 'text-slate-500'} />
+                  <span className={`text-sm flex-1 ${isHousehold ? 'text-indigo-300' : 'text-slate-400'}`}>
+                    ¿Del hogar?
+                  </span>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${isHousehold ? 'bg-indigo-500' : 'bg-slate-700'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${isHousehold ? 'left-[18px]' : 'left-0.5'}`} />
+                  </div>
+                </div>
 
-            {/* Household selector */}
-            {isHousehold && households.length > 1 && (
-              <select value={householdId} onChange={e => setHouseholdId(e.target.value)} className={selectCls}>
-                {(households as Household[]).map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-              </select>
+                {isHousehold && households.length > 1 && (
+                  <select value={householdId} onChange={e => setHouseholdId(e.target.value)} className={selectCls}>
+                    {(households as Household[]).map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                  </select>
+                )}
+              </>
             )}
 
             {submitError && (
@@ -499,7 +588,10 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 disabled={submitting}
                 className="flex-1 py-3 rounded-xl text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
               >
-                {submitting ? <Loader2 size={16} className="animate-spin" /> : 'Confirmar'}
+                {submitting
+                  ? <Loader2 size={16} className="animate-spin" />
+                  : txType === 'income' ? 'Registrar ingreso' : txType === 'transfer' ? 'Transferir' : 'Confirmar gasto'
+                }
               </button>
             </div>
           </div>

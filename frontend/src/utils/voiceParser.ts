@@ -2,10 +2,12 @@ export interface ParsedVoice {
   amount: number | null
   currency: 'UYU' | 'USD' | 'EUR' | null
   matchedAccountId: string | null
+  matchedDestAccountId: string | null
   matchedConceptId: string | null
   isHousehold: boolean
   rawTranscript: string
   spokenAccountText: string | null
+  spokenDestAccountText: string | null
   spokenConceptText: string | null
 }
 
@@ -238,7 +240,22 @@ export function parseVoiceExpense(
     }
   }
 
-  // 5. Concept n-gram scan on remaining words
+  // 5. Destination account scan on remaining words (for transfers)
+  let matchedDestAccountId: string | null = null
+  let spokenDestAccountText: string | null = null
+
+  if (accounts.length > 0 && matchedAccountId) {
+    const remainingForDest = scanWords.filter((_, i) => !usedIndices.has(i))
+    const destAccounts = accounts.filter(a => a.id !== matchedAccountId)
+    const destResult = findBestEntity(remainingForDest, destAccounts, 4, 2)
+    if (destResult) {
+      matchedDestAccountId = destResult.entity.id
+      spokenDestAccountText = remainingForDest.slice(destResult.startIdx, destResult.endIdx).join(' ')
+      for (let i = destResult.startIdx; i < destResult.endIdx; i++) usedIndices.add(i)
+    }
+  }
+
+  // 6. Concept n-gram scan on remaining words
   let matchedConceptId: string | null = null
   let spokenConceptText: string | null = null
 
@@ -255,10 +272,12 @@ export function parseVoiceExpense(
     amount,
     currency,
     matchedAccountId,
+    matchedDestAccountId,
     matchedConceptId,
     isHousehold,
     rawTranscript,
     spokenAccountText,
+    spokenDestAccountText,
     spokenConceptText,
   }
 }
