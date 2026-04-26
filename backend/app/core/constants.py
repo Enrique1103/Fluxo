@@ -36,6 +36,14 @@ INITIAL_USER_CATEGORIES = [
         "concepts": ["Supermercado", "Delivery", "Feria"],
     },
     {
+        "name": "Aseo",
+        "slug": "aseo",
+        "icon": "sparkles",
+        "color": "#0EA5E9",
+        "is_system": False,
+        "concepts": ["Higiene Personal", "Limpieza", "Peluquería", "Perfumería"],
+    },
+    {
         "name": "Vivienda",
         "slug": "vivienda",
         "icon": "home",
