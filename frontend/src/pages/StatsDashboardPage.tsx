@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Activity, BarChart2, ChevronLeft, ChevronRight,
   Eye, EyeOff, TrendingUp, TrendingDown, Settings,
-  CreditCard, Wallet, Upload, X, Search, Home,
+  CreditCard, Wallet, Upload, X, Search, Home, Pencil,
 } from 'lucide-react'
 import ExportButton from '../components/ExportButton'
 import { exportMonthlyPDF } from '../lib/exportPDF'
@@ -323,12 +323,13 @@ const ALL_PAYMENT_METHODS: PaymentMethod[] = [
 ]
 
 function TxTable({
-  transactions, privacy, currency, onDelete, onConfirmOpenChange, categoryFilter,
+  transactions, privacy, currency, onDelete, onEdit, onConfirmOpenChange, categoryFilter,
 }: {
   transactions: MonthlyBreakdown['transactions']
   privacy: boolean
   currency: string
   onDelete?: (id: string) => Promise<void>
+  onEdit?: (id: string) => void
   onConfirmOpenChange?: (open: boolean) => void
   categoryFilter?: string | null
 }) {
@@ -545,17 +546,28 @@ function TxTable({
                     {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '→' : '-'}{fmtMoney(tx.amount, currency, privacy)}
                   </td>
                   <td className="py-2 pr-3 text-right">
-                    {onDelete && (
-                      <button
-                        onClick={() => askDelete(tx)}
-                        disabled={deletingId === tx.id}
-                        className="p-1 text-slate-700 hover:text-red-400 transition-colors disabled:opacity-40"
-                      >
-                        {deletingId === tx.id
-                          ? <span className="text-xs">…</span>
-                          : <span className="text-xs font-bold">✕</span>}
-                      </button>
-                    )}
+                    <div className="flex items-center justify-end gap-1">
+                      {onEdit && (
+                        <button
+                          onClick={() => onEdit(tx.id)}
+                          className="p-1 text-slate-700 hover:text-emerald-400 transition-colors"
+                          title="Editar"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          onClick={() => askDelete(tx)}
+                          disabled={deletingId === tx.id}
+                          className="p-1 text-slate-700 hover:text-red-400 transition-colors disabled:opacity-40"
+                        >
+                          {deletingId === tx.id
+                            ? <span className="text-xs">…</span>
+                            : <span className="text-xs font-bold">✕</span>}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -634,6 +646,7 @@ export default function StatsDashboardPage() {
   const [currency,     setCurrency]     = useState('UYU')
   const [settingsOpen,      setSettingsOpen]      = useState(false)
   const [txModalOpen,       setTxModalOpen]       = useState(false)
+  const [editTxId,          setEditTxId]          = useState<string | undefined>(undefined)
   const [voiceOpen,         setVoiceOpen]         = useState(false)
   const [txConfirmOpen,     setTxConfirmOpen]     = useState(false)
   const [selectedCategory,  setSelectedCategory]  = useState<string | null>(null)
@@ -1021,6 +1034,7 @@ export default function StatsDashboardPage() {
             currency={currency}
             categoryFilter={selectedCategory}
             onConfirmOpenChange={setTxConfirmOpen}
+            onEdit={id => { setEditTxId(id); setTxModalOpen(true) }}
             onDelete={async (id) => {
               await deleteTransaction(id)
               await invalidateFinancialData(queryClient)
@@ -1039,11 +1053,15 @@ export default function StatsDashboardPage() {
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
         </button>
-        <FAB onClick={() => setTxModalOpen(true)} />
+        <FAB onClick={() => { setEditTxId(undefined); setTxModalOpen(true) }} />
       </>
     )}
     <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-    <TransactionModal open={txModalOpen} onClose={() => setTxModalOpen(false)} />
+    <TransactionModal
+      open={txModalOpen}
+      editTxId={editTxId}
+      onClose={() => { setTxModalOpen(false); setEditTxId(undefined) }}
+    />
     <VoiceExpenseModal open={voiceOpen} onClose={() => setVoiceOpen(false)} />
     </>
   )

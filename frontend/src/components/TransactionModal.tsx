@@ -6,7 +6,9 @@ import {
   fetchAccounts,
   fetchCategories,
   fetchConcepts,
+  fetchTransaction,
   createTransaction,
+  updateTransaction,
   createInstalmentPlan,
   createAccount,
   createCategory,
@@ -20,6 +22,7 @@ import { invalidateFinancialData } from '../lib/queryClient'
 interface Props {
   open: boolean
   onClose: () => void
+  editTxId?: string
 }
 
 const PRESET_COLORS = [
@@ -186,7 +189,8 @@ function QuickCreateCategory({ onCreated, onCancel }: QuickCreateCategoryProps) 
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export default function TransactionModal({ open, onClose }: Props) {
+export default function TransactionModal({ open, onClose, editTxId }: Props) {
+  const isEditing = !!editTxId
   const queryClient = useQueryClient()
 
   const [txType, setTxType] = useState<'income' | 'expense' | 'transfer'>('expense')
@@ -229,9 +233,10 @@ export default function TransactionModal({ open, onClose }: Props) {
   const { data: categories  = [] } = useQuery({ queryKey: ['categories'],  queryFn: fetchCategories,  enabled: open })
   const { data: concepts    = [] } = useQuery({ queryKey: ['concepts'],    queryFn: fetchConcepts,    enabled: open })
   const { data: households  = [] } = useQuery({ queryKey: ['households'],  queryFn: fetchHouseholds,  enabled: open })
+  const { data: editTx      }      = useQuery({ queryKey: ['tx', editTxId], queryFn: () => fetchTransaction(editTxId!), enabled: !!editTxId && open })
 
   useEffect(() => {
-    if (accounts.length > 0 && !accountId) {
+    if (accounts.length > 0 && !accountId && !isEditing) {
       const first = accounts[0]
       setAccountId(first.id)
       if (txType === 'expense') {
@@ -242,9 +247,30 @@ export default function TransactionModal({ open, onClose }: Props) {
     }
   }, [accounts])
 
+  // Pre-fill fields when editing an existing transaction
   useEffect(() => {
-    if (open && households.length > 0) setHouseholdId(households[0].id)
-  }, [open, households])
+    if (!editTx) return
+    setTxType(editTx.type)
+    setAccountId(editTx.account_id)
+    setConceptId(editTx.concept_id)
+    setCategoryId(editTx.category_id)
+    setAmount(String(editTx.amount))
+    setDate(editTx.date)
+    setDescription(editTx.description ?? '')
+    setMetodoPago(editTx.metodo_pago)
+    setIsShared(!!editTx.household_id)
+  }, [editTx])
+
+  useEffect(() => {
+    if (!open) return
+    if (editTx?.household_id) {
+      setHouseholdId(editTx.household_id)
+    } else if (households.length > 0 && !isEditing) {
+      setHouseholdId(households[0].id)
+    } else if (households.length > 0 && !householdId) {
+      setHouseholdId(households[0].id)
+    }
+  }, [open, households, editTx])
 
   useEffect(() => { setDestAccountId('') }, [accountId])
 
@@ -290,20 +316,32 @@ export default function TransactionModal({ open, onClose }: Props) {
 
   const handleSubmit = async () => {
     setServerError(null)
-    if (!accountId)  { setServerError('Seleccioná una cuenta');    return }
     if (!conceptId)  { setServerError('Seleccioná un concepto');   return }
     if (!categoryId) { setServerError('Seleccioná una categoría'); return }
     const amt = parseFloat(amount)
     if (isNaN(amt) || amt <= 0) { setServerError('El monto debe ser mayor a 0'); return }
     if (!date) { setServerError('La fecha es requerida'); return }
-    if (txType === 'transfer' && !destAccountId) { setServerError('Seleccioná la cuenta destino'); return }
-    if (enCuotas && txType === 'expense') {
-      const n = parseInt(nCuotas)
-      if (isNaN(n) || n < 2 || n > 60) { setServerError('Las cuotas deben ser entre 2 y 60'); return }
+    if (!isEditing) {
+      if (!accountId) { setServerError('Seleccioná una cuenta'); return }
+      if (txType === 'transfer' && !destAccountId) { setServerError('Seleccioná la cuenta destino'); return }
+      if (enCuotas && txType === 'expense') {
+        const n = parseInt(nCuotas)
+        if (isNaN(n) || n < 2 || n > 60) { setServerError('Las cuotas deben ser entre 2 y 60'); return }
+      }
     }
     setSubmitting(true)
     try {
-      if (enCuotas && txType === 'expense') {
+      if (isEditing) {
+        await updateTransaction(editTxId!, {
+          amount:       amt,
+          date,
+          description:  description.trim() || null,
+          concept_id:   conceptId,
+          category_id:  categoryId,
+          ...(txType === 'expense' ? { metodo_pago: metodoPago } : {}),
+          household_id: isShared && householdId && txType === 'expense' ? householdId : null,
+        })
+      } else if (enCuotas && txType === 'expense') {
         await createInstalmentPlan({
           account_id:   accountId,
           concept_id:   conceptId,
@@ -335,7 +373,7 @@ export default function TransactionModal({ open, onClose }: Props) {
       await invalidateFinancialData(queryClient)
       onClose()
     } catch (err) {
-      setServerError(parseErr(err, 'No se pudo registrar el movimiento'))
+      setServerError(parseErr(err, isEditing ? 'No se pudo guardar los cambios' : 'No se pudo registrar el movimiento'))
     } finally {
       setSubmitting(false)
     }
@@ -351,7 +389,7 @@ export default function TransactionModal({ open, onClose }: Props) {
 
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold text-white">Registrar Movimiento</h2>
+          <h2 className="text-base font-semibold text-white">{isEditing ? 'Editar Movimiento' : 'Registrar Movimiento'}</h2>
           <button
             onClick={onClose}
             className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800"
@@ -360,7 +398,7 @@ export default function TransactionModal({ open, onClose }: Props) {
           </button>
         </div>
 
-        {/* Tipo toggle */}
+        {/* Tipo toggle — deshabilitado en modo edición */}
         <div className="flex gap-2 mb-5">
           {(['income', 'expense', 'transfer'] as const).map(type => {
             const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia' }
@@ -369,14 +407,18 @@ export default function TransactionModal({ open, onClose }: Props) {
               expense:  'bg-rose-400/15 border-rose-400/40 text-rose-400',
               transfer: 'bg-amber-400/15 border-amber-400/40 text-amber-400',
             }
+            const isActive = txType === type
             return (
               <button
                 key={type}
-                onClick={() => { setTxType(type); if (type !== 'expense') { setIsShared(false); setHouseholdId('') } }}
+                disabled={isEditing}
+                onClick={() => { if (!isEditing) { setTxType(type); if (type !== 'expense') { setIsShared(false); setHouseholdId('') } } }}
                 className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all ${
-                  txType === type
+                  isActive
                     ? activeStyles[type]
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                    : isEditing
+                      ? 'bg-slate-800/30 border-slate-700/30 text-slate-600 cursor-default'
+                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
                 }`}
               >
                 {labels[type]}
@@ -448,20 +490,25 @@ export default function TransactionModal({ open, onClose }: Props) {
         {!noAccounts && (
           <div className="space-y-4">
 
-            {/* Cuenta */}
+            {/* Cuenta — read-only en modo edición */}
             <div>
-              <label className={labelClass}>Cuenta</label>
+              <label className={labelClass}>Cuenta {isEditing && <span className="text-slate-600">(no editable)</span>}</label>
               <div className="relative">
-                <select value={accountId} onChange={e => {
-                  const id = e.target.value
-                  setAccountId(id)
-                  const acc = accounts.find(a => a.id === id)
-                  if (acc && txType === 'expense') {
-                    if (acc.type === 'cash')   { setMetodoPago('efectivo');       setEnCuotas(false) }
-                    if (acc.type === 'debit')  { setMetodoPago('tarjeta_debito'); setEnCuotas(false) }
-                    if (acc.type === 'credit') { setMetodoPago('tarjeta_credito') }
-                  }
-                }} className={selectClass}>
+                <select
+                  value={accountId}
+                  disabled={isEditing}
+                  onChange={e => {
+                    const id = e.target.value
+                    setAccountId(id)
+                    const acc = accounts.find(a => a.id === id)
+                    if (acc && txType === 'expense') {
+                      if (acc.type === 'cash')   { setMetodoPago('efectivo');       setEnCuotas(false) }
+                      if (acc.type === 'debit')  { setMetodoPago('tarjeta_debito'); setEnCuotas(false) }
+                      if (acc.type === 'credit') { setMetodoPago('tarjeta_credito') }
+                    }
+                  }}
+                  className={selectClass + (isEditing ? ' opacity-50 cursor-default' : '')}
+                >
                   <option value="" disabled>Seleccioná una cuenta</option>
                   {accounts.map(acc => (
                     <option key={acc.id} value={acc.id}>
@@ -691,7 +738,7 @@ export default function TransactionModal({ open, onClose }: Props) {
               className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 mt-2"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              Registrar
+              {isEditing ? 'Guardar cambios' : 'Registrar'}
             </button>
           </div>
         )}

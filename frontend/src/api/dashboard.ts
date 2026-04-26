@@ -280,9 +280,22 @@ export const deleteAccount = async (id: string): Promise<void> => {
 }
 
 // --- Transaction management ---
+export interface TransactionDetail {
+  id: string; account_id: string; concept_id: string; category_id: string
+  amount: number; type: 'income' | 'expense' | 'transfer'; date: string
+  description: string | null; metodo_pago: PaymentMethod
+  household_id: string | null; instalment_plan_id: string | null
+}
+
+export const fetchTransaction = async (id: string): Promise<TransactionDetail> => {
+  const { data } = await client.get<TransactionDetail>(`/v1/transactions/${id}`)
+  return data
+}
+
 export const updateTransaction = async (id: string, payload: {
-  amount?: number; description?: string | null; date?: string; concept_id?: string; category_id?: string
-  metodo_pago?: PaymentMethod
+  amount?: number; description?: string | null; date?: string
+  concept_id?: string; category_id?: string; metodo_pago?: PaymentMethod
+  household_id?: string | null
 }): Promise<void> => {
   await client.patch(`/v1/transactions/${id}`, payload)
 }
