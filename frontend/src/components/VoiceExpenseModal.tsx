@@ -270,7 +270,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
 
             {/* Amount + currency */}
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Monto</label>
+              <label className="text-xs text-slate-400 mb-1 block">Monto <span style={{color:'red'}}>[DEBUG state="{amount}"]</span></label>
               <div className="flex gap-2">
                 <input
                   type="text"
