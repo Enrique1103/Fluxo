@@ -167,13 +167,19 @@ export function parseVoiceExpense(
   const isHousehold = /del hogar|para el hogar|\bhogar\b|compartido/.test(t)
   t = t.replace(/del hogar|para el hogar|\bhogar\b|compartido/g, '').replace(/\s+/g, ' ').trim()
 
-  // 2. Amount — normalized text first, raw transcript as fallback for encoding edge cases
+  // 2. Amount — strip everything except digits and decimal separators from raw transcript,
+  //    then take the first numeric token. This handles $100, US$100, "cien" fallback, etc.
   let amount: number | null = null
-  const digitMatch = t.match(/\d+(?:[.,]\d+)?/) ?? rawTranscript.match(/\d+(?:[.,]\d+)?/)
-  if (digitMatch) {
-    amount = parseFloat(digitMatch[0].replace(',', '.'))
-    t = t.replace(digitMatch[0], '').replace(/\s+/g, ' ').trim()
+  const digitTokens = rawTranscript
+    .replace(/[^\d.,\s]/g, ' ')
+    .split(/\s+/)
+    .filter(s => /^\d+(?:[.,]\d+)?$/.test(s) && s.length > 0)
+
+  if (digitTokens.length > 0) {
+    amount = parseFloat(digitTokens[0].replace(',', '.'))
+    t = t.replace(digitTokens[0], '').replace(/\s+/g, ' ').trim()
   } else {
+    // Fallback: written Spanish number ("cien", "doscientos", etc.)
     const noTrigger = t.replace(/\b(gaste|gasto|pague|pago|compre|cobre|recibi)\b/gi, '').trim()
     const prepIdx = noTrigger.search(/\b(?:en|de|para)\b/)
     const candidate = prepIdx >= 0 ? noTrigger.slice(0, prepIdx).trim() : noTrigger
