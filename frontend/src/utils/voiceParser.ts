@@ -172,35 +172,52 @@ export function parseVoiceExpense(
   const isHousehold = /del hogar|para el hogar|\bhogar\b|compartido/.test(t)
   t = t.replace(/del hogar|para el hogar|\bhogar\b|compartido/g, '').replace(/\s+/g, ' ').trim()
 
-  // 2. Amount — merge spaced thousands groups first ("58 000" → "58000", "1 500 000" → "1500000"),
-  //    then scan each word for the first positive finite number.
-  //    Handles: $100, US$100, 100pesos, 1.500, 58 000, 1 500 000, 150,50, etc.
+  // 2. Amount — handles spaced thousands ("58 000"), Spanish notation ("1.500", "152.000,28"),
+  //    double-period format ("152.000.28"), and plain decimals ("150,50").
   function mergeThousands(s: string): string {
     let prev = ''
     while (prev !== s) { prev = s; s = s.replace(/(\d+)\s(\d{3})(?!\d)/g, '$1$2') }
     return s
   }
+  function parseNumericToken(raw: string): number | null {
+    const s = raw.replace(/^[^\d]*/, '').replace(/[^\d.,]*$/, '')
+    if (!s) return null
+    // "1.500.000" or "152.000" — all periods are thousands separators (each group exactly 3 digits)
+    if (/^\d{1,3}(\.\d{3})+$/.test(s)) return parseInt(s.replace(/\./g, ''), 10)
+    // "1,500,000" — all commas are thousands separators
+    if (/^\d{1,3}(,\d{3})+$/.test(s)) return parseInt(s.replace(/,/g, ''), 10)
+    // "1.500,28" or "152.000,28" — period thousands + comma decimal
+    if (/^\d{1,3}(\.\d{3})*,\d{1,2}$/.test(s)) return parseFloat(s.replace(/\./g, '').replace(',', '.'))
+    // "152.000.28" or "1.500.28" — period thousands + period decimal (last group ≤ 2 digits)
+    if (/^\d+(\.\d{3})+\.\d{1,2}$/.test(s)) {
+      const parts = s.split('.')
+      const decimal = parts.pop()!
+      return parseFloat(parts.join('') + '.' + decimal)
+    }
+    // "150,28" — comma as decimal separator
+    if (/^\d+,\d{1,2}$/.test(s)) return parseFloat(s.replace(',', '.'))
+    // "150" or "150.28" — plain integer or decimal
+    if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s)
+    return null
+  }
+
   const amountSource = mergeThousands(rawTranscript)
   t = mergeThousands(t)
 
   let amount: number | null = null
   let amountStr: string | null = null
   for (const word of amountSource.split(/\s+/)) {
-    const cleaned = word.replace(/^[^\d]*/, '').replace(/[^\d.,]*$/, '')
-    if (!cleaned) continue
-    // "1.500" / "1,500" with exactly 3 decimal digits = thousands separator (Spanish notation)
-    const numStr = /^\d+[.,]\d{3}$/.test(cleaned)
-      ? cleaned.replace(/[.,]/, '')
-      : cleaned.replace(',', '.')
-    if (/^\d+(?:\.\d+)?$/.test(numStr)) {
-      const n = parseFloat(numStr)
-      if (isFinite(n) && n > 0) { amount = n; amountStr = cleaned; break }
+    const n = parseNumericToken(word)
+    if (n !== null && isFinite(n) && n > 0) {
+      amount = n
+      amountStr = word.replace(/^[^\d]*/, '').replace(/[^\d.,]*$/, '')
+      break
     }
   }
   if (amountStr) {
-    // amountStr may have had thousands separator stripped — remove both forms from t
-    const amountNorm = amountStr.replace(/[.,]/, '')
-    t = t.replace(amountNorm, '').replace(amountStr, '').replace(/\s+/g, ' ').trim()
+    // norm() converts "." and "," to spaces, so "152.000.28" → "152 000 28" → mergeThousands → "152000 28"
+    const amountInT = mergeThousands(norm(amountStr))
+    t = t.replace(amountInT, '').replace(/\s+/g, ' ').trim()
   } else {
     // Fallback: written Spanish number ("cien", "doscientos", etc.)
     const noTrigger = t.replace(/\b(gaste|gasto|pague|pago|compre|cobre|recibi)\b/gi, '').trim()
