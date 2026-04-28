@@ -147,7 +147,7 @@ export default function ExchangeRateManager({ userCurrency }: { userCurrency: st
               <input
                 value={form.from_currency}
                 onChange={e => setForm(f => ({ ...f, from_currency: e.target.value.toUpperCase() }))}
-                maxLength={3}
+                maxLength={10}
                 placeholder="USD"
                 className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/60"
               />
@@ -157,8 +157,8 @@ export default function ExchangeRateManager({ userCurrency }: { userCurrency: st
               <input
                 value={form.to_currency}
                 onChange={e => setForm(f => ({ ...f, to_currency: e.target.value.toUpperCase() }))}
-                maxLength={3}
-                placeholder="UYU"
+                maxLength={10}
+                placeholder={userCurrency}
                 className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/60"
               />
             </div>

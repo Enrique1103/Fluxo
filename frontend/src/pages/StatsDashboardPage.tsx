@@ -788,7 +788,7 @@ export default function StatsDashboardPage() {
               onChange={e => setCurrency(e.target.value)}
               className="bg-transparent text-sm font-medium text-slate-300 outline-none appearance-none cursor-pointer pr-4"
             >
-              {['UYU', 'USD', 'EUR'].map(c => (
+              {[...new Set([me?.currency_default ?? 'UYU', 'USD', 'EUR'])].map(c => (
                 <option key={c} value={c} className="bg-slate-900">{c}</option>
               ))}
             </select>

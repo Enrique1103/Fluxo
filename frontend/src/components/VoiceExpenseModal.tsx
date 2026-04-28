@@ -7,6 +7,7 @@ import { fetchHouseholds } from '../api/households'
 import { invalidateFinancialData } from '../lib/queryClient'
 import type { Account, Category, Concept } from '../api/dashboard'
 import type { Household } from '../api/households'
+import { useHomeCurrency } from '../hooks/useHomeCurrency'
 
 interface Props {
   open: boolean
@@ -37,6 +38,8 @@ const inputStyle = {
 
 export default function VoiceExpenseModal({ open, onClose }: Props) {
   const qc = useQueryClient()
+  const homeCurrency = useHomeCurrency()
+  const currencyOpts = [...new Set([homeCurrency, 'USD', 'EUR'])]
 
   const { data: accounts   = [], isLoading: loadingAccounts  } = useQuery({ queryKey: ['accounts'],   queryFn: fetchAccounts,   enabled: open })
   const { data: categories = []                              } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories, enabled: open })
@@ -53,7 +56,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
 
   // Review fields
   const [amount,      setAmount]      = useState('')
-  const [currency,    setCurrency]    = useState('UYU')
+  const [currency,    setCurrency]    = useState(homeCurrency)
   const [conceptId,   setConceptId]   = useState('')
   const [categoryId,  setCategoryId]  = useState('')
   const [accountId,   setAccountId]   = useState('')
@@ -95,7 +98,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       setInterim('')
       setSpeechError('')
       setTxType('expense')
-      setAmount(''); setCurrency('UYU'); setConceptId(''); setCategoryId('')
+      setAmount(''); setCurrency(homeCurrency); setConceptId(''); setCategoryId('')
       setAccountId(''); setDestAccountId(''); setDescription(''); setIsHousehold(false)
       setRawText(''); setUnmatchedAccount(null); setUnmatchedConcept(null)
       setEnCuotas(false); setNCuotas('2')
@@ -419,9 +422,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   className={inputCls + ' flex-1'}
                 />
                 <select value={currency} onChange={e => setCurrency(e.target.value)} className={baseCls + ' w-24 bg-slate-800 text-slate-200'}>
-                  <option value="UYU">UYU</option>
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
+                  {currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
             </div>

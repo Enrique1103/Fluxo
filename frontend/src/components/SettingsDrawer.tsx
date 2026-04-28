@@ -6,6 +6,7 @@ import {
   ChevronRight, ArrowLeft, Plus, Target, Eye, EyeOff, Sun, Moon,
 } from 'lucide-react'
 import useTheme from '../hooks/useTheme'
+import { useHomeCurrency } from '../hooks/useHomeCurrency'
 import {
   fetchMe, updateCurrency, updateName, updatePassword, logoutApi, deleteUserAccount,
   fetchAccounts, updateAccount, deleteAccount, type Account,
@@ -206,9 +207,11 @@ function PerfilSection({ open }: { open: boolean }) {
   const [optimisticCurrency, setOptimisticCurrency] = useState<string | null>(null)
   const [currencyStatus,     setCurrencyStatus]     = useState<Status>(null)
   const [savingCurrency,     setSavingCurrency]     = useState(false)
+  const [currencyDraft,      setCurrencyDraft]      = useState('')
   const activeCurrency = optimisticCurrency ?? me?.currency_default ?? ''
+  useEffect(() => { if (me?.currency_default && !currencyDraft) setCurrencyDraft(me.currency_default) }, [me?.currency_default])
   const handleCurrencyChange = async (value: string) => {
-    if (value === activeCurrency || savingCurrency) return
+    if (!value || value === activeCurrency || savingCurrency) return
     setOptimisticCurrency(value); setSavingCurrency(true); setCurrencyStatus(null)
     try {
       await updateCurrency(value)
@@ -217,6 +220,7 @@ function PerfilSection({ open }: { open: boolean }) {
       setCurrencyStatus({ type: 'success', msg: 'Moneda actualizada' })
     } catch (err: any) {
       setOptimisticCurrency(null)
+      setCurrencyDraft(activeCurrency)
       setCurrencyStatus({ type: 'error', msg: parseErr(err, 'No se pudo actualizar') })
     } finally { setSavingCurrency(false) }
   }
@@ -321,24 +325,29 @@ function PerfilSection({ open }: { open: boolean }) {
           <h3 className="text-sm font-semibold text-slate-200">Moneda por defecto</h3>
         </div>
         <div className="flex gap-2">
-          {(['UYU', 'USD', 'EUR'] as const).map(cur => (
-            <button
-              key={cur}
-              disabled={savingCurrency}
-              onClick={() => handleCurrencyChange(cur)}
-              translate="no"
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all ${
-                activeCurrency === cur
-                  ? 'bg-emerald-400/15 border-emerald-400/40 text-emerald-400'
-                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
-              }`}
-            >
-              {savingCurrency && activeCurrency === cur
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" />
-                : cur}
-            </button>
-          ))}
+          <input
+            list="currency-list"
+            type="text"
+            value={currencyDraft}
+            onChange={e => setCurrencyDraft(e.target.value.toUpperCase().slice(0, 10))}
+            placeholder="Ej. UYU, BRL, CUP…"
+            translate="no"
+            className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-emerald-500/60 transition-colors font-mono"
+          />
+          <datalist id="currency-list">
+            {['UYU', 'USD', 'EUR', 'BRL', 'ARS', 'CLP', 'COP', 'MXN', 'PEN', 'CUP', 'GBP', 'JPY', 'CAD', 'AUD'].map(c => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+          <button
+            onClick={() => handleCurrencyChange(currencyDraft.trim())}
+            disabled={savingCurrency || !currencyDraft.trim() || currencyDraft.trim() === activeCurrency}
+            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 rounded-xl text-sm font-bold transition-colors flex items-center gap-1"
+          >
+            {savingCurrency ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar'}
+          </button>
         </div>
+        <p className="text-[10px] text-slate-500 px-1 mt-1.5">Código ISO de tu moneda (ej. UYU, BRL, CUP)</p>
         <StatusMsg status={currencyStatus} />
       </section>
 
@@ -384,7 +393,9 @@ function PerfilSection({ open }: { open: boolean }) {
 // ─── Cuentas section ──────────────────────────────────────────────────────────
 
 function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => void }) {
-  const queryClient = useQueryClient()
+  const queryClient  = useQueryClient()
+  const homeCurrency = useHomeCurrency()
+  const currencyOpts = [...new Set([homeCurrency, 'USD', 'EUR'])]
   const { data: accounts = [] } = useQuery({
     queryKey: ['accounts'],
     queryFn:  fetchAccounts,
@@ -499,9 +510,7 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
                       onChange={e => setEditAcctCurrency(e.target.value)}
                       className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/60 cursor-pointer"
                     >
-                      <option value="UYU">UYU</option>
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
+                      {currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                 )}

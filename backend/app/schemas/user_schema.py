@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-_CURRENCY_PATTERN = r"^(UYU|USD|EUR)$"
+_CURRENCY_PATTERN = r"^[A-Z]{2,10}$"
 
 
 def _validate_password_strength(v: str) -> str:

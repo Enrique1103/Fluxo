@@ -3,6 +3,7 @@ import { X, Loader2, ChevronDown } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { createAccount } from '../api/dashboard'
 import { invalidateFinancialData } from '../lib/queryClient'
+import { useHomeCurrency } from '../hooks/useHomeCurrency'
 
 interface Props {
   open: boolean
@@ -27,18 +28,20 @@ function parseErr(err: unknown, fallback: string): string {
 }
 
 export default function AccountModal({ open, onClose }: Props) {
-  const queryClient = useQueryClient()
+  const queryClient  = useQueryClient()
+  const homeCurrency = useHomeCurrency()
+  const currencyOpts = [...new Set([homeCurrency, 'USD', 'EUR'])]
 
   const [name,        setName]        = useState('')
   const [type,        setType]        = useState('cash')
-  const [currency,    setCurrency]    = useState('UYU')
+  const [currency,    setCurrency]    = useState(homeCurrency)
   const [balance,     setBalance]     = useState('')
   const [creditLimit, setCreditLimit] = useState('')
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState<string | null>(null)
 
   const reset = () => {
-    setName(''); setType('cash'); setCurrency('UYU')
+    setName(''); setType('cash'); setCurrency(homeCurrency)
     setBalance(''); setCreditLimit(''); setError(null)
   }
 
@@ -118,9 +121,7 @@ export default function AccountModal({ open, onClose }: Props) {
               <label className={labelClass}>Moneda</label>
               <div className="relative">
                 <select value={currency} onChange={e => setCurrency(e.target.value)} className={selectClass}>
-                  <option value="UYU">UYU</option>
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
+                  {currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
               </div>

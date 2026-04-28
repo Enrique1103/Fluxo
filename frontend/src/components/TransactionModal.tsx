@@ -18,6 +18,7 @@ import {
 } from '../api/dashboard'
 import { fetchHouseholds } from '../api/households'
 import { invalidateFinancialData } from '../lib/queryClient'
+import { useHomeCurrency } from '../hooks/useHomeCurrency'
 
 interface Props {
   open: boolean
@@ -190,8 +191,10 @@ function QuickCreateCategory({ onCreated, onCancel }: QuickCreateCategoryProps) 
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export default function TransactionModal({ open, onClose, editTxId }: Props) {
-  const isEditing = !!editTxId
-  const queryClient = useQueryClient()
+  const isEditing    = !!editTxId
+  const queryClient  = useQueryClient()
+  const homeCurrency = useHomeCurrency()
+  const currencyOpts = [...new Set([homeCurrency, 'USD', 'EUR'])]
 
   const [txType, setTxType] = useState<'income' | 'expense' | 'transfer'>('expense')
 
@@ -223,7 +226,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   // Inline account creation state
   const [acctName,     setAcctName]     = useState('')
   const [acctType,     setAcctType]     = useState('cash')
-  const [acctCurrency, setAcctCurrency] = useState('UYU')
+  const [acctCurrency, setAcctCurrency] = useState(homeCurrency)
   const [acctBalance,  setAcctBalance]  = useState('')
   const [acctLimit,    setAcctLimit]    = useState('')
   const [creatingAcct, setCreatingAcct] = useState(false)
@@ -281,7 +284,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
       setAmount(''); setDate(today()); setDescription('')
       setDestAccountId(''); setServerError(null)
       setShowNewConcept(false); setShowNewCategory(false)
-      setAcctName(''); setAcctType('cash'); setAcctCurrency('UYU')
+      setAcctName(''); setAcctType('cash'); setAcctCurrency(homeCurrency)
       setAcctBalance(''); setAcctLimit(''); setAcctError(null)
       setMetodoPago('efectivo')
       setEnCuotas(false); setNCuotas('2')
@@ -454,9 +457,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                   <label className={labelClass}>Moneda</label>
                   <div className="relative">
                     <select value={acctCurrency} onChange={e => setAcctCurrency(e.target.value)} className={selectClass}>
-                      <option value="UYU">UYU</option>
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
+                      {currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
                   </div>

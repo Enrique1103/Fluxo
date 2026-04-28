@@ -875,7 +875,7 @@ export default function DashboardPage() {
   const { theme } = useTheme()
   const isLight = theme === 'light'
   const [privacyMode,   setPrivacyMode]   = useState(() => localStorage.getItem('privacy') === 'true')
-  const [currency,      setCurrency]      = useState('UYU')
+  const [currency,      setCurrency]      = useState('UYU') // synced to home currency below
   const [settingsOpen,    setSettingsOpen]    = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>(null)
   const [goalModalOpen,    setGoalModalOpen]    = useState(false)
@@ -951,6 +951,7 @@ export default function DashboardPage() {
     queryFn:  fetchMe,
   })
 
+  useEffect(() => { if (me?.currency_default) setCurrency(me.currency_default) }, [me?.currency_default])
 
   const { data: patrimonioData = [] } = useQuery({
     queryKey: ['patrimonio', monthsBack, monthsAhead, currency],
@@ -1157,7 +1158,7 @@ export default function DashboardPage() {
               onChange={e => setCurrency(e.target.value)}
               className="bg-transparent text-sm font-medium text-slate-300 outline-none appearance-none cursor-pointer pr-4"
             >
-              {['UYU', 'USD', 'EUR'].map(cur => (
+              {[...new Set([me?.currency_default ?? 'UYU', 'USD', 'EUR'])].map(cur => (
                 <option key={cur} value={cur} translate="no" className="bg-slate-900">{cur}</option>
               ))}
             </select>

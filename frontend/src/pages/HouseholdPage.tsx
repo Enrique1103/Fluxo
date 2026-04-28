@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -18,6 +18,7 @@ import CreateModal from '../components/household/CreateModal'
 import JoinModal from '../components/household/JoinModal'
 import EditModal from '../components/household/EditModal'
 import SettingsDrawer from '../components/SettingsDrawer'
+import { useHomeCurrency } from '../hooks/useHomeCurrency'
 import {
   MONTH_NAMES, DONUT_COLORS, avatarPalette, fmtNum,
   getUserIdFromToken, getMemberBreakdown, categoryColor,
@@ -30,8 +31,10 @@ export default function HouseholdPage() {
   const token         = useAuthStore((s) => s.token)
   const currentUserId = getUserIdFromToken(token)
 
+  const homeCurrency = useHomeCurrency()
   const [privacy,      setPrivacy]      = useState(() => localStorage.getItem('privacy') === 'true')
-  const [currency,     setCurrency]     = useState('UYU')
+  const [currency,     setCurrency]     = useState(homeCurrency)
+  useEffect(() => { if (homeCurrency) setCurrency(homeCurrency) }, [homeCurrency])
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const [showCreate, setShowCreate] = useState(false)
@@ -193,9 +196,7 @@ export default function HouseholdPage() {
             onChange={e => setCurrency(e.target.value)}
             className="bg-slate-800/60 border border-slate-700/50 rounded-xl px-2 py-1.5 text-xs font-semibold text-slate-200 focus:outline-none focus:border-indigo-500/50 cursor-pointer"
           >
-            <option value="UYU">UYU</option>
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
+            {[...new Set([homeCurrency, 'USD', 'EUR'])].map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           {/* Settings */}
           <button
