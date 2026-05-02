@@ -37,7 +37,8 @@ export default function DatePicker({
   const [open, setOpen] = useState(false)
   const [viewYear,  setViewYear]  = useState(selected?.getFullYear()  ?? today.getFullYear())
   const [viewMonth, setViewMonth] = useState(selected?.getMonth()     ?? today.getMonth())
-  const ref = useRef<HTMLDivElement>(null)
+  const ref     = useRef<HTMLDivElement>(null)
+  const [flipUp, setFlipUp] = useState(false)
 
   // Sync view when value changes externally
   useEffect(() => {
@@ -103,7 +104,13 @@ export default function DatePicker({
       {/* Trigger */}
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => {
+          if (!open && ref.current) {
+            const rect = ref.current.getBoundingClientRect()
+            setFlipUp(rect.bottom + 320 > window.innerHeight)
+          }
+          setOpen(o => !o)
+        }}
         className="w-full flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-emerald-500/60 hover:border-slate-600 transition-colors text-left text-slate-200"
       >
         <CalendarDays className="w-4 h-4 text-slate-500 shrink-0" />
@@ -114,8 +121,8 @@ export default function DatePicker({
 
       {/* Calendar popup */}
       {open && (
-        <div className="absolute z-50 mt-1.5 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4"
-          style={{ top: '100%', left: 0 }}>
+        <div className="absolute z-50 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4"
+          style={flipUp ? { bottom: 'calc(100% + 6px)', left: 0 } : { top: 'calc(100% + 6px)', left: 0 }}>
 
           {/* Month/year navigation */}
           <div className="flex items-center justify-between mb-3">
