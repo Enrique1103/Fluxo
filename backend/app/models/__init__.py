@@ -1,6 +1,6 @@
 from .base import Base
 from .users_models import User
-from .accounts_models import Account, AccountType, CurrencyCode
+from .accounts_models import Account, AccountType
 from .categories_models import Category
 from .concepts_models import Concept
 from .transactions_models import Transaction, TransactionType, TransferRole
@@ -17,7 +17,6 @@ __all__ = [
     "User",
     "Account",
     "AccountType",
-    "CurrencyCode",
     "Category",
     "Concept",
     "Transaction",

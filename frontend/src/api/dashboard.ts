@@ -188,6 +188,7 @@ export const createTransaction = async (payload: {
   account_id: string; concept_id: string; category_id: string; amount: number
   type: 'income' | 'expense' | 'transfer'; date: string; description?: string
   transfer_to_account_id?: string; external_account_id?: string
+  commission?: number
   metodo_pago?: PaymentMethod; household_id?: string
 }): Promise<void> => {
   await client.post('/v1/transactions', payload)
@@ -284,6 +285,7 @@ export interface TransactionDetail {
   id: string; account_id: string; concept_id: string; category_id: string
   amount: number; type: 'income' | 'expense' | 'transfer'; date: string
   description: string | null; metodo_pago: PaymentMethod
+  commission: number | null
   household_id: string | null; instalment_plan_id: string | null
 }
 

@@ -123,6 +123,7 @@ def create(
     transfer_id: uuid.UUID | None = None,
     transfer_role: TransferRole | None = None,
     external_account_id: uuid.UUID | None = None,
+    commission: Decimal | None = None,
     metodo_pago: PaymentMethod = PaymentMethod.OTRO,
     household_id: uuid.UUID | None = None,
 ) -> Transaction:
@@ -138,6 +139,7 @@ def create(
         transfer_id=transfer_id,
         transfer_role=transfer_role,
         external_account_id=external_account_id,
+        commission=commission,
         metodo_pago=metodo_pago,
         household_id=household_id,
     )

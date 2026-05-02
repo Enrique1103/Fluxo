@@ -211,6 +211,9 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   // Expense payment method
   const [metodoPago, setMetodoPago] = useState<PaymentMethod>('efectivo')
 
+  // Comisión de transferencia
+  const [commission, setCommission] = useState('')
+
   // Cuotas
   const [enCuotas,  setEnCuotas]  = useState(false)
   const [nCuotas,   setNCuotas]   = useState('2')
@@ -287,6 +290,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
       setAcctName(''); setAcctType('cash'); setAcctCurrency(homeCurrency)
       setAcctBalance(''); setAcctLimit(''); setAcctError(null)
       setMetodoPago('efectivo')
+      setCommission('')
       setEnCuotas(false); setNCuotas('2')
       setIsShared(false); setHouseholdId('')
     }
@@ -366,6 +370,9 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
           description: description.trim() || undefined,
           ...(txType === 'transfer' && destAccountId
             ? { transfer_to_account_id: destAccountId }
+            : {}),
+          ...(txType === 'transfer' && commission && parseFloat(commission) > 0
+            ? { commission: parseFloat(commission) }
             : {}),
           ...(txType === 'expense' ? { metodo_pago: metodoPago } : {}),
           ...(isShared && householdId && txType === 'expense'
@@ -542,6 +549,22 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
                 </div>
+              </div>
+            )}
+
+            {/* Comisión — solo para transferencias */}
+            {txType === 'transfer' && (
+              <div>
+                <label className={labelClass}>Comisión bancaria <span className="text-slate-600">(opcional)</span></label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={commission}
+                  onChange={e => setCommission(e.target.value)}
+                  placeholder="0.00"
+                  className={inputClass}
+                />
               </div>
             )}
 

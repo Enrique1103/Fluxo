@@ -38,6 +38,8 @@ class TransactionCreate(BaseModel):
     description: str | None = Field(default=None, max_length=100)
     transfer_to_account_id: uuid.UUID | None = None
     external_account_id: uuid.UUID | None = None
+    # Comisión bancaria — solo aplica para TRANSFER, ignorado para otros tipos
+    commission: Decimal | None = Field(default=None, ge=0)
     # Método de pago — solo aplica para EXPENSE, ignorado para otros tipos
     metodo_pago: PaymentMethod = PaymentMethod.OTRO
     # Hogar compartido — solo aplica para EXPENSE, ignorado para otros tipos
@@ -88,6 +90,7 @@ class TransactionResponse(BaseModel):
     transfer_id: uuid.UUID | None
     transfer_role: TransferRole | None
     external_account_id: uuid.UUID | None = None
+    commission: Decimal | None = None
     metodo_pago: PaymentMethod
     instalment_plan_id: uuid.UUID | None = None
     household_id: uuid.UUID | None = None

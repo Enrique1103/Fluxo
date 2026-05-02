@@ -3,6 +3,8 @@ from decimal import Decimal
 from enum import Enum
 from pydantic import BaseModel, Field, model_validator
 
+_CURRENCY_PATTERN = r"^[A-Z]{2,10}$"
+
 
 class AccountType(str, Enum):
     CASH = "cash"
@@ -11,17 +13,11 @@ class AccountType(str, Enum):
     INVESTMENT = "investment"
 
 
-class CurrencyCode(str, Enum):
-    UYU = "UYU"
-    USD = "USD"
-    EUR = "EUR"
-
-
 # --- Creación ---
 class AccountCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     type: AccountType
-    currency: CurrencyCode
+    currency: str = Field(..., pattern=_CURRENCY_PATTERN)
     balance: Decimal = Field(default=Decimal("0.00"), ge=0)
     credit_limit: Decimal | None = Field(None, gt=0)
 
@@ -41,7 +37,7 @@ class AccountCreate(BaseModel):
 class AccountUpdate(BaseModel):
     name: str | None = Field(None, min_length=2, max_length=100)
     type: AccountType | None = None
-    currency: CurrencyCode | None = None
+    currency: str | None = Field(None, pattern=_CURRENCY_PATTERN)
     credit_limit: Decimal | None = Field(None, gt=0)
     balance: Decimal | None = None
 
@@ -52,7 +48,7 @@ class AccountResponse(BaseModel):
     user_id: uuid.UUID
     name: str
     type: AccountType
-    currency: CurrencyCode
+    currency: str
     balance: Decimal
     credit_limit: Decimal | None
     is_liability: bool

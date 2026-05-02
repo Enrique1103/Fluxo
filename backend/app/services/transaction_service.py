@@ -114,9 +114,9 @@ def _check_exchange_rate_for_date(
         return
 
     foreign_currencies = {
-        a.currency.value
+        a.currency
         for a in involved_accounts
-        if a.currency.value != str(user.currency_default)
+        if a.currency != str(user.currency_default)
     }
 
     missing = []
@@ -161,7 +161,8 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
             # Verificar tasa solo para la cuenta origen
             _check_exchange_rate_for_date(db, user, tx_in.date, [source_account])
 
-            _apply_expense(source_account, tx_in.amount)
+            commission = tx_in.commission or Decimal("0.00")
+            _apply_expense(source_account, tx_in.amount + commission)
 
             source_tx = transaction_crud.create(
                 db,
@@ -175,6 +176,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
                 description=tx_in.description,
                 transfer_role=TransferRole.SOURCE,
                 external_account_id=tx_in.external_account_id,
+                commission=tx_in.commission,
             )
             concept_crud.increment_frequency(db, concept)
             concept_crud.update_category(db, concept, category_id)
@@ -192,7 +194,8 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         _check_exchange_rate_for_date(db, user, tx_in.date, [source_account, dest_account])
 
         # 4. Apply balance mutations for transfer
-        _apply_expense(source_account, tx_in.amount)
+        commission = tx_in.commission or Decimal("0.00")
+        _apply_expense(source_account, tx_in.amount + commission)
         _apply_income(dest_account, tx_in.amount)
 
         # 5. Create SOURCE transaction
@@ -208,6 +211,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
             description=tx_in.description,
             transfer_id=None,
             transfer_role=TransferRole.SOURCE,
+            commission=tx_in.commission,
         )
 
         # 6. Create DESTINATION transaction
@@ -401,9 +405,9 @@ def delete(db: Session, user: User, tx_id: uuid.UUID) -> None:
         partner_id = tx.transfer_id
         partner_tx = transaction_crud.get_by_id(db, partner_id) if partner_id else None
 
-        # Reverse this leg
+        # Reverse this leg (SOURCE deducted amount + commission)
         if tx.transfer_role == TransferRole.SOURCE:
-            _reverse_expense(account, tx.amount)
+            _reverse_expense(account, tx.amount + (tx.commission or Decimal("0.00")))
         else:
             _reverse_income(account, tx.amount)
         transaction_crud.soft_delete(db, tx)
@@ -413,7 +417,7 @@ def delete(db: Session, user: User, tx_id: uuid.UUID) -> None:
             partner_account = account_crud.get_by_id(db, partner_tx.account_id)
             if partner_account:
                 if partner_tx.transfer_role == TransferRole.SOURCE:
-                    _reverse_expense(partner_account, partner_tx.amount)
+                    _reverse_expense(partner_account, partner_tx.amount + (partner_tx.commission or Decimal("0.00")))
                 else:
                     _reverse_income(partner_account, partner_tx.amount)
             transaction_crud.soft_delete(db, partner_tx)

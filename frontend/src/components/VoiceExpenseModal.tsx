@@ -68,6 +68,8 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const [unmatchedConcept, setUnmatchedConcept] = useState<string | null>(null)
   const [destAccountId,    setDestAccountId]    = useState('')
 
+  const [commission,  setCommission]  = useState('')
+
   const [enCuotas,    setEnCuotas]    = useState(false)
   const [nCuotas,     setNCuotas]     = useState('2')
 
@@ -101,6 +103,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       setAmount(''); setCurrency(homeCurrency); setConceptId(''); setCategoryId('')
       setAccountId(''); setDestAccountId(''); setDescription(''); setIsHousehold(false)
       setRawText(''); setUnmatchedAccount(null); setUnmatchedConcept(null)
+      setCommission('')
       setEnCuotas(false); setNCuotas('2')
       setSubmitting(false); setSubmitError('')
     } else {
@@ -197,6 +200,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     }
 
     if (parsed.matchedDestAccountId) setDestAccountId(parsed.matchedDestAccountId)
+    setCommission(parsed.commission !== null ? String(parsed.commission) : '')
 
     setPhase('review')
   }
@@ -263,6 +267,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
           description:  description.trim() || undefined,
           ...(txType === 'expense' ? { metodo_pago: derivedMetodoPago() } : {}),
           ...(txType === 'transfer' && destAccountId ? { transfer_to_account_id: destAccountId } : {}),
+          ...(txType === 'transfer' && commission && parseFloat(commission) > 0 ? { commission: parseFloat(commission) } : {}),
           ...(txType === 'expense' && isHousehold && householdId ? { household_id: householdId } : {}),
         })
       }
@@ -349,7 +354,8 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 <p className="text-slate-300 text-sm">
                   "transferí <span className="text-emerald-400">[monto]</span> de{' '}
                   <span className="text-violet-400">[cuenta origen]</span> a{' '}
-                  <span className="text-amber-400">[cuenta destino]</span>"
+                  <span className="text-amber-400">[cuenta destino]</span>{' '}
+                  <span className="text-slate-500">con comisión de [monto]</span>"
                 </p>
               )}
             </div>
@@ -488,6 +494,25 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {/* Comisión — solo para transferencias */}
+            {txType === 'transfer' && (
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">
+                  Comisión bancaria <span className="text-slate-600">(opcional)</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={commission}
+                  onChange={e => setCommission(e.target.value)}
+                  placeholder="0.00"
+                  style={inputStyle}
+                  className={inputCls}
+                />
               </div>
             )}
 

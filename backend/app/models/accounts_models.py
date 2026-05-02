@@ -16,12 +16,6 @@ class AccountType(str, Enum):
     INVESTMENT = "investment"
 
 
-class CurrencyCode(str, Enum):
-    UYU = "UYU"
-    USD = "USD"
-    EUR = "EUR"
-
-
 class Account(Base):
     __tablename__ = "accounts"
 
@@ -33,7 +27,7 @@ class Account(Base):
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     type: Mapped[AccountType] = mapped_column(SQLEnum(AccountType), nullable=False)
-    currency: Mapped[CurrencyCode] = mapped_column(SQLEnum(CurrencyCode), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False)
     balance: Mapped[Decimal] = mapped_column(
         Numeric(15, 2), nullable=False, default=Decimal("0.00")
     )

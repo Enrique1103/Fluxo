@@ -32,16 +32,19 @@ export default function AccountModal({ open, onClose }: Props) {
   const homeCurrency = useHomeCurrency()
   const currencyOpts = [...new Set([homeCurrency, 'USD', 'EUR'])]
 
-  const [name,        setName]        = useState('')
-  const [type,        setType]        = useState('cash')
-  const [currency,    setCurrency]    = useState(homeCurrency)
-  const [balance,     setBalance]     = useState('')
-  const [creditLimit, setCreditLimit] = useState('')
-  const [saving,      setSaving]      = useState(false)
-  const [error,       setError]       = useState<string | null>(null)
+  const [name,             setName]             = useState('')
+  const [type,             setType]             = useState('cash')
+  const [currencyOverride, setCurrencyOverride] = useState<string | null>(null)
+  const [balance,          setBalance]          = useState('')
+  const [creditLimit,      setCreditLimit]      = useState('')
+  const [saving,           setSaving]           = useState(false)
+  const [error,            setError]            = useState<string | null>(null)
+
+  // currency es siempre homeCurrency salvo que el usuario lo cambie explícitamente
+  const currency = currencyOverride ?? homeCurrency
 
   const reset = () => {
-    setName(''); setType('cash'); setCurrency(homeCurrency)
+    setName(''); setType('cash'); setCurrencyOverride(null)
     setBalance(''); setCreditLimit(''); setError(null)
   }
 
@@ -120,7 +123,7 @@ export default function AccountModal({ open, onClose }: Props) {
             <div>
               <label className={labelClass}>Moneda</label>
               <div className="relative">
-                <select value={currency} onChange={e => setCurrency(e.target.value)} className={selectClass}>
+                <select value={currency} onChange={e => setCurrencyOverride(e.target.value)} className={selectClass}>
                   {currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />

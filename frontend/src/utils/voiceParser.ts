@@ -9,6 +9,7 @@ export interface ParsedVoice {
   spokenAccountText: string | null
   spokenDestAccountText: string | null
   spokenConceptText: string | null
+  commission: number | null
 }
 
 const HUNDREDS: Record<string, number> = {
@@ -235,6 +236,16 @@ export function parseVoiceExpense(
     if (candidate) amount = parseWrittenNumber(candidate)
   }
 
+  // 3a. Detect commission ("con comisión de 45", "comision 30", etc.)
+  let commission: number | null = null
+  const commMatch = t.match(/con\s+comisi[oó]n\s+de\s+([\d.,]+)|comisi[oó]n\s+(?:de\s+)?([\d.,]+)/)
+  if (commMatch) {
+    const raw = (commMatch[1] ?? commMatch[2]).replace(',', '.')
+    const parsed = parseFloat(raw)
+    if (!isNaN(parsed) && parsed > 0) commission = parsed
+    t = t.replace(commMatch[0], '').replace(/\s+/g, ' ').trim()
+  }
+
   // 3. Detect voice currency keywords before removing them
   let voiceCurrency: 'UYU' | 'USD' | 'EUR' | null = null
   if (/\bdolar(?:es)?\b|\busd\b/.test(t))    voiceCurrency = 'USD'
@@ -320,5 +331,6 @@ export function parseVoiceExpense(
     spokenAccountText,
     spokenDestAccountText,
     spokenConceptText,
+    commission,
   }
 }

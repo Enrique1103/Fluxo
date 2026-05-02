@@ -2,14 +2,14 @@ import uuid
 from decimal import Decimal
 from pydantic import BaseModel
 
-from app.schemas.account_schema import AccountType, CurrencyCode
+from app.schemas.account_schema import AccountType
 
 
 class AccountSummary(BaseModel):
     id: uuid.UUID
     name: str
     type: AccountType
-    currency: CurrencyCode
+    currency: str
     balance: Decimal
     credit_limit: Decimal | None
 
