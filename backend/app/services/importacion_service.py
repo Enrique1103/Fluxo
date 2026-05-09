@@ -1191,7 +1191,7 @@ class ParserMidinero:
 
                 movimientos.append({
                     "fecha":       fecha_str,
-                    "concepto":    None,
+                    "concepto":    concepto_z or None,
                     "monto":       monto,
                     "moneda":      moneda,
                     "categoria":   categoria,
@@ -1422,23 +1422,20 @@ class ParserZcuentas:
                 monto           = importe  # negativo=gasto/salida, positivo=ingreso
                 concepto_z_raw  = str(row.get("Concepto", "") or "").strip()
                 concepto_z      = "" if concepto_z_raw.lower() in ("nan", "none", "") else concepto_z_raw
-                descripcion_raw = str(row.get("Descripci\u00f3n", "") or "").strip()
+                etiqueta_raw    = str(row.get("Etiqueta", "") or "").strip()
+                etiqueta        = "" if etiqueta_raw.lower() in ("nan", "none", "") else etiqueta_raw
+                descripcion_raw = str(row.get("Descripción", "") or row.get("Descripcion", "") or "").strip()
                 cuenta_nombre   = str(row.get("Cuenta", "") or "").strip()
 
                 # Inferir moneda del nombre de la cuenta en Zcuentas
                 moneda = "USD" if "USD" in cuenta_nombre.upper() else "UYU"
 
-                # Descripción visible: "[Concepto Zcuentas] texto libre"
-                partes = []
-                if concepto_z:
-                    partes.append(f"[{concepto_z}]")
-                if descripcion_raw and descripcion_raw != concepto_z:
-                    partes.append(descripcion_raw)
-                descripcion_final = " ".join(partes) or None
+                # Descripcion visible: solo el texto libre
+                descripcion_final = descripcion_raw if descripcion_raw and descripcion_raw != concepto_z else None
 
-                # Auto-categorización: usar el Concepto de Zcuentas como pista primaria
-                categoria: str | None = None
-                if concepto_z:
+                # Categoria: columna Etiqueta tiene prioridad sobre auto-categorizacion
+                categoria: str | None = etiqueta if etiqueta else None
+                if categoria is None and concepto_z:
                     categoria, _ = self.categorizador.categorizar(concepto_z)
                 if categoria is None and descripcion_raw:
                     categoria, _ = self.categorizador.categorizar(descripcion_raw)

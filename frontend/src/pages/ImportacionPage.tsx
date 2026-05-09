@@ -438,7 +438,7 @@ export default function ImportacionPage() {
       const edits: Record<number, RowEdit> = {}
       data.movimientos.forEach((m, i) => {
         if (m.estado === 'validado') idx.add(i)
-        edits[i] = { concepto: '', esNuevo: false, categoria: m.categoria ?? '', esNuevaCategoria: false, metodo_pago: m.metodo_pago || 'otro', householdId: '', transferDestAccountId: '' }
+        edits[i] = { concepto: m.concepto || '', esNuevo: false, categoria: m.categoria ?? '', esNuevaCategoria: false, metodo_pago: m.metodo_pago || 'otro', householdId: '', transferDestAccountId: '' }
       })
       setSeleccionados(idx)
       setRowEdits(edits)
