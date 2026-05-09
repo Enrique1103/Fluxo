@@ -1191,7 +1191,7 @@ class ParserMidinero:
 
                 movimientos.append({
                     "fecha":       fecha_str,
-                    "concepto":    concepto_z or None,
+                    "concepto":    None,
                     "monto":       monto,
                     "moneda":      moneda,
                     "categoria":   categoria,
@@ -1745,7 +1745,7 @@ class ImportacionService:
             "estado": importacion.estado,
             "importados": importados,
             "descartados": total - importados,
-            "importacion_id": importacion.id,
+            "importacion_id": str(importacion.id),
         }
 
     def _crear_transaccion(
