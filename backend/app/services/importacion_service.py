@@ -1675,18 +1675,23 @@ class ImportacionService:
         importados = 0
         errores_confirmacion: list[dict] = []
 
+        # Cachés en memoria: evitan consultas repetidas a la DB por cada fila
+        concepto_cache:  dict[str, Any] = {}
+        categoria_cache: dict[str, Any] = {}
+        account_cache:   dict[str, Any] = {}
+
         for mov in a_importar:
             try:
                 meta = mov.get("metadata") or {}
 
-                # Determinar cuenta para este movimiento (por-movimiento o global)
+                # Cuenta para este movimiento (por-movimiento o global)
                 cuenta_fluxo_id_raw = meta.get("cuenta_fluxo_id")
                 if cuenta_fluxo_id_raw:
-                    mov_account = account_crud.get_by_id(
-                        self.db, uuid.UUID(str(cuenta_fluxo_id_raw))
-                    )
-                    if not mov_account or mov_account.user_id != self.user_id:
-                        mov_account = account
+                    cid = str(cuenta_fluxo_id_raw)
+                    if cid not in account_cache:
+                        acc = account_crud.get_by_id(self.db, uuid.UUID(cid))
+                        account_cache[cid] = acc if (acc and acc.user_id == self.user_id) else None
+                    mov_account = account_cache[cid] or account
                 else:
                     mov_account = account
 
@@ -1699,17 +1704,26 @@ class ImportacionService:
                     and dest_account_id_raw
                 )
                 if is_zcuentas_transfer:
-                    dest_account = account_crud.get_by_id(
-                        self.db, uuid.UUID(str(dest_account_id_raw))
-                    )
-                    if dest_account and dest_account.user_id == self.user_id:
+                    did = str(dest_account_id_raw)
+                    if did not in account_cache:
+                        dacc = account_crud.get_by_id(self.db, uuid.UUID(did))
+                        account_cache[did] = dacc if (dacc and dacc.user_id == self.user_id) else None
+                    dest_account = account_cache[did]
+                    if dest_account:
                         self._crear_transferencia_zcuentas(
-                            mov, mov_account, dest_account, categoria_fallback
+                            mov, mov_account, dest_account, categoria_fallback,
+                            concepto_cache, categoria_cache,
                         )
                     else:
-                        self._crear_transaccion(mov, mov_account, categoria_fallback)
+                        self._crear_transaccion(
+                            mov, mov_account, categoria_fallback,
+                            concepto_cache, categoria_cache,
+                        )
                 else:
-                    self._crear_transaccion(mov, mov_account, categoria_fallback)
+                    self._crear_transaccion(
+                        mov, mov_account, categoria_fallback,
+                        concepto_cache, categoria_cache,
+                    )
                 importados += 1
             except Exception as exc:
                 errores_confirmacion.append({
@@ -1737,6 +1751,7 @@ class ImportacionService:
             "errores_confirmacion": errores_confirmacion,
         }
 
+        self.db.flush()   # único flush para todas las transacciones del lote
         self.db.commit()
 
         return {
@@ -1746,58 +1761,66 @@ class ImportacionService:
             "importacion_id": str(importacion.id),
         }
 
+    def _resolver_categoria(
+        self,
+        nombre_cat: str | None,
+        categoria_fallback,
+        categoria_cache: dict,
+    ):
+        if not nombre_cat:
+            return categoria_fallback
+        if nombre_cat in categoria_cache:
+            return categoria_cache[nombre_cat]
+        categoria = category_crud.get_by_name_and_user(self.db, nombre_cat, self.user_id)
+        if categoria is None:
+            import re
+            slug = re.sub(r"[^a-z0-9]+", "-", nombre_cat.lower()).strip("-")
+            categoria = category_crud.create(self.db, user_id=self.user_id, name=nombre_cat, slug=slug)
+        categoria_cache[nombre_cat] = categoria
+        return categoria
+
+    def _resolver_concepto(self, nombre: str, concepto_cache: dict):
+        nombre = nombre[:100]
+        if nombre in concepto_cache:
+            return concepto_cache[nombre]
+        concepto = concept_crud.get_by_name_and_user(self.db, nombre, self.user_id)
+        if concepto is None:
+            concepto = concept_crud.create(self.db, user_id=self.user_id, name=nombre)
+        concepto_cache[nombre] = concepto
+        return concepto
+
     def _crear_transaccion(
         self,
         mov: dict,
         account,
         categoria_fallback,
+        concepto_cache: dict | None = None,
+        categoria_cache: dict | None = None,
     ) -> Transaction:
         """Crea una Transaction a partir de un movimiento importado."""
+        if concepto_cache is None:
+            concepto_cache = {}
+        if categoria_cache is None:
+            categoria_cache = {}
+
         monto = Decimal(str(abs(mov["monto"])))
         tipo = TransactionType.EXPENSE if mov["monto"] < 0 else TransactionType.INCOME
         fecha = datetime.strptime(mov["fecha"], "%Y-%m-%d").date()
 
-        # Categoría: buscar por nombre o usar fallback
-        nombre_cat = mov.get("categoria")
-        if nombre_cat:
-            categoria = category_crud.get_by_name_and_user(
-                self.db, nombre_cat, self.user_id
-            )
-            if categoria is None:
-                import re
-                slug = re.sub(r"[^a-z0-9]+", "-", nombre_cat.lower()).strip("-")
-                categoria = category_crud.create(
-                    self.db, user_id=self.user_id, name=nombre_cat, slug=slug
-                )
-        else:
-            categoria = None
-        if categoria is None:
-            categoria = categoria_fallback
+        categoria = self._resolver_categoria(mov.get("categoria"), categoria_fallback, categoria_cache)
+        concepto  = self._resolver_concepto(mov.get("concepto") or "Importado", concepto_cache)
 
-        # Concepto: buscar existente o crear nuevo
-        concepto_nombre = (mov.get("concepto") or "Importado")[:100]
-        concepto = concept_crud.get_by_name_and_user(
-            self.db, concepto_nombre, self.user_id
-        )
-        if concepto is None:
-            concepto = concept_crud.create(
-                self.db, user_id=self.user_id, name=concepto_nombre
-            )
-
-        # Método de pago
         metodo_raw = mov.get("metodo_pago", "otro")
         try:
             metodo = PaymentMethod(metodo_raw)
         except ValueError:
             metodo = PaymentMethod.OTRO
 
-        # Mutar saldo de la cuenta
         if tipo == TransactionType.EXPENSE:
             _aplicar_gasto(account, monto)
         else:
             _aplicar_ingreso(account, monto)
 
-        # Crear transacción
         tx = transaction_crud.create(
             self.db,
             user_id=self.user_id,
@@ -1813,14 +1836,12 @@ class ImportacionService:
         tx.import_hash = mov.get("import_hash")
         raw_hh = mov.get("household_id")
         if raw_hh:
-            import uuid as _uuid
             try:
-                tx.household_id = _uuid.UUID(str(raw_hh))
+                tx.household_id = uuid.UUID(str(raw_hh))
             except (ValueError, AttributeError):
                 pass
-        self.db.flush()
 
-        concept_crud.increment_frequency(self.db, concepto)
+        concepto.frequency_score += 1
         return tx
 
     def _crear_transferencia_zcuentas(
@@ -1829,23 +1850,23 @@ class ImportacionService:
         source_account,
         dest_account,
         categoria_fallback,
+        concepto_cache: dict | None = None,
+        categoria_cache: dict | None = None,
     ) -> None:
         """
         Crea una transferencia entre dos cuentas del usuario a partir de
         un movimiento Zcuentas (pata negativa con cuenta destino ya resuelta).
         """
+        if concepto_cache is None:
+            concepto_cache = {}
+        if categoria_cache is None:
+            categoria_cache = {}
+
         monto = Decimal(str(abs(mov["monto"])))
         fecha = datetime.strptime(mov["fecha"], "%Y-%m-%d").date()
 
-        concepto_nombre = (mov.get("concepto") or "Transferencia")[:100]
-        concepto = concept_crud.get_by_name_and_user(self.db, concepto_nombre, self.user_id)
-        if concepto is None:
-            concepto = concept_crud.create(self.db, user_id=self.user_id, name=concepto_nombre)
-
-        categoria = (
-            category_crud.get_by_name_and_user(self.db, mov.get("categoria") or "", self.user_id)
-            or categoria_fallback
-        )
+        concepto  = self._resolver_concepto(mov.get("concepto") or "Transferencia", concepto_cache)
+        categoria = self._resolver_categoria(mov.get("categoria"), categoria_fallback, categoria_cache)
 
         metodo_raw = mov.get("metodo_pago", "otro")
         try:
@@ -1891,5 +1912,4 @@ class ImportacionService:
         )
         tx_dest.import_hash = None  # solo la fuente tiene hash de deduplicación
 
-        self.db.flush()
-        concept_crud.increment_frequency(self.db, concepto)
+        concepto.frequency_score += 1
