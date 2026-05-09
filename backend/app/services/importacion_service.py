@@ -1464,7 +1464,7 @@ class ParserZcuentas:
 
                 movimientos.append({
                     "fecha":       fecha_str,
-                    "concepto":    None,
+                    "concepto":    concepto_z or None,
                     "monto":       monto,
                     "moneda":      moneda,
                     "categoria":   categoria,
