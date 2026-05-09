@@ -83,20 +83,20 @@ class DetectorDuplicados:
         dato = f"{fecha}|{concepto.upper().strip()}|{round(monto, 2)}|{cuenta_id}"
         return hashlib.sha256(dato.encode()).hexdigest()[:16]
 
+    _SENTINEL = uuid.UUID(int=0)
+
     @staticmethod
     def hashes_existentes(db: Session, user_id: uuid.UUID,
                           cuenta_id: uuid.UUID) -> dict[str, dict]:
         """Devuelve dict {import_hash: tx_detail} de transacciones ya importadas."""
-        rows = (
-            db.query(Transaction)
-            .filter(
-                Transaction.user_id == user_id,
-                Transaction.account_id == cuenta_id,
-                Transaction.import_hash.isnot(None),
-                Transaction.is_deleted.is_(False),
-            )
-            .all()
+        q = db.query(Transaction).filter(
+            Transaction.user_id == user_id,
+            Transaction.import_hash.isnot(None),
+            Transaction.is_deleted.is_(False),
         )
+        if cuenta_id != DetectorDuplicados._SENTINEL:
+            q = q.filter(Transaction.account_id == cuenta_id)
+        rows = q.all()
         result = {}
         for tx in rows:
             result[tx.import_hash] = {
@@ -115,15 +115,13 @@ class DetectorDuplicados:
                            cuenta_id: uuid.UUID) -> dict[tuple, dict]:
         """Devuelve dict {(fecha_str, monto): tx_detail} de transacciones existentes."""
         from app.models.transactions_models import Transaction as Tx
-        rows = (
-            db.query(Tx)
-            .filter(
-                Tx.user_id == user_id,
-                Tx.account_id == cuenta_id,
-                Tx.is_deleted.is_(False),
-            )
-            .all()
+        q = db.query(Tx).filter(
+            Tx.user_id == user_id,
+            Tx.is_deleted.is_(False),
         )
+        if cuenta_id != DetectorDuplicados._SENTINEL:
+            q = q.filter(Tx.account_id == cuenta_id)
+        rows = q.all()
         result = {}
         for tx in rows:
             fecha_str = tx.date.strftime("%Y-%m-%d") if tx.date else ""
