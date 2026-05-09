@@ -370,7 +370,7 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
     rows = (
         db.query(Transaction, Category.name, Concept.name, Account.name, Account.currency, DestAccount.name, ExternalAccount.name)
         .join(Category, Transaction.category_id == Category.id)
-        .join(Concept, Transaction.concept_id == Concept.id)
+        .outerjoin(Concept, Transaction.concept_id == Concept.id)
         .join(Account, Transaction.account_id == Account.id)
         .outerjoin(DestTx, Transaction.transfer_id == DestTx.id)
         .outerjoin(DestAccount, DestTx.account_id == DestAccount.id)
@@ -438,7 +438,7 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
             type=tx.type.value,
             amount=_convert(tx.amount, acc_currency, tx.date),
             category_name=cat_name,
-            concept_name=con_name,
+            concept_name=con_name or '',
             account_name=acc_name,
             description=tx.description,
             transfer_dest_name=dest_acc_name or ext_acc_name,
