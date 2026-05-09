@@ -69,10 +69,12 @@ def _compute_cuota_amounts(total_amount: Decimal, n_cuotas: int) -> list[Decimal
 
 
 def create(db: Session, user: User, data: InstalmentPlanCreate) -> InstalmentPlanResponse:
-    # 1. Validar concepto
-    concept = concept_crud.get_by_id(db, data.concept_id)
-    if not concept or concept.user_id != user.id:
-        raise ConceptNotBelongsToUser("El concepto no pertenece al usuario")
+    # 1. Validar concepto (opcional — None es permitido)
+    concept = None
+    if data.concept_id is not None:
+        concept = concept_crud.get_by_id(db, data.concept_id)
+        if not concept or concept.user_id != user.id:
+            raise ConceptNotBelongsToUser("El concepto no pertenece al usuario")
 
     # 2. Validar categoría
     category = category_crud.get_by_id(db, data.category_id)
@@ -88,13 +90,15 @@ def create(db: Session, user: User, data: InstalmentPlanCreate) -> InstalmentPla
             "Los planes de cuotas solo pueden registrarse en cuentas de crédito"
         )
 
+    concept_id = concept.id if concept else None
+
     # 4. Crear el plan
     plan = instalment_plan_crud.create(
         db,
         user_id=user.id,
         account_id=account.id,
         category_id=category.id,
-        concept_id=concept.id,
+        concept_id=concept_id,
         description=data.description,
         total_amount=data.total_amount,
         n_cuotas=data.n_cuotas,
@@ -115,7 +119,7 @@ def create(db: Session, user: User, data: InstalmentPlanCreate) -> InstalmentPla
             user_id=user.id,
             account_id=account.id,
             category_id=category.id,
-            concept_id=concept.id,
+            concept_id=concept_id,
             amount=cuota_amount,
             type=TransactionType.EXPENSE,
             date=fecha_cuota,
@@ -126,7 +130,8 @@ def create(db: Session, user: User, data: InstalmentPlanCreate) -> InstalmentPla
         db.add(tx)
 
     db.flush()
-    concept_crud.increment_frequency(db, concept)
+    if concept:
+        concept_crud.increment_frequency(db, concept)
     db.commit()
     db.refresh(plan)
     return _build_response(db, plan)

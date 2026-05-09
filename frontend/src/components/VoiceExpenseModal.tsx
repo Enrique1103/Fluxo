@@ -223,7 +223,6 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     if (txType === 'transfer') {
       if (!destAccountId) { setSubmitError('Seleccioná la cuenta destino'); return }
     } else {
-      if (!conceptId)  { setSubmitError('Seleccioná un concepto'); return }
       if (!categoryId) { setSubmitError('Seleccioná una categoría'); return }
     }
 
@@ -248,7 +247,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       if (txType === 'expense' && isCredit && enCuotas) {
         await createInstalmentPlan({
           account_id:   accountId,
-          concept_id:   resolvedConceptId,
+          concept_id:   resolvedConceptId || null,
           category_id:  resolvedCategoryId,
           total_amount: parseFloat(amount),
           n_cuotas:     parseInt(nCuotas),
@@ -259,7 +258,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       } else {
         await createTransaction({
           account_id:   accountId,
-          concept_id:   resolvedConceptId,
+          concept_id:   resolvedConceptId || null,
           category_id:  resolvedCategoryId,
           amount:       parseFloat(amount),
           type:         txType,
@@ -437,7 +436,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             {txType !== 'transfer' && (
               <>
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Concepto</label>
+                  <label className="text-xs text-slate-400 mb-1 block">Concepto <span className="text-slate-600">(opcional)</span></label>
                   {unmatchedConcept && (
                     <div className="flex items-center gap-1.5 text-amber-400 text-xs mb-1">
                       <AlertCircle size={12} /> No encontré "{unmatchedConcept}", elegí uno:
@@ -448,8 +447,8 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                     setConceptId(id)
                     const c = (concepts as Concept[]).find(x => x.id === id)
                     if (c?.category_id) setCategoryId(c.category_id)
-                  }} className={selectCls + (conceptId ? '' : ' border-amber-500/50')}>
-                    <option value="">— Elegir concepto —</option>
+                  }} className={selectCls}>
+                    <option value="">Sin concepto</option>
                     {(concepts as Concept[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>

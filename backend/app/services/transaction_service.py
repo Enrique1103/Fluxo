@@ -136,10 +136,12 @@ def _check_exchange_rate_for_date(
 
 
 def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
-    # 1. Validate concept ownership
-    concept = concept_crud.get_by_id(db, tx_in.concept_id)
-    if not concept or concept.user_id != user.id:
-        raise ConceptNotBelongsToUser("El concepto no pertenece al usuario")
+    # 1. Validate concept ownership (optional — None is allowed)
+    concept = None
+    if tx_in.concept_id is not None:
+        concept = concept_crud.get_by_id(db, tx_in.concept_id)
+        if not concept or concept.user_id != user.id:
+            raise ConceptNotBelongsToUser("El concepto no pertenece al usuario")
 
     # 2. Validate category ownership (independent from concept)
     category = category_crud.get_by_id(db, tx_in.category_id)
@@ -169,7 +171,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
                 user_id=user.id,
                 account_id=source_account.id,
                 category_id=category_id,
-                concept_id=concept.id,
+                concept_id=concept.id if concept else None,
                 amount=tx_in.amount,
                 transaction_type=TransactionType.TRANSFER,
                 date=tx_in.date,
@@ -178,8 +180,9 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
                 external_account_id=tx_in.external_account_id,
                 commission=tx_in.commission,
             )
-            concept_crud.increment_frequency(db, concept)
-            concept_crud.update_category(db, concept, category_id)
+            if concept:
+                concept_crud.increment_frequency(db, concept)
+                concept_crud.update_category(db, concept, category_id)
             db.commit()
             db.refresh(source_tx)
             return source_tx
@@ -204,7 +207,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
             user_id=user.id,
             account_id=source_account.id,
             category_id=category_id,
-            concept_id=concept.id,
+            concept_id=concept.id if concept else None,
             amount=tx_in.amount,
             transaction_type=TransactionType.TRANSFER,
             date=tx_in.date,
@@ -220,7 +223,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
             user_id=user.id,
             account_id=dest_account.id,
             category_id=category_id,
-            concept_id=concept.id,
+            concept_id=concept.id if concept else None,
             amount=tx_in.amount,
             transaction_type=TransactionType.TRANSFER,
             date=tx_in.date,
@@ -233,8 +236,9 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         source_tx.transfer_id = dest_tx.id
         db.flush()
 
-        concept_crud.increment_frequency(db, concept)
-        concept_crud.update_category(db, concept, category_id)
+        if concept:
+            concept_crud.increment_frequency(db, concept)
+            concept_crud.update_category(db, concept, category_id)
         db.commit()
         db.refresh(source_tx)
         return source_tx
@@ -262,7 +266,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         user_id=user.id,
         account_id=source_account.id,
         category_id=category_id,
-        concept_id=concept.id,
+        concept_id=concept.id if concept else None,
         amount=tx_in.amount,
         transaction_type=tx_in.type,
         date=tx_in.date,
@@ -270,8 +274,9 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         metodo_pago=tx_in.metodo_pago if tx_in.type == TransactionType.EXPENSE else PaymentMethod.OTRO,
         household_id=resolved_household_id,
     )
-    concept_crud.increment_frequency(db, concept)
-    concept_crud.update_category(db, concept, category_id)
+    if concept:
+        concept_crud.increment_frequency(db, concept)
+        concept_crud.update_category(db, concept, category_id)
     db.commit()
     db.refresh(db_tx)
     return db_tx
@@ -423,9 +428,10 @@ def delete(db: Session, user: User, tx_id: uuid.UUID) -> None:
             transaction_crud.soft_delete(db, partner_tx)
 
         # Decrement concept once for the pair
-        concept = concept_crud.get_by_id(db, tx.concept_id)
-        if concept:
-            concept_crud.decrement_frequency(db, concept)
+        if tx.concept_id is not None:
+            concept = concept_crud.get_by_id(db, tx.concept_id)
+            if concept:
+                concept_crud.decrement_frequency(db, concept)
 
     else:
         # Regular transaction
@@ -434,9 +440,10 @@ def delete(db: Session, user: User, tx_id: uuid.UUID) -> None:
         else:
             _reverse_income(account, tx.amount)
 
-        concept = concept_crud.get_by_id(db, tx.concept_id)
-        if concept:
-            concept_crud.decrement_frequency(db, concept)
+        if tx.concept_id is not None:
+            concept = concept_crud.get_by_id(db, tx.concept_id)
+            if concept:
+                concept_crud.decrement_frequency(db, concept)
 
         transaction_crud.soft_delete(db, tx)
 

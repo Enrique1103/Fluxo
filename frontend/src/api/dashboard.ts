@@ -185,7 +185,7 @@ export const fetchConcepts = async (): Promise<Concept[]> => {
 
 // --- Transactions ---
 export const createTransaction = async (payload: {
-  account_id: string; concept_id: string; category_id: string; amount: number
+  account_id: string; concept_id?: string | null; category_id: string; amount: number
   type: 'income' | 'expense' | 'transfer'; date: string; description?: string
   transfer_to_account_id?: string; external_account_id?: string
   commission?: number
@@ -199,7 +199,7 @@ export const cancelInstalmentPlan = async (planId: string): Promise<void> => {
 }
 
 export const createInstalmentPlan = async (payload: {
-  account_id: string; concept_id: string; category_id: string
+  account_id: string; concept_id?: string | null; category_id: string
   total_amount: number; n_cuotas: number; fecha_inicio: string
   description?: string; metodo_pago: PaymentMethod
 }): Promise<void> => {

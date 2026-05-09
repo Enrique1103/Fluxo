@@ -30,7 +30,7 @@ class PaymentMethod(str, Enum):
 # metodo_pago solo aplica para EXPENSE; para otros tipos se ignora.
 class TransactionCreate(BaseModel):
     account_id: uuid.UUID
-    concept_id: uuid.UUID
+    concept_id: uuid.UUID | None = None
     category_id: uuid.UUID
     amount: Decimal = Field(..., gt=0)
     type: TransactionType
@@ -82,7 +82,7 @@ class TransactionResponse(BaseModel):
     user_id: uuid.UUID
     account_id: uuid.UUID
     category_id: uuid.UUID
-    concept_id: uuid.UUID
+    concept_id: uuid.UUID | None
     amount: Decimal
     type: TransactionType
     date: PyDate

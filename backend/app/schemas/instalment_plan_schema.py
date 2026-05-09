@@ -16,7 +16,7 @@ class PaymentMethod(str, Enum):
 
 class InstalmentPlanCreate(BaseModel):
     account_id: uuid.UUID
-    concept_id: uuid.UUID
+    concept_id: uuid.UUID | None = None
     category_id: uuid.UUID
     description: str | None = Field(default=None, max_length=100)
     total_amount: Decimal = Field(..., gt=0)
@@ -34,7 +34,7 @@ class InstalmentPlanResponse(BaseModel):
     user_id: uuid.UUID
     account_id: uuid.UUID
     category_id: uuid.UUID
-    concept_id: uuid.UUID
+    concept_id: uuid.UUID | None
     description: str | None
     total_amount: Decimal
     monto_cuota: Decimal

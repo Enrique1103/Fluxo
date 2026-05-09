@@ -323,7 +323,6 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
 
   const handleSubmit = async () => {
     setServerError(null)
-    if (!conceptId)  { setServerError('Seleccioná un concepto');   return }
     if (!categoryId) { setServerError('Seleccioná una categoría'); return }
     const amt = parseFloat(amount)
     if (isNaN(amt) || amt <= 0) { setServerError('El monto debe ser mayor a 0'); return }
@@ -343,7 +342,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
           amount:       amt,
           date,
           description:  description.trim() || null,
-          concept_id:   conceptId,
+          concept_id:   conceptId || undefined,
           category_id:  categoryId,
           ...(txType === 'expense' ? { metodo_pago: metodoPago } : {}),
           household_id: isShared && householdId && txType === 'expense' ? householdId : null,
@@ -351,7 +350,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
       } else if (enCuotas && txType === 'expense') {
         await createInstalmentPlan({
           account_id:   accountId,
-          concept_id:   conceptId,
+          concept_id:   conceptId || null,
           category_id:  categoryId,
           total_amount: amt,
           n_cuotas:     parseInt(nCuotas),
@@ -362,7 +361,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
       } else {
         await createTransaction({
           account_id:  accountId,
-          concept_id:  conceptId,
+          concept_id:  conceptId || null,
           category_id: categoryId,
           amount:      amt,
           type:        txType,
@@ -568,6 +567,34 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               </div>
             )}
 
+            {/* Concepto (opcional) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className={labelClass + ' mb-0'}>Concepto <span className="text-slate-600">(opcional)</span></label>
+                <button
+                  onClick={() => { setShowNewConcept(v => !v); setShowNewCategory(false) }}
+                  className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                >
+                  <Plus className="w-3 h-3" /> Nuevo
+                </button>
+              </div>
+              <div className="relative">
+                <select value={conceptId} onChange={e => setConceptId(e.target.value)} className={`${selectClass} ${conceptId ? 'text-slate-200' : 'text-slate-500'}`}>
+                  <option value="">Sin concepto</option>
+                  {concepts.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+              </div>
+              {showNewConcept && (
+                <QuickCreateConcept
+                  onCreated={id => { setConceptId(id); setShowNewConcept(false) }}
+                  onCancel={() => setShowNewConcept(false)}
+                />
+              )}
+            </div>
+
             {/* Categoría */}
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -664,34 +691,6 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                 )}
               </div>
             )}
-
-            {/* Concepto */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className={labelClass + ' mb-0'}>Concepto</label>
-                <button
-                  onClick={() => { setShowNewConcept(v => !v); setShowNewCategory(false) }}
-                  className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
-                >
-                  <Plus className="w-3 h-3" /> Nuevo
-                </button>
-              </div>
-              <div className="relative">
-                <select value={conceptId} onChange={e => setConceptId(e.target.value)} className={selectClass}>
-                  <option value="" disabled>Seleccioná un concepto</option>
-                  {concepts.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-              </div>
-              {showNewConcept && (
-                <QuickCreateConcept
-                  onCreated={id => { setConceptId(id); setShowNewConcept(false) }}
-                  onCancel={() => setShowNewConcept(false)}
-                />
-              )}
-            </div>
 
             {/* Monto */}
             <div>
