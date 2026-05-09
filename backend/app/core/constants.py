@@ -84,12 +84,20 @@ INITIAL_USER_CATEGORIES = [
         "concepts": ["Antel", "Claro", "Movistar", "Netflix", "Spotify", "Gimnasio", "Compra en Temu"],
     },
     {
+        "name": "Educación",
+        "slug": "educacion",
+        "icon": "graduation-cap",
+        "color": "#6366F1",
+        "is_system": False,
+        "concepts": ["Academia", "Universidad", "Útiles", "Libros", "Cursos"],
+    },
+    {
         "name": "Servicios",
         "slug": "servicios",
         "icon": "building",
         "color": "#F59E0B",
         "is_system": False,
-        "concepts": ["Educación", "IM", "ADT", "CJPPU"],
+        "concepts": ["IM", "ADT", "CJPPU"],
     },
     {
         "name": "Sin clasificar",
