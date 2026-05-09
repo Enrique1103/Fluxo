@@ -1821,25 +1821,28 @@ class ImportacionService:
         else:
             _aplicar_ingreso(account, monto)
 
-        tx = transaction_crud.create(
-            self.db,
+        hh_id = None
+        raw_hh = mov.get("household_id")
+        if raw_hh:
+            try:
+                hh_id = uuid.UUID(str(raw_hh))
+            except (ValueError, AttributeError):
+                pass
+
+        tx = Transaction(
             user_id=self.user_id,
             account_id=account.id,
             category_id=categoria.id,
             concept_id=concepto.id,
             amount=monto,
-            transaction_type=tipo,
+            type=tipo,
             date=fecha,
             description=(mov.get("descripcion") or "")[:100] or None,
             metodo_pago=metodo,
+            import_hash=mov.get("import_hash"),
+            household_id=hh_id,
         )
-        tx.import_hash = mov.get("import_hash")
-        raw_hh = mov.get("household_id")
-        if raw_hh:
-            try:
-                tx.household_id = uuid.UUID(str(raw_hh))
-            except (ValueError, AttributeError):
-                pass
+        self.db.add(tx)
 
         concepto.frequency_score += 1
         return tx
@@ -1878,38 +1881,36 @@ class ImportacionService:
 
         # Pata SOURCE: dinero sale de source_account
         _aplicar_gasto(source_account, monto)
-        tx_source = transaction_crud.create(
-            self.db,
+        self.db.add(Transaction(
             user_id=self.user_id,
             account_id=source_account.id,
             category_id=categoria.id,
             concept_id=concepto.id,
             amount=monto,
-            transaction_type=TransactionType.EXPENSE,
+            type=TransactionType.EXPENSE,
             date=fecha,
             description=(mov.get("descripcion") or "")[:100] or None,
             metodo_pago=metodo,
             transfer_id=shared_transfer_id,
             transfer_role=TransferRole.SOURCE,
-        )
-        tx_source.import_hash = mov.get("import_hash")
+            import_hash=mov.get("import_hash"),
+        ))
 
         # Pata DESTINATION: dinero llega a dest_account
         _aplicar_ingreso(dest_account, monto)
-        tx_dest = transaction_crud.create(
-            self.db,
+        self.db.add(Transaction(
             user_id=self.user_id,
             account_id=dest_account.id,
             category_id=categoria.id,
             concept_id=concepto.id,
             amount=monto,
-            transaction_type=TransactionType.INCOME,
+            type=TransactionType.INCOME,
             date=fecha,
             description=(mov.get("descripcion") or "")[:100] or None,
             metodo_pago=metodo,
             transfer_id=shared_transfer_id,
             transfer_role=TransferRole.DESTINATION,
-        )
-        tx_dest.import_hash = None  # solo la fuente tiene hash de deduplicación
+            import_hash=None,  # solo la fuente tiene hash de deduplicación
+        ))
 
         concepto.frequency_score += 1
