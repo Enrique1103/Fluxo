@@ -49,7 +49,7 @@ INITIAL_USER_CATEGORIES = [
         "icon": "home",
         "color": "#8B5CF6",
         "is_system": False,
-        "concepts": ["Alquiler", "Luz", "Agua", "Gastos Comunes"],
+        "concepts": ["Alquiler", "UTE", "OSE", "Gastos Comunes"],
     },
     {
         "name": "Transporte",
@@ -81,7 +81,15 @@ INITIAL_USER_CATEGORIES = [
         "icon": "repeat",
         "color": "#7C3AED",
         "is_system": False,
-        "concepts": ["Internet", "Netflix", "Spotify", "Gimnasio", "Compra en Temu"],
+        "concepts": ["Antel", "Claro", "Movistar", "Netflix", "Spotify", "Gimnasio", "Compra en Temu"],
+    },
+    {
+        "name": "Servicios",
+        "slug": "servicios",
+        "icon": "building",
+        "color": "#F59E0B",
+        "is_system": False,
+        "concepts": ["Educación", "IM", "ADT", "CJPPU"],
     },
     {
         "name": "Sin clasificar",
