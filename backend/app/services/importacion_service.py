@@ -1675,10 +1675,23 @@ class ImportacionService:
         importados = 0
         errores_confirmacion: list[dict] = []
 
-        # Cachés en memoria: evitan consultas repetidas a la DB por cada fila
-        concepto_cache:  dict[str, Any] = {}
-        categoria_cache: dict[str, Any] = {}
+        # Pre-cargar catálogos completos del usuario en memoria.
+        # Una sola query por tabla → cero queries en el loop principal.
+        concepto_cache:  dict[str, Any] = {
+            c.name: c for c in concept_crud.get_all_by_user(self.db, self.user_id)
+        }
+        categoria_cache: dict[str, Any] = {
+            c.name: c for c in category_crud.get_all_by_user(self.db, self.user_id)
+        }
         account_cache:   dict[str, Any] = {}
+
+        # Pre-cargar reglas de aprendizaje para evitar N queries en ese loop
+        reglas_existentes: set[tuple] = set(
+            (r.categoria, r.palabra_clave)
+            for r in self.db.query(ReglaCategorias)
+            .filter(ReglaCategorias.user_id == self.user_id)
+            .all()
+        )
 
         for mov in a_importar:
             try:
@@ -1731,12 +1744,21 @@ class ImportacionService:
                     "error": str(exc),
                 })
 
-        # Aprendizaje de categorías
+        # Aprendizaje de categorías — sin queries (reglas pre-cargadas arriba)
         for mov in a_importar:
             cat = mov.get("categoria")
             descripcion_banco = mov.get("descripcion", "")
             if cat and descripcion_banco:
-                self.categorizador.registrar_aprendizaje(descripcion_banco, cat)
+                palabra = descripcion_banco.upper().strip()[:100]
+                clave = (cat, palabra)
+                if clave not in reglas_existentes:
+                    reglas_existentes.add(clave)
+                    self.db.add(ReglaCategorias(
+                        user_id=self.user_id,
+                        categoria=cat,
+                        palabra_clave=palabra,
+                        confianza=0.90,
+                    ))
 
         # Actualizar auditoría
         total = len(movimientos)
