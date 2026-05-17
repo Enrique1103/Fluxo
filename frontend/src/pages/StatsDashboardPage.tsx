@@ -3,7 +3,7 @@ import useTheme from '../hooks/useTheme'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
-  Activity, BarChart2, ChevronLeft, ChevronRight,
+  Activity, BarChart2, ChevronLeft, ChevronRight, ChevronDown,
   Eye, EyeOff, TrendingUp, TrendingDown, Settings,
   CreditCard, Wallet, Upload, X, Search, Home, Pencil,
 } from 'lucide-react'
@@ -337,10 +337,19 @@ function TxTable({
   const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all')
   const [methodFilter, setMethodFilter] = useState<PaymentMethod | 'all'>('all')
   const [search, setSearch] = useState('')
+  const [internalCategory, setInternalCategory] = useState<string | null>(categoryFilter ?? null)
+  const [openDropdown, setOpenDropdown] = useState<'tipo' | 'categoria' | null>(null)
   const [deletingId,  setDeletingId]  = useState<string | null>(null)
   const [confirmId,   setConfirmId]   = useState<string | null>(null)
-  // Para cuotas: guardamos {txId, planId} y mostramos diálogo especial
   const [cuotaConfirm, setCuotaConfirm] = useState<{ txId: string; planId: string } | null>(null)
+
+  useEffect(() => { setInternalCategory(categoryFilter ?? null) }, [categoryFilter])
+
+  const availableCategories = useMemo(() => {
+    const cats = new Set<string>()
+    transactions.forEach(t => { if (t.category_name) cats.add(t.category_name) })
+    return Array.from(cats).sort()
+  }, [transactions])
 
   const askDelete = (tx: MonthlyBreakdown['transactions'][number]) => {
     if (tx.instalment_plan_id) {
@@ -392,8 +401,8 @@ function TxTable({
     if (methodFilter !== 'all') {
       result = result.filter(t => t.metodo_pago === methodFilter)
     }
-    if (categoryFilter) {
-      result = result.filter(t => t.category_name === categoryFilter)
+    if (internalCategory) {
+      result = result.filter(t => t.category_name === internalCategory)
     }
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -405,7 +414,7 @@ function TxTable({
       )
     }
     return result
-  }, [transactions, filter, methodFilter, categoryFilter, search])
+  }, [transactions, filter, methodFilter, internalCategory, search])
 
   // Summary totals by payment method (expenses only)
   const expenseTotals = useMemo(() => {
@@ -421,32 +430,124 @@ function TxTable({
 
   const hasExpenses = transactions.some(t => t.type === 'expense')
 
-  // Reset method filter when switching away from expense
   const handleTypeFilter = (f: typeof filter) => {
     setFilter(f)
     if (f !== 'expense' && f !== 'all') setMethodFilter('all')
   }
 
+  const closeDropdown = () => setTimeout(() => setOpenDropdown(null), 150)
+
+  const TYPE_OPTIONS = [
+    { value: 'all',      label: 'Todos',           activeClass: 'bg-slate-700 border-slate-600 text-slate-200' },
+    { value: 'income',   label: 'Ingresos',         activeClass: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400' },
+    { value: 'expense',  label: 'Gastos',           activeClass: 'bg-rose-500/15 border-rose-500/30 text-rose-400' },
+    { value: 'transfer', label: 'Transferencias',   activeClass: 'bg-amber-500/15 border-amber-500/30 text-amber-400' },
+  ] as const
+
+  const selectedTypeLabel = TYPE_OPTIONS.find(o => o.value === filter)?.label ?? 'Todos'
+  const selectedTypeActive = TYPE_OPTIONS.find(o => o.value === filter)?.activeClass ?? ''
+
+  const hasActiveFilters = filter !== 'all' || internalCategory || methodFilter !== 'all' || search.trim()
+
+  const clearAll = () => {
+    setFilter('all')
+    setInternalCategory(null)
+    setMethodFilter('all')
+    setSearch('')
+  }
+
   return (
     <div>
-      {/* Type filter pills */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        {(['all', 'income', 'expense', 'transfer'] as const).map(f => (
+      {/* Dropdown filters row */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+
+        {/* Tipo */}
+        <div className="relative">
           <button
-            key={f}
-            onClick={() => handleTypeFilter(f)}
-            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-              filter === f
-                ? f === 'income' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                  : f === 'expense' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                  : f === 'transfer' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                  : 'bg-slate-700 text-slate-200 border border-slate-600'
-                : 'text-slate-500 hover:text-slate-300 border border-transparent'
+            onClick={() => setOpenDropdown(openDropdown === 'tipo' ? null : 'tipo')}
+            onBlur={closeDropdown}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              filter !== 'all' ? selectedTypeActive : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
             }`}
           >
-            {f === 'all' ? 'Todos' : f === 'income' ? 'Ingresos' : f === 'expense' ? 'Gastos' : 'Transferencias'}
+            Tipo
+            {filter !== 'all' && <span className="opacity-75">· {selectedTypeLabel}</span>}
+            <ChevronDown className="w-3 h-3 ml-0.5 opacity-60" />
           </button>
-        ))}
+          {openDropdown === 'tipo' && (
+            <div className="absolute top-full left-0 mt-1 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-xl min-w-[160px] py-1 overflow-hidden">
+              {TYPE_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { handleTypeFilter(opt.value as typeof filter); setOpenDropdown(null) }}
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
+                    filter === opt.value ? 'font-semibold text-slate-100' : 'text-slate-400'
+                  }`}
+                >
+                  {opt.label}
+                  {filter === opt.value && <span className="text-emerald-400 text-[10px]">✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Categoría */}
+        <div className="relative">
+          <button
+            onClick={() => setOpenDropdown(openDropdown === 'categoria' ? null : 'categoria')}
+            onBlur={closeDropdown}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              internalCategory
+                ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400'
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            Categoría
+            {internalCategory && <span className="opacity-75">· {internalCategory}</span>}
+            <ChevronDown className="w-3 h-3 ml-0.5 opacity-60" />
+          </button>
+          {openDropdown === 'categoria' && (
+            <div className="absolute top-full left-0 mt-1 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-xl min-w-[180px] py-1 overflow-hidden max-h-52 overflow-y-auto">
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => { setInternalCategory(null); setOpenDropdown(null) }}
+                className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
+                  !internalCategory ? 'font-semibold text-slate-100' : 'text-slate-400'
+                }`}
+              >
+                Todas
+                {!internalCategory && <span className="text-emerald-400 text-[10px]">✓</span>}
+              </button>
+              {availableCategories.map(cat => (
+                <button
+                  key={cat}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { setInternalCategory(cat); setOpenDropdown(null) }}
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
+                    internalCategory === cat ? 'font-semibold text-indigo-300' : 'text-slate-400'
+                  }`}
+                >
+                  {cat}
+                  {internalCategory === cat && <span className="text-emerald-400 text-[10px]">✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Limpiar */}
+        {hasActiveFilters && (
+          <button
+            onClick={clearAll}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
+          >
+            <X className="w-3 h-3" />
+            Limpiar
+          </button>
+        )}
+
         <span className="ml-auto text-sm text-slate-600 self-center">{filtered.length} movimientos</span>
       </div>
 

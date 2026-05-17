@@ -5,7 +5,7 @@ import {
   Activity, BarChart2, Upload, Home, Users, Plus, Copy, Check,
   Loader2, X, UserCheck, UserX, ArrowRight,
   AlertTriangle, Settings, Crown, Wallet, TrendingDown,
-  Eye, EyeOff, ChevronLeft, ChevronRight, Search,
+  Eye, EyeOff, ChevronLeft, ChevronRight, Search, ChevronDown,
 } from 'lucide-react'
 import { useHouseholdEvents } from '../hooks/useHouseholdEvents'
 import { useAuthStore } from '../store/authStore'
@@ -50,6 +50,8 @@ export default function HouseholdPage() {
   const [filterMember,     setFilterMember]     = useState<string | null>(null)
   const [filterCategory,   setFilterCategory]   = useState<string | null>(null)
   const [filterSearch,     setFilterSearch]     = useState('')
+  const [openDropdown,     setOpenDropdown]     = useState<'miembro' | 'categoria' | null>(null)
+  const closeDropdown = () => setTimeout(() => setOpenDropdown(null), 150)
 
   const [year,  setYear]  = useState(() => new Date().getFullYear())
   const [month, setMonth] = useState(() => new Date().getMonth() + 1)
@@ -696,43 +698,112 @@ export default function HouseholdPage() {
                               )}
                             </div>
 
-                            {/* Chips: Miembro | Categoría en una sola fila */}
-                            <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none]">
-                              <span className="text-[10px] uppercase tracking-widest shrink-0 text-slate-500">Miembro</span>
-                              {activeMembers.map(m => (
-                                <button key={m.user_id}
-                                  onClick={() => setFilterMember(filterMember === m.user_id ? null : m.user_id)}
-                                  className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
-                                    filterMember === m.user_id
+                            {/* Dropdowns: Miembro + Categoría */}
+                            <div className="flex items-center gap-2">
+
+                              {/* Miembro */}
+                              <div className="relative">
+                                <button
+                                  onClick={() => setOpenDropdown(openDropdown === 'miembro' ? null : 'miembro')}
+                                  onBlur={closeDropdown}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                                    filterMember
                                       ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400'
                                       : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
-                                  }`}>
-                                  <div className={`w-1.5 h-1.5 rounded-full ${avatarPalette(m.user_name).bg.replace('/20', '')}`} />
-                                  {m.user_name}
+                                  }`}
+                                >
+                                  Miembro
+                                  {filterMember && (
+                                    <span className="opacity-75">· {activeMembers.find(m => m.user_id === filterMember)?.user_name}</span>
+                                  )}
+                                  <ChevronDown className="w-3 h-3 ml-0.5 opacity-60" />
                                 </button>
-                              ))}
+                                {openDropdown === 'miembro' && (
+                                  <div className="absolute top-full left-0 mt-1 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-xl min-w-[160px] py-1 overflow-hidden max-h-52 overflow-y-auto">
+                                    <button
+                                      onMouseDown={e => e.preventDefault()}
+                                      onClick={() => { setFilterMember(null); setOpenDropdown(null) }}
+                                      className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
+                                        !filterMember ? 'font-semibold text-slate-100' : 'text-slate-400'
+                                      }`}
+                                    >
+                                      Todos
+                                      {!filterMember && <span className="text-emerald-400 text-[10px]">✓</span>}
+                                    </button>
+                                    {activeMembers.map(m => (
+                                      <button
+                                        key={m.user_id}
+                                        onMouseDown={e => e.preventDefault()}
+                                        onClick={() => { setFilterMember(m.user_id); setOpenDropdown(null) }}
+                                        className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between gap-2 ${
+                                          filterMember === m.user_id ? 'font-semibold text-indigo-300' : 'text-slate-400'
+                                        }`}
+                                      >
+                                        <span className="flex items-center gap-2">
+                                          <div className={`w-2 h-2 rounded-full shrink-0 ${avatarPalette(m.user_name).bg.replace('/20', '')}`} />
+                                          {m.user_name}
+                                        </span>
+                                        {filterMember === m.user_id && <span className="text-emerald-400 text-[10px]">✓</span>}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
 
-                              <div className="w-px h-4 bg-slate-700 shrink-0 mx-0.5" />
-
-                              <span className="text-[10px] uppercase tracking-widest shrink-0 text-slate-500">Categoría</span>
-                              {analytics.expense_by_category.map((cat, i) => (
-                                <button key={cat.category_name}
-                                  onClick={() => setFilterCategory(filterCategory === cat.category_name ? null : cat.category_name)}
-                                  className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
-                                    filterCategory === cat.category_name
+                              {/* Categoría */}
+                              <div className="relative">
+                                <button
+                                  onClick={() => setOpenDropdown(openDropdown === 'categoria' ? null : 'categoria')}
+                                  onBlur={closeDropdown}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                                    filterCategory
                                       ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400'
                                       : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
-                                  }`}>
-                                  <div className="w-1.5 h-1.5 rounded-full shrink-0"
-                                    style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }} />
-                                  {cat.category_name}
+                                  }`}
+                                >
+                                  Categoría
+                                  {filterCategory && <span className="opacity-75">· {filterCategory}</span>}
+                                  <ChevronDown className="w-3 h-3 ml-0.5 opacity-60" />
                                 </button>
-                              ))}
+                                {openDropdown === 'categoria' && (
+                                  <div className="absolute top-full left-0 mt-1 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-xl min-w-[180px] py-1 overflow-hidden max-h-52 overflow-y-auto">
+                                    <button
+                                      onMouseDown={e => e.preventDefault()}
+                                      onClick={() => { setFilterCategory(null); setOpenDropdown(null) }}
+                                      className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
+                                        !filterCategory ? 'font-semibold text-slate-100' : 'text-slate-400'
+                                      }`}
+                                    >
+                                      Todas
+                                      {!filterCategory && <span className="text-emerald-400 text-[10px]">✓</span>}
+                                    </button>
+                                    {analytics.expense_by_category.map((cat, i) => (
+                                      <button
+                                        key={cat.category_name}
+                                        onMouseDown={e => e.preventDefault()}
+                                        onClick={() => { setFilterCategory(cat.category_name); setOpenDropdown(null) }}
+                                        className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between gap-2 ${
+                                          filterCategory === cat.category_name ? 'font-semibold text-indigo-300' : 'text-slate-400'
+                                        }`}
+                                      >
+                                        <span className="flex items-center gap-2">
+                                          <div className="w-2 h-2 rounded-full shrink-0"
+                                            style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+                                          {cat.category_name}
+                                        </span>
+                                        {filterCategory === cat.category_name && <span className="text-emerald-400 text-[10px]">✓</span>}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
 
+                              {/* Limpiar */}
                               {(filterMember || filterCategory || filterSearch) && (
                                 <button
                                   onClick={() => { setFilterMember(null); setFilterCategory(null); setFilterSearch('') }}
-                                  className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20 ml-1">
+                                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
+                                >
                                   <X className="w-3 h-3" />
                                   Limpiar
                                 </button>
