@@ -5,7 +5,7 @@ import {
   Activity, BarChart2, Upload, Home, Users, Plus, Copy, Check,
   Loader2, X, UserCheck, UserX, ArrowRight,
   AlertTriangle, Settings, Crown, Wallet, TrendingDown,
-  Eye, EyeOff, ChevronLeft, ChevronRight,
+  Eye, EyeOff, ChevronLeft, ChevronRight, Search,
 } from 'lucide-react'
 import { useHouseholdEvents } from '../hooks/useHouseholdEvents'
 import { useAuthStore } from '../store/authStore'
@@ -49,6 +49,7 @@ export default function HouseholdPage() {
   const [expandedExpenses, setExpandedExpenses] = useState(false)
   const [filterMember,     setFilterMember]     = useState<string | null>(null)
   const [filterCategory,   setFilterCategory]   = useState<string | null>(null)
+  const [filterSearch,     setFilterSearch]     = useState('')
 
   const [year,  setYear]  = useState(() => new Date().getFullYear())
   const [month, setMonth] = useState(() => new Date().getMonth() + 1)
@@ -646,9 +647,15 @@ export default function HouseholdPage() {
                     {/* 4. HISTORIAL DE GASTOS                            */}
                     {/* ══════════════════════════════════════════════════ */}
                     {analytics.shared_expenses.length > 0 && (() => {
+                      const q = filterSearch.toLowerCase().trim()
                       const displayed = analytics.shared_expenses.filter(e => {
                         if (filterMember   && e.paid_by_user_id  !== filterMember)   return false
                         if (filterCategory && e.category_name    !== filterCategory)  return false
+                        if (q && !(
+                          e.concept_name?.toLowerCase().includes(q) ||
+                          e.category_name?.toLowerCase().includes(q) ||
+                          e.paid_by_user_name?.toLowerCase().includes(q)
+                        )) return false
                         return true
                       })
                       const shown = expandedExpenses ? displayed : displayed.slice(0, 6)
@@ -656,11 +663,12 @@ export default function HouseholdPage() {
                       return (
                         <div className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
                           <div className={`px-5 pt-4 pb-3 border-b border-slate-800`}>
+                            {/* Título + Ver todos */}
                             <div className="flex items-center justify-between mb-3">
                               <p className={sectionTitle}>
                                 Historial de gastos
                                 <span className="normal-case font-normal text-slate-500 ml-1">
-                                  ({displayed.length}{(filterMember || filterCategory) ? ` de ${analytics.shared_expenses.length}` : ''})
+                                  ({displayed.length}{(filterMember || filterCategory || filterSearch) ? ` de ${analytics.shared_expenses.length}` : ''})
                                 </span>
                               </p>
                               {displayed.length > 6 && (
@@ -671,17 +679,26 @@ export default function HouseholdPage() {
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] mb-2">
-                              <span className={`text-[10px] uppercase tracking-widest shrink-0 text-slate-500`}>Miembro</span>
-                              <button
-                                onClick={() => setFilterMember(null)}
-                                className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
-                                  !filterMember
-                                    ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400'
-                                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
-                                }`}>
-                                Todos
-                              </button>
+                            {/* Buscador */}
+                            <div className="relative mb-2.5">
+                              <input
+                                type="text"
+                                value={filterSearch}
+                                onChange={e => setFilterSearch(e.target.value)}
+                                placeholder="Buscar por concepto, categoría o miembro..."
+                                className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-8 pr-4 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-500/60 transition-colors placeholder:text-slate-600"
+                              />
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-600 pointer-events-none" />
+                              {filterSearch && (
+                                <button onClick={() => setFilterSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Chips: Miembro | Categoría en una sola fila */}
+                            <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none]">
+                              <span className="text-[10px] uppercase tracking-widest shrink-0 text-slate-500">Miembro</span>
                               {activeMembers.map(m => (
                                 <button key={m.user_id}
                                   onClick={() => setFilterMember(filterMember === m.user_id ? null : m.user_id)}
@@ -694,19 +711,10 @@ export default function HouseholdPage() {
                                   {m.user_name}
                                 </button>
                               ))}
-                            </div>
 
-                            <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none]">
-                              <span className={`text-[10px] uppercase tracking-widest shrink-0 text-slate-500`}>Categoría</span>
-                              <button
-                                onClick={() => setFilterCategory(null)}
-                                className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
-                                  !filterCategory
-                                    ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400'
-                                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
-                                }`}>
-                                Todas
-                              </button>
+                              <div className="w-px h-4 bg-slate-700 shrink-0 mx-0.5" />
+
+                              <span className="text-[10px] uppercase tracking-widest shrink-0 text-slate-500">Categoría</span>
                               {analytics.expense_by_category.map((cat, i) => (
                                 <button key={cat.category_name}
                                   onClick={() => setFilterCategory(filterCategory === cat.category_name ? null : cat.category_name)}
@@ -720,6 +728,15 @@ export default function HouseholdPage() {
                                   {cat.category_name}
                                 </button>
                               ))}
+
+                              {(filterMember || filterCategory || filterSearch) && (
+                                <button
+                                  onClick={() => { setFilterMember(null); setFilterCategory(null); setFilterSearch('') }}
+                                  className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20 ml-1">
+                                  <X className="w-3 h-3" />
+                                  Limpiar
+                                </button>
+                              )}
                             </div>
                           </div>
 
