@@ -699,11 +699,48 @@ export async function exportHouseholdPDF(data: HouseholdExportData) {
     { label: 'Período',          value: period,                                 color: C.violet  },
   ], y)
 
-  // Group expenses chart
-  const donutImg = await captureChart('fluxo-export-household-donut')
-  if (donutImg) {
+  // Group expenses chart — programmatic donut + side-by-side category table
+  const PIE_COLORS_H: [number,number,number][] = [
+    C.indigo, C.emerald, C.rose, C.cyan, C.amber, C.violet,
+    [236, 72, 153], [20, 184, 166], [251, 146, 60],
+  ]
+  const expCats = analytics.expense_by_category.filter(c => Number(c.total) > 0)
+  if (expCats.length > 0 && Number(analytics.total_shared) > 0) {
     y = sectionHeader(doc, 'Distribución por Categoría', y)
-    y = addChartImage(doc, donutImg, y, 'Gastos del grupo por categoría · ' + period)
+    const CHART_MM = 55
+    const pieData  = expCats.map(c => ({ name: c.category_name, total: Number(c.total) }))
+    const pieImg   = createDonutChartDataUrl(pieData, PIE_COLORS_H, Number(analytics.total_shared))
+    doc.addImage(pieImg, 'PNG', 14, y, CHART_MM, CHART_MM)
+
+    const TABLE_X = 14 + CHART_MM + 5
+    autoTable(doc, {
+      startY: y,
+      margin: { left: TABLE_X, right: 14 },
+      head: [['Categoría', 'Total', '%']],
+      body: expCats.map(cat => {
+        const pct = ((Number(cat.total) / Number(analytics.total_shared)) * 100).toFixed(1) + '%'
+        return [cat.category_name, fmt(Number(cat.total), currency), pct]
+      }),
+      headStyles:         { fillColor: C.indigo, textColor: C.white, fontSize: 7.5, fontStyle: 'bold' },
+      bodyStyles:         { fontSize: 7.5, textColor: C.light, fillColor: C.card },
+      alternateRowStyles: { fillColor: C.border },
+      columnStyles: {
+        0: { cellPadding: { top: 2, right: 2, bottom: 2, left: 7 } },
+        1: { halign: 'right' },
+        2: { halign: 'right', cellWidth: 18 },
+      },
+      tableLineColor: C.border,
+      tableLineWidth: 0.1,
+      didDrawCell(data) {
+        if (data.section === 'body' && data.column.index === 0) {
+          const [r, g, b] = PIE_COLORS_H[data.row.index % PIE_COLORS_H.length]
+          doc.setFillColor(r, g, b)
+          doc.rect(data.cell.x + 2, data.cell.y + data.cell.height / 2 - 1.5, 3, 3, 'F')
+        }
+      },
+    })
+    const tableEndY = (doc as any).lastAutoTable.finalY
+    y = Math.max(y + CHART_MM, tableEndY) + 10
   }
 
   // Member contributions
