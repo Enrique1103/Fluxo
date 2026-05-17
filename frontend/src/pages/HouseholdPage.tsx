@@ -662,12 +662,10 @@ export default function HouseholdPage() {
                         )) return false
                         return true
                       })
-                      const shown = expandedExpenses ? displayed : displayed.slice(0, 6)
-
                       return (
                         <div className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
                           <div className={`px-5 pt-4 pb-3 border-b border-slate-800`}>
-                            {/* Título + Ver todos */}
+                            {/* Título */}
                             <div className="flex items-center justify-between mb-3">
                               <p className={sectionTitle}>
                                 Historial de gastos
@@ -675,29 +673,6 @@ export default function HouseholdPage() {
                                   ({displayed.length}{(filterMember || filterCategory || filterSearch || filterAmount) ? ` de ${analytics.shared_expenses.length}` : ''})
                                 </span>
                               </p>
-                              {displayed.length > 6 && (
-                                <button onClick={() => setExpandedExpenses(v => !v)}
-                                  className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
-                                  {expandedExpenses ? 'Ver menos' : 'Ver todos'}
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Buscador */}
-                            <div className="relative mb-2.5">
-                              <input
-                                type="text"
-                                value={filterSearch}
-                                onChange={e => setFilterSearch(e.target.value)}
-                                placeholder="Buscar por concepto, categoría o miembro..."
-                                className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-8 pr-4 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-500/60 transition-colors placeholder:text-slate-600"
-                              />
-                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-600 pointer-events-none" />
-                              {filterSearch && (
-                                <button onClick={() => setFilterSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400">
-                                  <X className="w-3 h-3" />
-                                </button>
-                              )}
                             </div>
 
                             {/* Dropdowns: Miembro + Categoría */}
@@ -828,26 +803,44 @@ export default function HouseholdPage() {
                                 </button>
                               )}
                             </div>
+
+                            {/* Buscador */}
+                            <div className="relative mt-2.5">
+                              <input
+                                type="text"
+                                value={filterSearch}
+                                onChange={e => setFilterSearch(e.target.value)}
+                                placeholder="Buscar por concepto, categoría o miembro..."
+                                className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-8 pr-4 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-500/60 transition-colors placeholder:text-slate-600"
+                              />
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-600 pointer-events-none" />
+                              {filterSearch && (
+                                <button onClick={() => setFilterSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="overflow-x-auto">
-                            {shown.length === 0 ? (
+                          <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 340 }}>
+                            {displayed.length === 0 ? (
                               <p className="text-sm text-center py-4 text-slate-500">
                                 Sin resultados para los filtros seleccionados
                               </p>
                             ) : (
                               <table className="w-full text-xs">
-                                <thead>
+                                <thead className="sticky top-0 bg-slate-900 z-10">
                                   <tr className="text-slate-600 uppercase text-[11px]">
-                                    <th className="text-left pb-2 pl-4">Fecha</th>
-                                    <th className="text-left pb-2">Categoría · Concepto</th>
-                                    <th className="text-left pb-2 hidden sm:table-cell">Miembro</th>
-                                    <th className="text-left pb-2 hidden md:table-cell">Cuenta</th>
-                                    <th className="text-right pb-2 pr-4">Monto</th>
+                                    <th className="text-left pb-2 pt-1 pl-4">Fecha</th>
+                                    <th className="text-left pb-2 pt-1">Categoría · Concepto</th>
+                                    <th className="text-left pb-2 pt-1 hidden lg:table-cell">Descripción</th>
+                                    <th className="text-left pb-2 pt-1 hidden sm:table-cell">Miembro</th>
+                                    <th className="text-left pb-2 pt-1 hidden md:table-cell">Cuenta</th>
+                                    <th className="text-right pb-2 pt-1 pr-4">Monto</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
-                                  {shown.map(e => {
+                                  {displayed.map(e => {
                                     const pal = avatarPalette(e.paid_by_user_name)
                                     return (
                                       <tr key={e.transaction_id} className="hover:bg-slate-800/30 transition-colors">
@@ -856,6 +849,7 @@ export default function HouseholdPage() {
                                           <p className="text-slate-300 font-medium leading-tight">{e.category_name}</p>
                                           <p className="text-slate-600 leading-tight">{e.concept_name}</p>
                                         </td>
+                                        <td className="py-2 text-slate-500 hidden lg:table-cell max-w-[180px] truncate">{e.description}</td>
                                         <td className="py-2 hidden sm:table-cell">
                                           <div className="flex items-center gap-1.5">
                                             <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${pal.bg} ${pal.text}`}>

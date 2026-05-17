@@ -648,6 +648,7 @@ function TxTable({
               <tr className="text-slate-600 uppercase text-sm">
                 <th className="text-left pb-2 pl-1">Fecha</th>
                 <th className="text-left pb-2">Categoría · Concepto</th>
+                <th className="text-left pb-2 hidden lg:table-cell">Descripción</th>
                 <th className="text-left pb-2 hidden sm:table-cell">Cuenta</th>
                 <th className="text-left pb-2 hidden md:table-cell">Método</th>
                 <th className="text-right pb-2 pr-1">Monto</th>
@@ -673,6 +674,7 @@ function TxTable({
                     </div>
                     <p className="text-slate-600">{tx.concept_name}</p>
                   </td>
+                  <td className="py-2 text-slate-500 hidden lg:table-cell max-w-[180px] truncate">{tx.description}</td>
                   <td className="py-2 text-slate-500 hidden sm:table-cell">{tx.account_name}</td>
                   <td className="py-2 hidden md:table-cell">
                     {tx.type === 'expense' && tx.metodo_pago && (

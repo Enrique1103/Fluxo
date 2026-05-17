@@ -122,6 +122,7 @@ class SharedExpense(BaseModel):
     paid_by_user_id: uuid.UUID
     paid_by_user_name: str
     account_name: str
+    description: str | None = None
 
 
 class CategoryBreakdown(BaseModel):

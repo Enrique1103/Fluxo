@@ -62,6 +62,7 @@ export interface SharedExpense {
   paid_by_user_id: string
   paid_by_user_name: string
   account_name: string
+  description?: string | null
 }
 
 export interface HouseholdAlert {
