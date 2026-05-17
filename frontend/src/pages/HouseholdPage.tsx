@@ -46,7 +46,6 @@ export default function HouseholdPage() {
   const [copied,      setCopied]      = useState(false)
   const [showInvite,  setShowInvite]  = useState(false)
   const [confirmRemoveId,  setConfirmRemoveId]  = useState<string | null>(null)
-  const [expandedExpenses, setExpandedExpenses] = useState(false)
   const [filterMember,     setFilterMember]     = useState<string | null>(null)
   const [filterCategory,   setFilterCategory]   = useState<string | null>(null)
   const [filterSearch,     setFilterSearch]     = useState('')
