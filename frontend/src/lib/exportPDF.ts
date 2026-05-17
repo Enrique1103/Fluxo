@@ -694,7 +694,7 @@ export async function exportHouseholdPDF(data: HouseholdExportData) {
   // Summary
   y = sectionHeader(doc, 'Gastos compartidos', y)
   y = addMetricCards(doc, [
-    { label: 'Total compartido', value: fmt(analytics.total_shared, currency), color: C.indigo },
+    { label: 'Total compartido', value: fmt(Number(analytics.total_shared), currency), color: C.indigo },
     { label: 'Miembros',         value: String(members.length),                 color: C.cyan   },
     { label: 'Período',          value: period,                                 color: C.violet  },
   ], y)
@@ -752,10 +752,10 @@ export async function exportHouseholdPDF(data: HouseholdExportData) {
       head: [['Miembro', '% Ingreso', 'Pagado', 'Debería pagar', 'Balance']],
       body: analytics.members.map(m => [
         m.user_name,
-        m.income_pct.toFixed(1) + '%',
-        fmt(m.expenses_paid, currency),
-        fmt(m.should_pay, currency),
-        fmt(m.balance, currency),
+        Number(m.income_pct).toFixed(1) + '%',
+        fmt(Number(m.expenses_paid), currency),
+        fmt(Number(m.should_pay), currency),
+        fmt(Number(m.balance), currency),
       ]),
       headStyles:         { fillColor: C.indigo, textColor: C.white, fontSize: 8, fontStyle: 'bold' },
       bodyStyles:         { fontSize: 8, textColor: C.light, fillColor: C.card },
@@ -763,7 +763,7 @@ export async function exportHouseholdPDF(data: HouseholdExportData) {
       columnStyles:       { 1: { halign: 'center' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
       didParseCell(data) {
         if (data.section === 'body' && data.column.index === 4) {
-          const raw = analytics.members[data.row.index]?.balance ?? 0
+          const raw = Number(analytics.members[data.row.index]?.balance ?? 0)
           data.cell.styles.textColor = raw >= 0 ? C.emerald : C.rose
         }
       },
@@ -781,7 +781,7 @@ export async function exportHouseholdPDF(data: HouseholdExportData) {
       body: analytics.settlement.map(s => [
         s.from_user_name,
         s.to_user_name,
-        fmt(s.amount, s.currency),
+        fmt(Number(s.amount), s.currency),
       ]),
       headStyles:         { fillColor: C.indigoDk, textColor: C.white, fontSize: 8, fontStyle: 'bold' },
       bodyStyles:         { fontSize: 8, textColor: C.light, fillColor: C.card },
@@ -803,7 +803,7 @@ export async function exportHouseholdPDF(data: HouseholdExportData) {
         e.concept_name,
         e.category_name,
         e.paid_by_user_name,
-        fmt(e.amount, e.currency),
+        fmt(Number(e.amount), e.currency),
       ]),
       headStyles:         { fillColor: C.dark, textColor: C.indigo, fontSize: 7.5, fontStyle: 'bold', lineColor: C.border, lineWidth: 0.3 },
       bodyStyles:         { fontSize: 7, textColor: C.light, fillColor: C.card },
