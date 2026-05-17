@@ -392,7 +392,7 @@ export async function exportGlobalPDF(data: GlobalExportData) {
 
 export async function exportMonthlyPDF(data: MonthlyExportData) {
   const { breakdown, year, month, currency, userName } = data
-  const { income, expenses, savings, categories, transactions } = breakdown
+  const { income, expenses, savings, categories, income_categories, transactions } = breakdown
   const period = `${MONTH_NAMES[month - 1]} ${year}`
   const doc    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W      = doc.internal.pageSize.getWidth()
@@ -544,6 +544,58 @@ export async function exportMonthlyPDF(data: MonthlyExportData) {
 
     const tableEndY = (doc as any).lastAutoTable.finalY
     y = Math.max(y + CHART_MM, tableEndY) + 10
+  }
+
+  // ── Distribución de Ingresos ──────────────────────────────────────────────
+  const INC_COLORS: [number,number,number][] = [
+    EMERALD, CYAN, [16, 185, 129], [6, 182, 212],
+    [52, 211, 153], [34, 211, 238], [110, 231, 183], [103, 232, 249],
+  ]
+  const incCats = (income_categories ?? []).filter(c => c.total > 0)
+  if (incCats.length > 0 && income > 0) {
+    if (y > doc.internal.pageSize.getHeight() - 60) {
+      doc.addPage()
+      doc.setFillColor(...WHITE)
+      doc.rect(0, 0, W, doc.internal.pageSize.getHeight(), 'F')
+      y = 14
+    }
+
+    y = section('Distribución de Ingresos', y)
+
+    const CHART_MM2 = 62
+    const pieImg2   = createDonutChartDataUrl(incCats, INC_COLORS, income)
+    doc.addImage(pieImg2, 'PNG', MARGIN, y, CHART_MM2, CHART_MM2)
+
+    const TABLE_X2 = MARGIN + CHART_MM2 + 5
+    autoTable(doc, {
+      startY: y,
+      margin: { left: TABLE_X2, right: MARGIN },
+      head: [['Categoría', 'Total', '% del ingreso']],
+      body: incCats.map(cat => {
+        const pct = ((cat.total / income) * 100).toFixed(1) + '%'
+        return [cat.name, fmt(cat.total, currency), pct]
+      }),
+      headStyles:         { fillColor: EMERALD, textColor: WHITE, fontSize: 7.5, fontStyle: 'bold' },
+      bodyStyles:         { fontSize: 7.5, textColor: TEXT, fillColor: WHITE },
+      alternateRowStyles: { fillColor: BG },
+      columnStyles: {
+        0: { cellPadding: { top: 2, right: 2, bottom: 2, left: 7 } },
+        1: { halign: 'right' },
+        2: { halign: 'right', cellWidth: 22 },
+      },
+      tableLineColor: BORDER,
+      tableLineWidth: 0.1,
+      didDrawCell(data) {
+        if (data.section === 'body' && data.column.index === 0) {
+          const [r, g, b] = INC_COLORS[data.row.index % INC_COLORS.length]
+          doc.setFillColor(r, g, b)
+          doc.rect(data.cell.x + 2, data.cell.y + data.cell.height / 2 - 1.5, 3, 3, 'F')
+        }
+      },
+    })
+
+    const incTableEndY = (doc as any).lastAutoTable.finalY
+    y = Math.max(y + CHART_MM2, incTableEndY) + 10
   }
 
   // ── Movimientos ───────────────────────────────────────────────────────────
