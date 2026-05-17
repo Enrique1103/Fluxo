@@ -526,9 +526,20 @@ export async function exportMonthlyPDF(data: MonthlyExportData) {
       headStyles:         { fillColor: INDIGO, textColor: WHITE, fontSize: 7.5, fontStyle: 'bold' },
       bodyStyles:         { fontSize: 7.5, textColor: TEXT, fillColor: WHITE },
       alternateRowStyles: { fillColor: BG },
-      columnStyles:       { 1: { halign: 'right' }, 2: { halign: 'right', cellWidth: 22 } },
-      tableLineColor:     BORDER,
-      tableLineWidth:     0.1,
+      columnStyles: {
+        0: { cellPadding: { top: 2, right: 2, bottom: 2, left: 7 } },
+        1: { halign: 'right' },
+        2: { halign: 'right', cellWidth: 22 },
+      },
+      tableLineColor: BORDER,
+      tableLineWidth: 0.1,
+      didDrawCell(data) {
+        if (data.section === 'body' && data.column.index === 0) {
+          const [r, g, b] = PIE_COLORS[data.row.index % PIE_COLORS.length]
+          doc.setFillColor(r, g, b)
+          doc.rect(data.cell.x + 2, data.cell.y + data.cell.height / 2 - 1.5, 3, 3, 'F')
+        }
+      },
     })
 
     const tableEndY = (doc as any).lastAutoTable.finalY
