@@ -50,6 +50,7 @@ export default function HouseholdPage() {
   const [filterMember,     setFilterMember]     = useState<string | null>(null)
   const [filterCategory,   setFilterCategory]   = useState<string | null>(null)
   const [filterSearch,     setFilterSearch]     = useState('')
+  const [filterAmount,     setFilterAmount]     = useState('')
   const [openDropdown,     setOpenDropdown]     = useState<'miembro' | 'categoria' | null>(null)
   const closeDropdown = () => setTimeout(() => setOpenDropdown(null), 150)
 
@@ -653,6 +654,7 @@ export default function HouseholdPage() {
                       const displayed = analytics.shared_expenses.filter(e => {
                         if (filterMember   && e.paid_by_user_id  !== filterMember)   return false
                         if (filterCategory && e.category_name    !== filterCategory)  return false
+                        if (filterAmount.trim() && !String(Math.round(Number(e.amount))).includes(filterAmount.trim())) return false
                         if (q && !(
                           e.concept_name?.toLowerCase().includes(q) ||
                           e.category_name?.toLowerCase().includes(q) ||
@@ -670,7 +672,7 @@ export default function HouseholdPage() {
                               <p className={sectionTitle}>
                                 Historial de gastos
                                 <span className="normal-case font-normal text-slate-500 ml-1">
-                                  ({displayed.length}{(filterMember || filterCategory || filterSearch) ? ` de ${analytics.shared_expenses.length}` : ''})
+                                  ({displayed.length}{(filterMember || filterCategory || filterSearch || filterAmount) ? ` de ${analytics.shared_expenses.length}` : ''})
                                 </span>
                               </p>
                               {displayed.length > 6 && (
@@ -798,10 +800,27 @@ export default function HouseholdPage() {
                                 )}
                               </div>
 
+                              {/* Monto */}
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-slate-800 border-slate-700">
+                                <span className="text-slate-500 shrink-0">Monto:</span>
+                                <input
+                                  type="number"
+                                  value={filterAmount}
+                                  onChange={e => setFilterAmount(e.target.value)}
+                                  placeholder="—"
+                                  className="w-16 bg-transparent text-slate-300 outline-none placeholder:text-slate-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                                {filterAmount && (
+                                  <button onClick={() => setFilterAmount('')} className="text-slate-600 hover:text-slate-400">
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+
                               {/* Limpiar */}
-                              {(filterMember || filterCategory || filterSearch) && (
+                              {(filterMember || filterCategory || filterSearch || filterAmount) && (
                                 <button
-                                  onClick={() => { setFilterMember(null); setFilterCategory(null); setFilterSearch('') }}
+                                  onClick={() => { setFilterMember(null); setFilterCategory(null); setFilterSearch(''); setFilterAmount('') }}
                                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
                                 >
                                   <X className="w-3 h-3" />

@@ -338,7 +338,8 @@ function TxTable({
   const [methodFilter, setMethodFilter] = useState<PaymentMethod | 'all'>('all')
   const [search, setSearch] = useState('')
   const [internalCategory, setInternalCategory] = useState<string | null>(categoryFilter ?? null)
-  const [openDropdown, setOpenDropdown] = useState<'tipo' | 'categoria' | null>(null)
+  const [amountFilter, setAmountFilter] = useState('')
+  const [openDropdown, setOpenDropdown] = useState<'tipo' | 'categoria' | 'metodo' | null>(null)
   const [deletingId,  setDeletingId]  = useState<string | null>(null)
   const [confirmId,   setConfirmId]   = useState<string | null>(null)
   const [cuotaConfirm, setCuotaConfirm] = useState<{ txId: string; planId: string } | null>(null)
@@ -404,17 +405,19 @@ function TxTable({
     if (internalCategory) {
       result = result.filter(t => t.category_name === internalCategory)
     }
+    if (amountFilter.trim()) {
+      result = result.filter(t => String(Math.round(t.amount)).includes(amountFilter.trim()))
+    }
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter(t =>
         t.concept_name.toLowerCase().includes(q) ||
         t.category_name.toLowerCase().includes(q) ||
-        (t.description?.toLowerCase().includes(q)) ||
-        String(t.amount).includes(q)
+        (t.description?.toLowerCase().includes(q))
       )
     }
     return result
-  }, [transactions, filter, methodFilter, internalCategory, search])
+  }, [transactions, filter, methodFilter, internalCategory, amountFilter, search])
 
   // Summary totals by payment method (expenses only)
   const expenseTotals = useMemo(() => {
@@ -447,13 +450,14 @@ function TxTable({
   const selectedTypeLabel = TYPE_OPTIONS.find(o => o.value === filter)?.label ?? 'Todos'
   const selectedTypeActive = TYPE_OPTIONS.find(o => o.value === filter)?.activeClass ?? ''
 
-  const hasActiveFilters = filter !== 'all' || internalCategory || methodFilter !== 'all' || search.trim()
+  const hasActiveFilters = filter !== 'all' || internalCategory || methodFilter !== 'all' || search.trim() || amountFilter.trim()
 
   const clearAll = () => {
     setFilter('all')
     setInternalCategory(null)
     setMethodFilter('all')
     setSearch('')
+    setAmountFilter('')
   }
 
   return (
@@ -537,6 +541,72 @@ function TxTable({
           )}
         </div>
 
+        {/* Método de Pago */}
+        {hasExpenses && (
+          <div className="relative">
+            <button
+              onClick={() => setOpenDropdown(openDropdown === 'metodo' ? null : 'metodo')}
+              onBlur={closeDropdown}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                methodFilter !== 'all'
+                  ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              Método de Pago
+              {methodFilter !== 'all' && <span className="opacity-75">· {PAYMENT_METHOD_LABELS[methodFilter as PaymentMethod]}</span>}
+              <ChevronDown className="w-3 h-3 ml-0.5 opacity-60" />
+            </button>
+            {openDropdown === 'metodo' && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-xl min-w-[180px] py-1 overflow-hidden">
+                <button
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { setMethodFilter('all'); setOpenDropdown(null) }}
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
+                    methodFilter === 'all' ? 'font-semibold text-slate-100' : 'text-slate-400'
+                  }`}
+                >
+                  Todos
+                  {methodFilter === 'all' && <span className="text-emerald-400 text-[10px]">✓</span>}
+                </button>
+                {ALL_PAYMENT_METHODS.filter(m => expenseTotals[m] !== undefined).map(m => (
+                  <button
+                    key={m}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => { setMethodFilter(m); setOpenDropdown(null) }}
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
+                      methodFilter === m ? 'font-semibold text-indigo-300' : 'text-slate-400'
+                    }`}
+                  >
+                    <span>
+                      {PAYMENT_METHOD_LABELS[m]}
+                      {!privacy && <span className="ml-1.5 opacity-50">${Math.round(expenseTotals[m]!).toLocaleString()}</span>}
+                    </span>
+                    {methodFilter === m && <span className="text-emerald-400 text-[10px]">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Monto */}
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-slate-800 border-slate-700">
+          <span className="text-slate-500 shrink-0">Monto:</span>
+          <input
+            type="number"
+            value={amountFilter}
+            onChange={e => setAmountFilter(e.target.value)}
+            placeholder="—"
+            className="w-16 bg-transparent text-slate-300 outline-none placeholder:text-slate-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+          {amountFilter && (
+            <button onClick={() => setAmountFilter('')} className="text-slate-600 hover:text-slate-400">
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
         {/* Limpiar */}
         {hasActiveFilters && (
           <button
@@ -550,28 +620,6 @@ function TxTable({
 
         <span className="ml-auto text-sm text-slate-600 self-center">{filtered.length} movimientos</span>
       </div>
-
-      {/* Method filter — visible when showing expenses */}
-      {(filter === 'expense' || filter === 'all') && hasExpenses && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {ALL_PAYMENT_METHODS.filter(m => expenseTotals[m] !== undefined).map(m => (
-            <button
-              key={m}
-              onClick={() => setMethodFilter(methodFilter === m ? 'all' : m)}
-              className={`px-2.5 py-1 rounded-lg text-sm font-medium border transition-colors ${
-                methodFilter === m
-                  ? PAYMENT_METHOD_STYLES[m]
-                  : 'text-slate-500 border-transparent hover:text-slate-400'
-              }`}
-            >
-              {PAYMENT_METHOD_LABELS[m]}
-              {expenseTotals[m] !== undefined && (
-                <span className="ml-1 opacity-70">{privacy ? '****' : `$${Math.round(expenseTotals[m]!).toLocaleString()}`}</span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Búsqueda */}
       <div className="relative mb-3">

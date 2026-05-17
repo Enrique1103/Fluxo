@@ -1,6 +1,6 @@
 import uuid
 from decimal import Decimal
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.crud import household_crud, exchange_rate_crud
 from app.exceptions.household_exceptions import HouseholdNotFound, UnauthorizedHouseholdAccess
@@ -119,6 +119,7 @@ def get_analytics(
     # ── Shared expenses for the period ──────────────────────────────────────
     shared_txs = (
         db.query(Transaction)
+        .options(joinedload(Transaction.account))
         .filter(
             Transaction.household_id == household_id,
             Transaction.is_deleted == False,
