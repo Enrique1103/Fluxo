@@ -121,6 +121,7 @@ class SharedExpense(BaseModel):
     currency: str
     paid_by_user_id: uuid.UUID
     paid_by_user_name: str
+    account_name: str
 
 
 class CategoryBreakdown(BaseModel):

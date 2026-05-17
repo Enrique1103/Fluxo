@@ -554,16 +554,6 @@ function TxTable({
       {/* Method filter — visible when showing expenses */}
       {(filter === 'expense' || filter === 'all') && hasExpenses && (
         <div className="flex flex-wrap gap-1.5 mb-3">
-          <button
-            onClick={() => setMethodFilter('all')}
-            className={`px-2.5 py-1 rounded-lg text-sm font-medium border transition-colors ${
-              methodFilter === 'all'
-                ? 'bg-slate-700 text-slate-200 border-slate-600'
-                : 'text-slate-500 border-transparent hover:text-slate-300'
-            }`}
-          >
-            Todos los métodos
-          </button>
           {ALL_PAYMENT_METHODS.filter(m => expenseTotals[m] !== undefined).map(m => (
             <button
               key={m}

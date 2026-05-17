@@ -154,6 +154,7 @@ def get_analytics(
             currency=account_currency,
             paid_by_user_id=tx.user_id,
             paid_by_user_name=_get_user_name(db, tx.user_id),
+            account_name=tx.account.name if tx.account else "",
         ))
 
     for cur in missing_currencies:

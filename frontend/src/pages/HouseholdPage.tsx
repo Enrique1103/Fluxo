@@ -823,6 +823,7 @@ export default function HouseholdPage() {
                                     <th className="text-left pb-2 pl-4">Fecha</th>
                                     <th className="text-left pb-2">Categoría · Concepto</th>
                                     <th className="text-left pb-2 hidden sm:table-cell">Miembro</th>
+                                    <th className="text-left pb-2 hidden md:table-cell">Cuenta</th>
                                     <th className="text-right pb-2 pr-4">Monto</th>
                                   </tr>
                                 </thead>
@@ -844,6 +845,7 @@ export default function HouseholdPage() {
                                             <span className="text-slate-500 truncate">{e.paid_by_user_name}</span>
                                           </div>
                                         </td>
+                                        <td className="py-2 text-slate-500 hidden md:table-cell">{e.account_name}</td>
                                         <td className="py-2 pr-4 text-right font-semibold tabular-nums text-rose-400">
                                           -{fmt(Number(e.amount))}
                                         </td>
