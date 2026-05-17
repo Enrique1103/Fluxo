@@ -723,40 +723,48 @@ export default function HouseholdPage() {
                             </div>
                           </div>
 
-                          <div className="p-4 space-y-1.5">
+                          <div className="overflow-x-auto">
                             {shown.length === 0 ? (
-                              <p className={`text-sm text-center py-4 text-slate-500`}>
+                              <p className="text-sm text-center py-4 text-slate-500">
                                 Sin resultados para los filtros seleccionados
                               </p>
-                            ) : shown.map(e => {
-                              const pal   = avatarPalette(e.paid_by_user_name)
-                              const color = categoryColor(e.category_name, analytics.expense_by_category)
-                              return (
-                                <div key={e.transaction_id}
-                                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors bg-slate-800/40 border-slate-700/30 hover:bg-slate-800/70`}>
-                                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${pal.bg} ${pal.text}`}>
-                                    {e.paid_by_user_name.charAt(0).toUpperCase()}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className={`text-sm truncate text-slate-300`}>
-                                      {e.concept_name || e.category_name}
-                                    </p>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                                      <p className="text-[10px] text-slate-500 truncate">
-                                        {e.category_name} · {e.paid_by_user_name} · {e.date}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="text-right shrink-0">
-                                    <p className={`text-sm font-bold tabular-nums text-rose-400`}>
-                                      {fmt(Number(e.amount))}
-                                    </p>
-                                    <p className="text-[10px] text-slate-500">{e.currency}</p>
-                                  </div>
-                                </div>
-                              )
-                            })}
+                            ) : (
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="text-slate-600 uppercase text-[11px]">
+                                    <th className="text-left pb-2 pl-4">Fecha</th>
+                                    <th className="text-left pb-2">Categoría · Concepto</th>
+                                    <th className="text-left pb-2 hidden sm:table-cell">Miembro</th>
+                                    <th className="text-right pb-2 pr-4">Monto</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                  {shown.map(e => {
+                                    const pal = avatarPalette(e.paid_by_user_name)
+                                    return (
+                                      <tr key={e.transaction_id} className="hover:bg-slate-800/30 transition-colors">
+                                        <td className="py-2 pl-4 text-slate-500 whitespace-nowrap">{e.date}</td>
+                                        <td className="py-2">
+                                          <p className="text-slate-300 font-medium leading-tight">{e.category_name}</p>
+                                          <p className="text-slate-600 leading-tight">{e.concept_name}</p>
+                                        </td>
+                                        <td className="py-2 hidden sm:table-cell">
+                                          <div className="flex items-center gap-1.5">
+                                            <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${pal.bg} ${pal.text}`}>
+                                              {e.paid_by_user_name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="text-slate-500 truncate">{e.paid_by_user_name}</span>
+                                          </div>
+                                        </td>
+                                        <td className="py-2 pr-4 text-right font-semibold tabular-nums text-rose-400">
+                                          -{fmt(Number(e.amount))}
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            )}
                           </div>
                         </div>
                       )
