@@ -521,18 +521,18 @@ function TxTable({
                   <td className="py-2 pl-1 text-slate-500 whitespace-nowrap">{fmtDate(tx.date)}</td>
                   <td className="py-2">
                     <div className="flex items-center gap-1.5 leading-tight">
-                      <p className="text-slate-300 font-medium">{tx.concept_name}</p>
+                      <p className="text-slate-300 font-medium">
+                        {tx.type === 'transfer' && tx.transfer_dest_name
+                          ? `→ ${tx.transfer_dest_name}`
+                          : tx.category_name}
+                      </p>
                       {tx.instalment_plan_id && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/20 shrink-0">
                           CUOTA
                         </span>
                       )}
                     </div>
-                    <p className="text-slate-600">
-                      {tx.type === 'transfer' && tx.transfer_dest_name
-                        ? `→ ${tx.transfer_dest_name}`
-                        : tx.category_name}
-                    </p>
+                    <p className="text-slate-600">{tx.concept_name}</p>
                   </td>
                   <td className="py-2 text-slate-500 hidden sm:table-cell">{tx.account_name}</td>
                   <td className="py-2 hidden md:table-cell">
