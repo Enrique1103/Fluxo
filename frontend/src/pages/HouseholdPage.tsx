@@ -18,6 +18,8 @@ import CreateModal from '../components/household/CreateModal'
 import JoinModal from '../components/household/JoinModal'
 import EditModal from '../components/household/EditModal'
 import SettingsDrawer from '../components/SettingsDrawer'
+import ExportButton from '../components/ExportButton'
+import { exportHouseholdPDF } from '../lib/exportPDF'
 import { useHomeCurrency } from '../hooks/useHomeCurrency'
 import {
   MONTH_NAMES, DONUT_COLORS, avatarPalette, fmtNum,
@@ -201,6 +203,18 @@ export default function HouseholdPage() {
           >
             {[...new Set([homeCurrency, 'USD', 'EUR'])].map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+          {/* Export */}
+          {analytics && household && (
+            <ExportButton
+              onExport={() => exportHouseholdPDF({
+                analytics,
+                members,
+                householdName: household.name,
+                month,
+                year,
+              })}
+            />
+          )}
           {/* Settings */}
           <button
             onClick={() => setSettingsOpen(true)}
