@@ -52,7 +52,7 @@ export default function HouseholdPage() {
   const [filterCategory,   setFilterCategory]   = useState<string | null>(null)
   const [filterSearch,     setFilterSearch]     = useState('')
   const [filterAmount,     setFilterAmount]     = useState('')
-  const [openDropdown,     setOpenDropdown]     = useState<'miembro' | 'categoria' | null>(null)
+  const [openDropdown,     setOpenDropdown]     = useState<'miembro' | 'categoria' | 'mes' | 'año' | 'moneda' | null>(null)
   const closeDropdown = () => setTimeout(() => setOpenDropdown(null), 150)
 
   const [year,  setYear]  = useState(() => new Date().getFullYear())
@@ -176,33 +176,71 @@ export default function HouseholdPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-          {/* Month selector */}
+          {/* Month + Year selector */}
           <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5">
-            <button onClick={prevMonth} className="p-1 text-slate-400 hover:text-slate-200 transition-colors">
+            <button onClick={() => { setOpenDropdown(null); prevMonth() }} className="p-1 text-slate-400 hover:text-slate-200 transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <select
-              value={month}
-              onChange={e => setMonth(Number(e.target.value))}
-              className="bg-transparent text-sm font-semibold text-slate-200 outline-none cursor-pointer appearance-none text-center"
-            >
-              {MONTH_NAMES.map((m, i) => (
-                <option key={i + 1} value={i + 1} className="bg-slate-900">{m}</option>
-              ))}
-            </select>
-            <select
-              value={year}
-              onChange={e => setYear(Number(e.target.value))}
-              className="bg-transparent text-sm font-semibold text-slate-200 outline-none cursor-pointer appearance-none text-center ml-1"
-            >
-              {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 3 + i).map(y => (
-                <option key={y} value={y} className="bg-slate-900">{y}</option>
-              ))}
-            </select>
-            <button onClick={nextMonth} disabled={isMaxMonth} className="p-1 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-30">
+
+            {/* Mes */}
+            <div className="relative">
+              <button
+                onClick={() => setOpenDropdown(openDropdown === 'mes' ? null : 'mes')}
+                onBlur={closeDropdown}
+                className="flex items-center gap-0.5 text-sm font-semibold text-slate-200 px-1 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                {MONTH_NAMES[month - 1]}
+                <ChevronDown className="w-3 h-3 opacity-50" />
+              </button>
+              {openDropdown === 'mes' && (
+                <div className="absolute top-full left-0 mt-1 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-xl min-w-[130px] py-1 overflow-hidden max-h-60 overflow-y-auto">
+                  {MONTH_NAMES.map((name, i) => (
+                    <button
+                      key={i + 1}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => { setMonth(i + 1); setOpenDropdown(null) }}
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${month === i + 1 ? 'font-semibold text-slate-100' : 'text-slate-400'}`}
+                    >
+                      {name}
+                      {month === i + 1 && <span className="text-emerald-400 text-[10px]">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Año */}
+            <div className="relative">
+              <button
+                onClick={() => setOpenDropdown(openDropdown === 'año' ? null : 'año')}
+                onBlur={closeDropdown}
+                className="flex items-center gap-0.5 text-sm font-semibold text-slate-200 px-1 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                {year}
+                <ChevronDown className="w-3 h-3 opacity-50" />
+              </button>
+              {openDropdown === 'año' && (
+                <div className="absolute top-full left-0 mt-1 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden">
+                  {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 3 + i).map(y => (
+                    <button
+                      key={y}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => { setYear(y); setOpenDropdown(null) }}
+                      className={`w-full text-left px-4 py-1.5 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between gap-4 ${year === y ? 'font-semibold text-slate-100' : 'text-slate-400'}`}
+                    >
+                      {y}
+                      {year === y && <span className="text-emerald-400 text-[10px]">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button onClick={() => { setOpenDropdown(null); nextMonth() }} disabled={isMaxMonth} className="p-1 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-30">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
+
           {/* Privacy toggle */}
           <button
             onClick={() => { const next = !privacy; setPrivacy(next); localStorage.setItem('privacy', String(next)) }}
@@ -210,18 +248,33 @@ export default function HouseholdPage() {
           >
             {privacy ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
           </button>
-          {/* Currency selector */}
-          <div className="relative flex items-center bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5">
-            <DollarSign className="w-4 h-4 text-emerald-500 mr-2" />
-            <select
-              value={currency}
-              onChange={e => setCurrency(e.target.value)}
-              className="bg-transparent text-sm font-medium text-slate-300 outline-none appearance-none cursor-pointer pr-4"
+
+          {/* Moneda */}
+          <div className="relative">
+            <button
+              onClick={() => setOpenDropdown(openDropdown === 'moneda' ? null : 'moneda')}
+              onBlur={closeDropdown}
+              className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5"
             >
-              {[...new Set([homeCurrency, 'USD', 'EUR'])].map(c => (
-                <option key={c} value={c} translate="no" className="bg-slate-900">{c}</option>
-              ))}
-            </select>
+              <DollarSign className="w-4 h-4 text-emerald-500" />
+              <span className="text-sm font-medium text-slate-300">{currency}</span>
+              <ChevronDown className="w-3 h-3 text-slate-500" />
+            </button>
+            {openDropdown === 'moneda' && (
+              <div className="absolute top-full right-0 mt-1 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden min-w-[100px]">
+                {[...new Set([homeCurrency, 'USD', 'EUR'])].map(c => (
+                  <button
+                    key={c}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => { setCurrency(c); setOpenDropdown(null) }}
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between gap-3 ${currency === c ? 'font-semibold text-slate-100' : 'text-slate-400'}`}
+                  >
+                    {c}
+                    {currency === c && <span className="text-emerald-400 text-[10px]">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           {/* Export */}
           {analytics && household && (
