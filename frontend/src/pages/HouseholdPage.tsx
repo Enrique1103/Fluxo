@@ -18,6 +18,7 @@ import CreateModal from '../components/household/CreateModal'
 import JoinModal from '../components/household/JoinModal'
 import EditModal from '../components/household/EditModal'
 import SettingsDrawer from '../components/SettingsDrawer'
+import MonthYearPicker from '../components/MonthYearPicker'
 import ExportButton from '../components/ExportButton'
 import { exportHouseholdPDF } from '../lib/exportPDF'
 import { useHomeCurrency } from '../hooks/useHomeCurrency'
@@ -52,7 +53,7 @@ export default function HouseholdPage() {
   const [filterCategory,   setFilterCategory]   = useState<string | null>(null)
   const [filterSearch,     setFilterSearch]     = useState('')
   const [filterAmount,     setFilterAmount]     = useState('')
-  const [openDropdown,     setOpenDropdown]     = useState<'miembro' | 'categoria' | 'mes' | 'año' | 'moneda' | null>(null)
+  const [openDropdown,     setOpenDropdown]     = useState<'miembro' | 'categoria' | 'fecha' | 'moneda' | null>(null)
   const closeDropdown = () => setTimeout(() => setOpenDropdown(null), 150)
 
   const [year,  setYear]  = useState(() => new Date().getFullYear())
@@ -181,61 +182,26 @@ export default function HouseholdPage() {
             <button onClick={() => { setOpenDropdown(null); prevMonth() }} className="p-1 text-slate-400 hover:text-slate-200 transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
-
-            {/* Mes */}
             <div className="relative">
               <button
-                onClick={() => setOpenDropdown(openDropdown === 'mes' ? null : 'mes')}
+                onClick={() => setOpenDropdown(openDropdown === 'fecha' ? null : 'fecha')}
                 onBlur={closeDropdown}
-                className="flex items-center gap-0.5 text-sm font-semibold text-slate-200 px-1 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
+                className="flex items-center gap-1 text-sm font-semibold text-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
               >
-                {MONTH_NAMES[month - 1]}
+                {MONTH_NAMES[month - 1]} {year}
                 <ChevronDown className="w-3 h-3 opacity-50" />
               </button>
-              {openDropdown === 'mes' && (
-                <div className="absolute top-full left-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl min-w-[130px] py-1 overflow-hidden max-h-60 overflow-y-auto">
-                  {MONTH_NAMES.map((name, i) => (
-                    <button
-                      key={i + 1}
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => { setMonth(i + 1); setOpenDropdown(null) }}
-                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${month === i + 1 ? 'font-semibold text-slate-200' : 'text-slate-400'}`}
-                    >
-                      {name}
-                      {month === i + 1 && <span className="text-emerald-400 text-[10px]">✓</span>}
-                    </button>
-                  ))}
-                </div>
+              {openDropdown === 'fecha' && (
+                <MonthYearPicker
+                  month={month}
+                  year={year}
+                  maxYear={now.getFullYear()}
+                  maxMonth={now.getMonth() + 1}
+                  onChange={(m, y) => { setMonth(m); setYear(y) }}
+                  onClose={() => setOpenDropdown(null)}
+                />
               )}
             </div>
-
-            {/* Año */}
-            <div className="relative">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === 'año' ? null : 'año')}
-                onBlur={closeDropdown}
-                className="flex items-center gap-0.5 text-sm font-semibold text-slate-200 px-1 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
-              >
-                {year}
-                <ChevronDown className="w-3 h-3 opacity-50" />
-              </button>
-              {openDropdown === 'año' && (
-                <div className="absolute top-full left-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden">
-                  {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 3 + i).map(y => (
-                    <button
-                      key={y}
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => { setYear(y); setOpenDropdown(null) }}
-                      className={`w-full text-left px-4 py-1.5 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between gap-4 ${year === y ? 'font-semibold text-slate-200' : 'text-slate-400'}`}
-                    >
-                      {y}
-                      {year === y && <span className="text-emerald-400 text-[10px]">✓</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
             <button onClick={() => { setOpenDropdown(null); nextMonth() }} disabled={isMaxMonth} className="p-1 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-30">
               <ChevronRight className="w-4 h-4" />
             </button>

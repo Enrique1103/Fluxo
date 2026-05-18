@@ -8,6 +8,7 @@ import {
   CreditCard, Wallet, Upload, X, Search, Home, Pencil, DollarSign,
 } from 'lucide-react'
 import ExportButton from '../components/ExportButton'
+import MonthYearPicker from '../components/MonthYearPicker'
 import { exportMonthlyPDF } from '../lib/exportPDF'
 import {
   fetchMonthlyBreakdown,
@@ -792,8 +793,14 @@ export default function StatsDashboardPage() {
   const [txConfirmOpen,     setTxConfirmOpen]     = useState(false)
   const [selectedCategory,  setSelectedCategory]  = useState<string | null>(null)
   const [donutMode,         setDonutMode]         = useState<'expense' | 'income'>('expense')
-  const [openHeaderDd,      setOpenHeaderDd]      = useState<'mes' | 'año' | 'moneda' | null>(null)
+  const [openHeaderDd,      setOpenHeaderDd]      = useState<'fecha' | 'moneda' | null>(null)
   const closeHeaderDd = () => setTimeout(() => setOpenHeaderDd(null), 150)
+
+  // Max date for picker: one month before (today + 2 years)
+  const pickerLimit = new Date(today.getFullYear() + 2, today.getMonth(), 1)
+  pickerLimit.setMonth(pickerLimit.getMonth() - 1)
+  const pickerMaxYear  = pickerLimit.getFullYear()
+  const pickerMaxMonth = pickerLimit.getMonth() + 1
 
   const queryClient = useQueryClient()
 
@@ -893,57 +900,24 @@ export default function StatsDashboardPage() {
               <ChevronLeft className="w-4 h-4" />
             </button>
 
-            {/* Mes */}
             <div className="relative">
               <button
-                onClick={() => setOpenHeaderDd(openHeaderDd === 'mes' ? null : 'mes')}
+                onClick={() => setOpenHeaderDd(openHeaderDd === 'fecha' ? null : 'fecha')}
                 onBlur={closeHeaderDd}
-                className="flex items-center gap-0.5 text-sm font-semibold text-slate-200 px-1 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
+                className="flex items-center gap-1 text-sm font-semibold text-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
               >
-                {MONTH_NAMES[month - 1]}
+                {MONTH_NAMES[month - 1]} {year}
                 <ChevronDown className="w-3 h-3 opacity-50" />
               </button>
-              {openHeaderDd === 'mes' && (
-                <div className="absolute top-full left-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl min-w-[130px] py-1 overflow-hidden max-h-60 overflow-y-auto">
-                  {MONTH_NAMES.map((name, i) => (
-                    <button
-                      key={i + 1}
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => { setMonth(i + 1); setOpenHeaderDd(null) }}
-                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${month === i + 1 ? 'font-semibold text-slate-200' : 'text-slate-400'}`}
-                    >
-                      {name}
-                      {month === i + 1 && <span className="text-emerald-400 text-[10px]">✓</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Año */}
-            <div className="relative">
-              <button
-                onClick={() => setOpenHeaderDd(openHeaderDd === 'año' ? null : 'año')}
-                onBlur={closeHeaderDd}
-                className="flex items-center gap-0.5 text-sm font-semibold text-slate-200 px-1 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
-              >
-                {year}
-                <ChevronDown className="w-3 h-3 opacity-50" />
-              </button>
-              {openHeaderDd === 'año' && (
-                <div className="absolute top-full left-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden">
-                  {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 3 + i).map(y => (
-                    <button
-                      key={y}
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => { setYear(y); setOpenHeaderDd(null) }}
-                      className={`w-full text-left px-4 py-1.5 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between gap-4 ${year === y ? 'font-semibold text-slate-200' : 'text-slate-400'}`}
-                    >
-                      {y}
-                      {year === y && <span className="text-emerald-400 text-[10px]">✓</span>}
-                    </button>
-                  ))}
-                </div>
+              {openHeaderDd === 'fecha' && (
+                <MonthYearPicker
+                  month={month}
+                  year={year}
+                  maxYear={pickerMaxYear}
+                  maxMonth={pickerMaxMonth}
+                  onChange={(m, y) => { setMonth(m); setYear(y) }}
+                  onClose={() => setOpenHeaderDd(null)}
+                />
               )}
             </div>
 
