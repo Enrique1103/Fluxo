@@ -678,74 +678,155 @@ export async function exportMonthlyPDF(data: MonthlyExportData) {
   doc.save(`fluxo_${year}-${String(month).padStart(2, '0')}.pdf`)
 }
 
-// ─── Household PDF ────────────────────────────────────────────────────────────
+// ─── Household PDF (mismo estilo que exportMonthlyPDF) ───────────────────────
 
 export async function exportHouseholdPDF(data: HouseholdExportData) {
   const { analytics, members, householdName, month, year } = data
   const period   = `${MONTH_NAMES[month - 1]} ${year}`
   const currency = analytics.base_currency
   const doc      = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const W        = doc.internal.pageSize.getWidth()
 
-  // Cover
-  addCover(doc, 'Análisis del Hogar', householdName, period, undefined)
+  // ── Paleta clara (idéntica a exportMonthlyPDF) ────────────────────────────
+  const WHITE:    [number,number,number] = [255, 255, 255]
+  const BG:       [number,number,number] = [248, 250, 252]
+  const BORDER:   [number,number,number] = [226, 232, 240]
+  const TEXT:     [number,number,number] = [15,  23,  42]
+  const MUTED:    [number,number,number] = [100, 116, 139]
+  const INDIGO:   [number,number,number] = [99,  102, 241]
+  const COVER_BG: [number,number,number] = [55,  48,  163]
+  const EMERALD:  [number,number,number] = [16,  185, 129]
+  const ROSE:     [number,number,number] = [244, 63,  94]
+  const CYAN:     [number,number,number] = [6,   182, 212]
+  const VIOLET:   [number,number,number] = [139, 92,  246]
 
-  let y = 90
-
-  // Summary
-  y = sectionHeader(doc, 'Gastos compartidos', y)
-  y = addMetricCards(doc, [
-    { label: 'Total compartido', value: fmt(Number(analytics.total_shared), currency), color: C.indigo },
-    { label: 'Miembros',         value: String(members.length),                 color: C.cyan   },
-    { label: 'Período',          value: period,                                 color: C.violet  },
-  ], y)
-
-  // Group expenses chart — programmatic donut + side-by-side category table
-  const PIE_COLORS_H: [number,number,number][] = [
-    C.indigo, C.emerald, C.rose, C.cyan, C.amber, C.violet,
-    [236, 72, 153], [20, 184, 166], [251, 146, 60],
+  const PIE_COLORS: [number,number,number][] = [
+    INDIGO, EMERALD, ROSE, CYAN,
+    [245, 158, 11], VIOLET, [236, 72, 153], [20, 184, 166], [251, 146, 60],
   ]
+
+  // ── Helper de sección (idéntico al mensual) ───────────────────────────────
+  const section = (label: string, y: number): number => {
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...TEXT)
+    doc.text(label, 14, y)
+    doc.setDrawColor(...BORDER)
+    doc.setLineWidth(0.25)
+    doc.line(14, y + 2.5, W - 14, y + 2.5)
+    return y + 8
+  }
+
+  const newPage = () => {
+    doc.addPage()
+    doc.setFillColor(...WHITE)
+    doc.rect(0, 0, W, doc.internal.pageSize.getHeight(), 'F')
+    return 14
+  }
+
+  // ── Fondo blanco ──────────────────────────────────────────────────────────
+  doc.setFillColor(...WHITE)
+  doc.rect(0, 0, W, doc.internal.pageSize.getHeight(), 'F')
+
+  // ── Cover ─────────────────────────────────────────────────────────────────
+  const COVER_H = 36
+  doc.setFillColor(...COVER_BG)
+  doc.rect(0, 0, W, COVER_H, 'F')
+
+  doc.setFontSize(22)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...WHITE)
+  doc.text('FLUXO', 14, 15)
+
+  doc.setFillColor(...INDIGO)
+  doc.rect(14, 17.5, 28, 1, 'F')
+
+  doc.setFontSize(9.5)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(196, 181, 253)
+  doc.text(`Reporte del Hogar · ${householdName} · ${period}`, 14, 26)
+
+  doc.setFontSize(7.5)
+  doc.setTextColor(196, 181, 253)
+  doc.text(`Generado: ${new Date().toLocaleDateString('es-UY')}`, W - 14, 15, { align: 'right' })
+
+  let y = COVER_H + 10
+
+  // ── Tarjetas de resumen ───────────────────────────────────────────────────
+  const cards = [
+    { label: 'TOTAL COMPARTIDO', value: fmt(Number(analytics.total_shared), currency), color: INDIGO  },
+    { label: 'MIEMBROS',          value: String(members.length),                        color: CYAN    },
+    { label: 'PERÍODO',           value: period,                                         color: VIOLET  },
+  ]
+  const MARGIN = 14
+  const GAP    = 5
+  const cardW  = (W - MARGIN * 2 - GAP * (cards.length - 1)) / cards.length
+  const CARD_H = 24
+
+  cards.forEach(({ label, value, color }, i) => {
+    const x = MARGIN + i * (cardW + GAP)
+    doc.setFillColor(...WHITE)
+    doc.roundedRect(x, y, cardW, CARD_H, 2, 2, 'F')
+    doc.setDrawColor(...BORDER)
+    doc.setLineWidth(0.3)
+    doc.roundedRect(x, y, cardW, CARD_H, 2, 2, 'S')
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...MUTED)
+    doc.text(label, x + cardW / 2, y + 8, { align: 'center' })
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...color)
+    doc.text(value, x + cardW / 2, y + 18, { align: 'center' })
+  })
+
+  y += CARD_H + 10
+
+  // ── Distribución por Categoría ────────────────────────────────────────────
   const expCats = analytics.expense_by_category.filter(c => Number(c.total) > 0)
   if (expCats.length > 0 && Number(analytics.total_shared) > 0) {
-    y = sectionHeader(doc, 'Distribución por Categoría', y)
-    const CHART_MM = 55
-    const pieData  = expCats.map(c => ({ name: c.category_name, total: Number(c.total) }))
-    const pieImg   = createDonutChartDataUrl(pieData, PIE_COLORS_H, Number(analytics.total_shared))
-    doc.addImage(pieImg, 'PNG', 14, y, CHART_MM, CHART_MM)
+    y = section('Distribución por Categoría', y)
+    const CHART_MM = 62
+    const pieImg   = createDonutChartDataUrl(
+      expCats.map(c => ({ name: c.category_name, total: Number(c.total) })),
+      PIE_COLORS,
+      Number(analytics.total_shared),
+    )
+    doc.addImage(pieImg, 'PNG', MARGIN, y, CHART_MM, CHART_MM)
 
-    const TABLE_X = 14 + CHART_MM + 5
     autoTable(doc, {
       startY: y,
-      margin: { left: TABLE_X, right: 14 },
+      margin: { left: MARGIN + CHART_MM + 5, right: MARGIN },
       head: [['Categoría', 'Total', '%']],
       body: expCats.map(cat => {
         const pct = ((Number(cat.total) / Number(analytics.total_shared)) * 100).toFixed(1) + '%'
         return [cat.category_name, fmt(Number(cat.total), currency), pct]
       }),
-      headStyles:         { fillColor: C.indigo, textColor: C.white, fontSize: 7.5, fontStyle: 'bold' },
-      bodyStyles:         { fontSize: 7.5, textColor: C.light, fillColor: C.card },
-      alternateRowStyles: { fillColor: C.border },
+      headStyles:         { fillColor: INDIGO, textColor: WHITE, fontSize: 7.5, fontStyle: 'bold' },
+      bodyStyles:         { fontSize: 7.5, textColor: TEXT, fillColor: WHITE },
+      alternateRowStyles: { fillColor: BG },
       columnStyles: {
         0: { cellPadding: { top: 2, right: 2, bottom: 2, left: 7 } },
         1: { halign: 'right' },
         2: { halign: 'right', cellWidth: 18 },
       },
-      tableLineColor: C.border,
+      tableLineColor: BORDER,
       tableLineWidth: 0.1,
       didDrawCell(data) {
         if (data.section === 'body' && data.column.index === 0) {
-          const [r, g, b] = PIE_COLORS_H[data.row.index % PIE_COLORS_H.length]
+          const [r, g, b] = PIE_COLORS[data.row.index % PIE_COLORS.length]
           doc.setFillColor(r, g, b)
           doc.rect(data.cell.x + 2, data.cell.y + data.cell.height / 2 - 1.5, 3, 3, 'F')
         }
       },
     })
-    const tableEndY = (doc as any).lastAutoTable.finalY
-    y = Math.max(y + CHART_MM, tableEndY) + 10
+    y = Math.max(y + CHART_MM, (doc as any).lastAutoTable.finalY) + 10
   }
 
-  // Member contributions
+  // ── Aportes por Miembro ───────────────────────────────────────────────────
   if (analytics.members.length > 0) {
-    y = sectionHeader(doc, 'Aportes por Miembro', y)
+    if (y > doc.internal.pageSize.getHeight() - 50) y = newPage()
+    y = section('Aportes por Miembro', y)
     autoTable(doc, {
       startY: y,
       margin: { left: 14, right: 14 },
@@ -757,23 +838,24 @@ export async function exportHouseholdPDF(data: HouseholdExportData) {
         fmt(Number(m.should_pay), currency),
         fmt(Number(m.balance), currency),
       ]),
-      headStyles:         { fillColor: C.indigo, textColor: C.white, fontSize: 8, fontStyle: 'bold' },
-      bodyStyles:         { fontSize: 8, textColor: C.light, fillColor: C.card },
-      alternateRowStyles: { fillColor: C.border },
+      headStyles:         { fillColor: TEXT, textColor: INDIGO, fontSize: 7.5, fontStyle: 'bold', lineColor: BORDER, lineWidth: 0.3 },
+      bodyStyles:         { fontSize: 7.5, textColor: TEXT, fillColor: WHITE },
+      alternateRowStyles: { fillColor: BG },
       columnStyles:       { 1: { halign: 'center' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
       didParseCell(data) {
         if (data.section === 'body' && data.column.index === 4) {
           const raw = Number(analytics.members[data.row.index]?.balance ?? 0)
-          data.cell.styles.textColor = raw >= 0 ? C.emerald : C.rose
+          data.cell.styles.textColor = raw >= 0 ? EMERALD : ROSE
         }
       },
     })
-    y = (doc as any).lastAutoTable.finalY + 8
+    y = (doc as any).lastAutoTable.finalY + 10
   }
 
-  // Settlement
+  // ── Liquidación de Deudas ─────────────────────────────────────────────────
   if (analytics.settlement.length > 0) {
-    y = sectionHeader(doc, 'Liquidación de Deudas', y)
+    if (y > doc.internal.pageSize.getHeight() - 40) y = newPage()
+    y = section('Liquidación de Deudas', y)
     autoTable(doc, {
       startY: y,
       margin: { left: 14, right: 14 },
@@ -783,17 +865,18 @@ export async function exportHouseholdPDF(data: HouseholdExportData) {
         s.to_user_name,
         fmt(Number(s.amount), s.currency),
       ]),
-      headStyles:         { fillColor: C.indigoDk, textColor: C.white, fontSize: 8, fontStyle: 'bold' },
-      bodyStyles:         { fontSize: 8, textColor: C.light, fillColor: C.card },
-      alternateRowStyles: { fillColor: C.border },
+      headStyles:         { fillColor: TEXT, textColor: INDIGO, fontSize: 7.5, fontStyle: 'bold', lineColor: BORDER, lineWidth: 0.3 },
+      bodyStyles:         { fontSize: 7.5, textColor: TEXT, fillColor: WHITE },
+      alternateRowStyles: { fillColor: BG },
       columnStyles:       { 2: { halign: 'right' } },
     })
-    y = (doc as any).lastAutoTable.finalY + 8
+    y = (doc as any).lastAutoTable.finalY + 10
   }
 
-  // Shared expenses table
+  // ── Gastos Compartidos ────────────────────────────────────────────────────
   if (analytics.shared_expenses.length > 0) {
-    y = sectionHeader(doc, 'Gastos Compartidos', y)
+    if (y > doc.internal.pageSize.getHeight() - 50) y = newPage()
+    y = section('Gastos Compartidos', y)
     autoTable(doc, {
       startY: y,
       margin: { left: 14, right: 14 },
@@ -805,13 +888,29 @@ export async function exportHouseholdPDF(data: HouseholdExportData) {
         e.paid_by_user_name,
         fmt(Number(e.amount), e.currency),
       ]),
-      headStyles:         { fillColor: C.dark, textColor: C.indigo, fontSize: 7.5, fontStyle: 'bold', lineColor: C.border, lineWidth: 0.3 },
-      bodyStyles:         { fontSize: 7, textColor: C.light, fillColor: C.card },
-      alternateRowStyles: { fillColor: C.border },
+      headStyles:         { fillColor: TEXT, textColor: INDIGO, fontSize: 7.5, fontStyle: 'bold', lineColor: BORDER, lineWidth: 0.3 },
+      bodyStyles:         { fontSize: 7, textColor: TEXT, fillColor: WHITE },
+      alternateRowStyles: { fillColor: BG },
       columnStyles:       { 0: { cellWidth: 14 }, 4: { halign: 'right', cellWidth: 28 } },
     })
   }
 
-  addPageNumbers(doc)
+  // ── Footer / numeración ───────────────────────────────────────────────────
+  const totalPages = (doc.internal as any).getNumberOfPages()
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p)
+    const pH = doc.internal.pageSize.getHeight()
+    doc.setFillColor(...BG)
+    doc.rect(0, pH - 8, W, 8, 'F')
+    doc.setDrawColor(...BORDER)
+    doc.setLineWidth(0.2)
+    doc.line(14, pH - 8, W - 14, pH - 8)
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...MUTED)
+    doc.text('Fluxo · Finanzas del Hogar', 14, pH - 3)
+    doc.text(`Página ${p} de ${totalPages}`, W - 14, pH - 3, { align: 'right' })
+  }
+
   doc.save(`fluxo_hogar_${year}-${String(month).padStart(2, '0')}.pdf`)
 }
