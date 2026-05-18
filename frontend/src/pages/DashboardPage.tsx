@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { useNavigate } from 'react-router-dom'
 import {
   Settings, Eye, EyeOff,
-  Activity, DollarSign,
+  Activity, DollarSign, ChevronDown,
   Lock, LockOpen, BarChart2,
   Edit3, Trash2, Plus, Loader2,
   CreditCard, Wallet, TrendingUp, Upload, Home,
@@ -876,6 +876,8 @@ export default function DashboardPage() {
   const isLight = theme === 'light'
   const [privacyMode,   setPrivacyMode]   = useState(() => localStorage.getItem('privacy') === 'true')
   const [currency,      setCurrency]      = useState('UYU') // synced to home currency below
+  const [openCurrencyDd, setOpenCurrencyDd] = useState(false)
+  const closeCurrencyDd = () => setTimeout(() => setOpenCurrencyDd(false), 150)
   const [settingsOpen,    setSettingsOpen]    = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>(null)
   const [goalModalOpen,    setGoalModalOpen]    = useState(false)
@@ -1137,7 +1139,7 @@ export default function DashboardPage() {
       </nav>
 
       {/* HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 sm:mb-8 gap-3 bg-slate-900/50 p-4 rounded-2xl border border-slate-800/50 backdrop-blur-md">
+      <header className="relative z-20 flex flex-col md:flex-row justify-between items-start md:items-center mb-4 sm:mb-8 gap-3 bg-slate-900/50 p-4 rounded-2xl border border-slate-800/50 backdrop-blur-md">
         <div className="flex items-center gap-4">
           <img
             src={isLight ? '/favicon-light.png' : '/favicon.png'}
@@ -1151,17 +1153,31 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex items-center bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5">
-            <DollarSign className="w-4 h-4 text-emerald-500 mr-2" />
-            <select
-              value={currency}
-              onChange={e => setCurrency(e.target.value)}
-              className="bg-transparent text-sm font-medium text-slate-300 outline-none appearance-none cursor-pointer pr-4"
+          <div className="relative">
+            <button
+              onClick={() => setOpenCurrencyDd(v => !v)}
+              onBlur={closeCurrencyDd}
+              className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5"
             >
-              {[...new Set([me?.currency_default ?? 'UYU', 'USD', 'EUR'])].map(cur => (
-                <option key={cur} value={cur} translate="no" className="bg-slate-900">{cur}</option>
-              ))}
-            </select>
+              <DollarSign className="w-4 h-4 text-emerald-500" />
+              <span className="text-sm font-medium text-slate-300">{currency}</span>
+              <ChevronDown className="w-3 h-3 text-slate-500" />
+            </button>
+            {openCurrencyDd && (
+              <div className="absolute top-full right-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden min-w-[100px]">
+                {[...new Set([me?.currency_default ?? 'UYU', 'USD', 'EUR'])].map(c => (
+                  <button
+                    key={c}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => { setCurrency(c); setOpenCurrencyDd(false) }}
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between gap-3 ${currency === c ? 'font-semibold text-slate-200' : 'text-slate-400'}`}
+                  >
+                    {c}
+                    {currency === c && <span className="text-emerald-400 text-[10px]">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <button onClick={() => { setPrivacyMode(p => { localStorage.setItem('privacy', String(!p)); return !p }) }}

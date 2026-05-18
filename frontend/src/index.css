@@ -196,6 +196,7 @@ html.light input:-webkit-autofill:focus {
 /* ── Light mode hover/active overrides (Tailwind modifier classes) ──────── */
 html.light .hover\:bg-slate-800:hover,
 html.light .hover\:bg-slate-800\/60:hover { background-color: #e2e8f0 !important; }
+html.light .hover\:bg-slate-800\/30:hover { background-color: rgba(226,232,240,0.5) !important; }
 html.light .hover\:bg-slate-700:hover,
 html.light .hover\:bg-slate-700\/60:hover  { background-color: #e2e8f0 !important; }
 html.light .hover\:text-white:hover        { color: #0f172a !important; }
