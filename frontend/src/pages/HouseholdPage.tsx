@@ -166,7 +166,7 @@ export default function HouseholdPage() {
       </nav>
 
       {/* ── Header card ──────────────────────────────────────────────────── */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 p-4 rounded-2xl border backdrop-blur-md bg-slate-900/50 border-slate-800/50">
+      <header className="relative z-20 flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 p-4 rounded-2xl border backdrop-blur-md bg-slate-900/50 border-slate-800/50">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-gradient-to-br from-indigo-400 to-violet-500 rounded-xl flex items-center justify-center shrink-0">
             <Home className="text-white w-4 h-4" />
@@ -193,13 +193,13 @@ export default function HouseholdPage() {
                 <ChevronDown className="w-3 h-3 opacity-50" />
               </button>
               {openDropdown === 'mes' && (
-                <div className="absolute top-full left-0 mt-1 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-xl min-w-[130px] py-1 overflow-hidden max-h-60 overflow-y-auto">
+                <div className="absolute top-full left-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl min-w-[130px] py-1 overflow-hidden max-h-60 overflow-y-auto">
                   {MONTH_NAMES.map((name, i) => (
                     <button
                       key={i + 1}
                       onMouseDown={e => e.preventDefault()}
                       onClick={() => { setMonth(i + 1); setOpenDropdown(null) }}
-                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${month === i + 1 ? 'font-semibold text-slate-100' : 'text-slate-400'}`}
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${month === i + 1 ? 'font-semibold text-slate-200' : 'text-slate-400'}`}
                     >
                       {name}
                       {month === i + 1 && <span className="text-emerald-400 text-[10px]">✓</span>}
@@ -220,13 +220,13 @@ export default function HouseholdPage() {
                 <ChevronDown className="w-3 h-3 opacity-50" />
               </button>
               {openDropdown === 'año' && (
-                <div className="absolute top-full left-0 mt-1 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden">
+                <div className="absolute top-full left-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden">
                   {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 3 + i).map(y => (
                     <button
                       key={y}
                       onMouseDown={e => e.preventDefault()}
                       onClick={() => { setYear(y); setOpenDropdown(null) }}
-                      className={`w-full text-left px-4 py-1.5 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between gap-4 ${year === y ? 'font-semibold text-slate-100' : 'text-slate-400'}`}
+                      className={`w-full text-left px-4 py-1.5 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between gap-4 ${year === y ? 'font-semibold text-slate-200' : 'text-slate-400'}`}
                     >
                       {y}
                       {year === y && <span className="text-emerald-400 text-[10px]">✓</span>}
@@ -261,13 +261,13 @@ export default function HouseholdPage() {
               <ChevronDown className="w-3 h-3 text-slate-500" />
             </button>
             {openDropdown === 'moneda' && (
-              <div className="absolute top-full right-0 mt-1 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden min-w-[100px]">
+              <div className="absolute top-full right-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden min-w-[100px]">
                 {[...new Set([homeCurrency, 'USD', 'EUR'])].map(c => (
                   <button
                     key={c}
                     onMouseDown={e => e.preventDefault()}
                     onClick={() => { setCurrency(c); setOpenDropdown(null) }}
-                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between gap-3 ${currency === c ? 'font-semibold text-slate-100' : 'text-slate-400'}`}
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between gap-3 ${currency === c ? 'font-semibold text-slate-200' : 'text-slate-400'}`}
                   >
                     {c}
                     {currency === c && <span className="text-emerald-400 text-[10px]">✓</span>}
@@ -786,8 +786,8 @@ export default function HouseholdPage() {
                                     <button
                                       onMouseDown={e => e.preventDefault()}
                                       onClick={() => { setFilterMember(null); setOpenDropdown(null) }}
-                                      className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
-                                        !filterMember ? 'font-semibold text-slate-100' : 'text-slate-400'
+                                      className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${
+                                        !filterMember ? 'font-semibold text-slate-200' : 'text-slate-400'
                                       }`}
                                     >
                                       Todos
@@ -798,7 +798,7 @@ export default function HouseholdPage() {
                                         key={m.user_id}
                                         onMouseDown={e => e.preventDefault()}
                                         onClick={() => { setFilterMember(m.user_id); setOpenDropdown(null) }}
-                                        className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between gap-2 ${
+                                        className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between gap-2 ${
                                           filterMember === m.user_id ? 'font-semibold text-indigo-300' : 'text-slate-400'
                                         }`}
                                       >
@@ -833,8 +833,8 @@ export default function HouseholdPage() {
                                     <button
                                       onMouseDown={e => e.preventDefault()}
                                       onClick={() => { setFilterCategory(null); setOpenDropdown(null) }}
-                                      className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
-                                        !filterCategory ? 'font-semibold text-slate-100' : 'text-slate-400'
+                                      className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${
+                                        !filterCategory ? 'font-semibold text-slate-200' : 'text-slate-400'
                                       }`}
                                     >
                                       Todas
@@ -845,7 +845,7 @@ export default function HouseholdPage() {
                                         key={cat.category_name}
                                         onMouseDown={e => e.preventDefault()}
                                         onClick={() => { setFilterCategory(cat.category_name); setOpenDropdown(null) }}
-                                        className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between gap-2 ${
+                                        className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between gap-2 ${
                                           filterCategory === cat.category_name ? 'font-semibold text-indigo-300' : 'text-slate-400'
                                         }`}
                                       >

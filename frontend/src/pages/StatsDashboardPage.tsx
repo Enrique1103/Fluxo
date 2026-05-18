@@ -485,8 +485,8 @@ function TxTable({
                   key={opt.value}
                   onMouseDown={e => e.preventDefault()}
                   onClick={() => { handleTypeFilter(opt.value as typeof filter); setOpenDropdown(null) }}
-                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
-                    filter === opt.value ? 'font-semibold text-slate-100' : 'text-slate-400'
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${
+                    filter === opt.value ? 'font-semibold text-slate-200' : 'text-slate-400'
                   }`}
                 >
                   {opt.label}
@@ -517,8 +517,8 @@ function TxTable({
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => { setInternalCategory(null); setOpenDropdown(null) }}
-                className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
-                  !internalCategory ? 'font-semibold text-slate-100' : 'text-slate-400'
+                className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${
+                  !internalCategory ? 'font-semibold text-slate-200' : 'text-slate-400'
                 }`}
               >
                 Todas
@@ -529,7 +529,7 @@ function TxTable({
                   key={cat}
                   onMouseDown={e => e.preventDefault()}
                   onClick={() => { setInternalCategory(cat); setOpenDropdown(null) }}
-                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${
                     internalCategory === cat ? 'font-semibold text-indigo-300' : 'text-slate-400'
                   }`}
                 >
@@ -562,8 +562,8 @@ function TxTable({
                 <button
                   onMouseDown={e => e.preventDefault()}
                   onClick={() => { setMethodFilter('all'); setOpenDropdown(null) }}
-                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
-                    methodFilter === 'all' ? 'font-semibold text-slate-100' : 'text-slate-400'
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${
+                    methodFilter === 'all' ? 'font-semibold text-slate-200' : 'text-slate-400'
                   }`}
                 >
                   Todos
@@ -574,7 +574,7 @@ function TxTable({
                     key={m}
                     onMouseDown={e => e.preventDefault()}
                     onClick={() => { setMethodFilter(m); setOpenDropdown(null) }}
-                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${
                       methodFilter === m ? 'font-semibold text-indigo-300' : 'text-slate-400'
                     }`}
                   >
@@ -876,7 +876,7 @@ export default function StatsDashboardPage() {
       </nav>
 
       {/* HEADER */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800/50 backdrop-blur-md">
+      <header className="relative z-20 flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800/50 backdrop-blur-md">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-violet-500 rounded-xl flex items-center justify-center">
             <BarChart2 className="text-white w-5 h-5" />
@@ -904,13 +904,13 @@ export default function StatsDashboardPage() {
                 <ChevronDown className="w-3 h-3 opacity-50" />
               </button>
               {openHeaderDd === 'mes' && (
-                <div className="absolute top-full left-0 mt-1 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-xl min-w-[130px] py-1 overflow-hidden max-h-60 overflow-y-auto">
+                <div className="absolute top-full left-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl min-w-[130px] py-1 overflow-hidden max-h-60 overflow-y-auto">
                   {MONTH_NAMES.map((name, i) => (
                     <button
                       key={i + 1}
                       onMouseDown={e => e.preventDefault()}
                       onClick={() => { setMonth(i + 1); setOpenHeaderDd(null) }}
-                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between ${month === i + 1 ? 'font-semibold text-slate-100' : 'text-slate-400'}`}
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${month === i + 1 ? 'font-semibold text-slate-200' : 'text-slate-400'}`}
                     >
                       {name}
                       {month === i + 1 && <span className="text-emerald-400 text-[10px]">✓</span>}
@@ -931,13 +931,13 @@ export default function StatsDashboardPage() {
                 <ChevronDown className="w-3 h-3 opacity-50" />
               </button>
               {openHeaderDd === 'año' && (
-                <div className="absolute top-full left-0 mt-1 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden">
+                <div className="absolute top-full left-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden">
                   {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 3 + i).map(y => (
                     <button
                       key={y}
                       onMouseDown={e => e.preventDefault()}
                       onClick={() => { setYear(y); setOpenHeaderDd(null) }}
-                      className={`w-full text-left px-4 py-1.5 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between gap-4 ${year === y ? 'font-semibold text-slate-100' : 'text-slate-400'}`}
+                      className={`w-full text-left px-4 py-1.5 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between gap-4 ${year === y ? 'font-semibold text-slate-200' : 'text-slate-400'}`}
                     >
                       {y}
                       {year === y && <span className="text-emerald-400 text-[10px]">✓</span>}
@@ -970,13 +970,13 @@ export default function StatsDashboardPage() {
               <ChevronDown className="w-3 h-3 text-slate-500" />
             </button>
             {openHeaderDd === 'moneda' && (
-              <div className="absolute top-full right-0 mt-1 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden min-w-[100px]">
+              <div className="absolute top-full right-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden min-w-[100px]">
                 {[...new Set([me?.currency_default ?? 'UYU', 'USD', 'EUR'])].map(c => (
                   <button
                     key={c}
                     onMouseDown={e => e.preventDefault()}
                     onClick={() => { setCurrency(c); setOpenHeaderDd(null) }}
-                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700/80 flex items-center justify-between gap-3 ${currency === c ? 'font-semibold text-slate-100' : 'text-slate-400'}`}
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between gap-3 ${currency === c ? 'font-semibold text-slate-200' : 'text-slate-400'}`}
                   >
                     {c}
                     {currency === c && <span className="text-emerald-400 text-[10px]">✓</span>}
