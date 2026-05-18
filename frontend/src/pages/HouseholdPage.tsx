@@ -254,7 +254,7 @@ export default function HouseholdPage() {
             <button
               onClick={() => setOpenDropdown(openDropdown === 'moneda' ? null : 'moneda')}
               onBlur={closeDropdown}
-              className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5"
+              className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"
             >
               <DollarSign className="w-4 h-4 text-emerald-500" />
               <span className="text-sm font-medium text-slate-300">{currency}</span>
@@ -291,9 +291,9 @@ export default function HouseholdPage() {
           {/* Settings */}
           <button
             onClick={() => setSettingsOpen(true)}
-            className="p-1.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors"
+            className="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-indigo-400 transition-colors"
           >
-            <Settings className="w-3.5 h-3.5" />
+            <Settings className="w-5 h-5" />
           </button>
         </div>
       </header>

@@ -1162,7 +1162,7 @@ export default function DashboardPage() {
             <button
               onClick={() => setOpenCurrencyDd(v => !v)}
               onBlur={closeCurrencyDd}
-              className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5"
+              className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"
             >
               <DollarSign className="w-4 h-4 text-emerald-500" />
               <span className="text-sm font-medium text-slate-300">{currency}</span>

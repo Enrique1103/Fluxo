@@ -24,13 +24,12 @@ export default function ExportButton({ onExport, title = 'Exportar PDF' }: Props
       onClick={handleClick}
       disabled={loading}
       title={title}
-      className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     >
       {loading
-        ? <Loader2 className="w-4 h-4 animate-spin" />
-        : <Download className="w-4 h-4" />
+        ? <Loader2 className="w-5 h-5 animate-spin" />
+        : <Download className="w-5 h-5" />
       }
-      <span className="hidden sm:inline">{loading ? 'Generando…' : 'Exportar'}</span>
     </button>
   )
 }
