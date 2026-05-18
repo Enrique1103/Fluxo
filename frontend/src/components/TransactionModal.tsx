@@ -33,9 +33,18 @@ const PRESET_COLORS = [
 
 const inputClass =
   'bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-emerald-500/60 transition-colors w-full'
-const selectClass =
-  'bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-emerald-500/60 transition-colors w-full appearance-none cursor-pointer'
 const labelClass = 'text-xs text-slate-400 mb-1 block'
+
+const METODO_LABELS: Record<string, string> = {
+  efectivo: 'Efectivo', tarjeta_credito: 'Tarjeta de crédito',
+  tarjeta_debito: 'Tarjeta de débito', transferencia_bancaria: 'Transferencia bancaria',
+  billetera_digital: 'Billetera digital', otro: 'Otro',
+}
+const ACCT_TYPE_LABELS: Record<string, string> = {
+  cash: 'Efectivo', debit: 'Débito', credit: 'Crédito', investment: 'Inversión',
+}
+const ddBtn   = 'w-full flex items-center justify-between bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm transition-colors text-left cursor-pointer'
+const ddPanel = 'absolute top-full left-0 mt-1 z-[200] w-full bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-y-auto max-h-52'
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
@@ -225,6 +234,9 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   // Quick-create panels
   const [showNewConcept,  setShowNewConcept]  = useState(false)
   const [showNewCategory, setShowNewCategory] = useState(false)
+
+  const [openDd, setOpenDd] = useState<string | null>(null)
+  const closeDd = () => setTimeout(() => setOpenDd(null), 150)
 
   // Inline account creation state
   const [acctName,     setAcctName]     = useState('')
@@ -450,22 +462,51 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                 <div>
                   <label className={labelClass}>Tipo</label>
                   <div className="relative">
-                    <select value={acctType} onChange={e => setAcctType(e.target.value)} className={selectClass}>
-                      <option value="cash">Efectivo</option>
-                      <option value="debit">Débito</option>
-                      <option value="credit">Crédito</option>
-                      <option value="investment">Inversión</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                    <button
+                      onClick={() => setOpenDd(openDd === 'acctType' ? null : 'acctType')}
+                      onBlur={closeDd}
+                      className={`${ddBtn} text-slate-200`}
+                    >
+                      <span>{ACCT_TYPE_LABELS[acctType] ?? acctType}</span>
+                      <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                    </button>
+                    {openDd === 'acctType' && (
+                      <div className={ddPanel}>
+                        {Object.entries(ACCT_TYPE_LABELS).map(([val, label]) => (
+                          <button key={val} onMouseDown={e => e.preventDefault()}
+                            onClick={() => { setAcctType(val); setOpenDd(null) }}
+                            className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${acctType === val ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                            {label}
+                            {acctType === val && <span className="text-emerald-400 text-[10px]">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>
                   <label className={labelClass}>Moneda</label>
                   <div className="relative">
-                    <select value={acctCurrency} onChange={e => setAcctCurrency(e.target.value)} className={selectClass}>
-                      {currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                    <button
+                      onClick={() => setOpenDd(openDd === 'acctCurrency' ? null : 'acctCurrency')}
+                      onBlur={closeDd}
+                      className={`${ddBtn} text-slate-200`}
+                    >
+                      <span>{acctCurrency}</span>
+                      <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                    </button>
+                    {openDd === 'acctCurrency' && (
+                      <div className={ddPanel}>
+                        {currencyOpts.map(c => (
+                          <button key={c} onMouseDown={e => e.preventDefault()}
+                            onClick={() => { setAcctCurrency(c); setOpenDd(null) }}
+                            className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${acctCurrency === c ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                            {c}
+                            {acctCurrency === c && <span className="text-emerald-400 text-[10px]">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -501,29 +542,38 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
             <div>
               <label className={labelClass}>Cuenta {isEditing && <span className="text-slate-600">(no editable)</span>}</label>
               <div className="relative">
-                <select
-                  value={accountId}
-                  disabled={isEditing}
-                  onChange={e => {
-                    const id = e.target.value
-                    setAccountId(id)
-                    const acc = accounts.find(a => a.id === id)
-                    if (acc && txType === 'expense') {
-                      if (acc.type === 'cash')   { setMetodoPago('efectivo');       setEnCuotas(false) }
-                      if (acc.type === 'debit')  { setMetodoPago('tarjeta_debito'); setEnCuotas(false) }
-                      if (acc.type === 'credit') { setMetodoPago('tarjeta_credito') }
-                    }
-                  }}
-                  className={selectClass + (isEditing ? ' opacity-50 cursor-default' : '')}
+                <button
+                  onClick={() => !isEditing && setOpenDd(openDd === 'account' ? null : 'account')}
+                  onBlur={closeDd}
+                  className={`${ddBtn} ${isEditing ? 'opacity-50 cursor-default' : ''} ${accountId ? 'text-slate-200' : 'text-slate-500'}`}
                 >
-                  <option value="" disabled>Seleccioná una cuenta</option>
-                  {accounts.map(acc => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} · {acc.currency} · {acc.balance.toLocaleString()}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                  <span className="truncate">
+                    {accountId
+                      ? (() => { const a = accounts.find(a => a.id === accountId); return a ? `${a.name} · ${a.currency} · ${Number(a.balance).toLocaleString()}` : '—' })()
+                      : 'Seleccioná una cuenta'}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                </button>
+                {openDd === 'account' && (
+                  <div className={ddPanel}>
+                    {accounts.map(acc => (
+                      <button key={acc.id} onMouseDown={e => e.preventDefault()}
+                        onClick={() => {
+                          setAccountId(acc.id)
+                          if (txType === 'expense') {
+                            if (acc.type === 'cash')   { setMetodoPago('efectivo');       setEnCuotas(false) }
+                            if (acc.type === 'debit')  { setMetodoPago('tarjeta_debito'); setEnCuotas(false) }
+                            if (acc.type === 'credit') { setMetodoPago('tarjeta_credito') }
+                          }
+                          setOpenDd(null)
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${accountId === acc.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                        <span className="truncate">{acc.name} · {acc.currency} · {Number(acc.balance).toLocaleString()}</span>
+                        {accountId === acc.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -532,21 +582,30 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               <div>
                 <label className={labelClass}>Cuenta destino</label>
                 <div className="relative">
-                  <select
-                    value={destAccountId}
-                    onChange={e => setDestAccountId(e.target.value)}
-                    className={selectClass}
+                  <button
+                    onClick={() => setOpenDd(openDd === 'destAccount' ? null : 'destAccount')}
+                    onBlur={closeDd}
+                    className={`${ddBtn} ${destAccountId ? 'text-slate-200' : 'text-slate-500'}`}
                   >
-                    <option value="" disabled>Seleccioná una cuenta</option>
-                    {accounts
-                      .filter(a => a.id !== accountId)
-                      .map(a => (
-                        <option key={a.id} value={a.id}>
-                          {a.name} · {a.currency} · {Number(a.balance).toLocaleString()}
-                        </option>
+                    <span className="truncate">
+                      {destAccountId
+                        ? (() => { const a = accounts.find(a => a.id === destAccountId); return a ? `${a.name} · ${a.currency} · ${Number(a.balance).toLocaleString()}` : '—' })()
+                        : 'Seleccioná una cuenta'}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                  </button>
+                  {openDd === 'destAccount' && (
+                    <div className={ddPanel}>
+                      {accounts.filter(a => a.id !== accountId).map(a => (
+                        <button key={a.id} onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setDestAccountId(a.id); setOpenDd(null) }}
+                          className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${destAccountId === a.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                          <span className="truncate">{a.name} · {a.currency} · {Number(a.balance).toLocaleString()}</span>
+                          {destAccountId === a.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                        </button>
                       ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -579,13 +638,29 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                 </button>
               </div>
               <div className="relative">
-                <select value={conceptId} onChange={e => setConceptId(e.target.value)} className={`${selectClass} ${conceptId ? 'text-slate-200' : 'text-slate-500'}`}>
-                  <option value="">Sin concepto</option>
-                  {concepts.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                <button
+                  onClick={() => setOpenDd(openDd === 'concept' ? null : 'concept')}
+                  onBlur={closeDd}
+                  className={`${ddBtn} ${conceptId ? 'text-slate-200' : 'text-slate-500'}`}
+                >
+                  <span className="truncate">{conceptId ? concepts.find(c => c.id === conceptId)?.name ?? 'Sin concepto' : 'Sin concepto'}</span>
+                  <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                </button>
+                {openDd === 'concept' && (
+                  <div className={ddPanel}>
+                    <button onMouseDown={e => e.preventDefault()} onClick={() => { setConceptId(''); setOpenDd(null) }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${!conceptId ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                      Sin concepto {!conceptId && <span className="text-emerald-400 text-[10px]">✓</span>}
+                    </button>
+                    {concepts.map(c => (
+                      <button key={c.id} onMouseDown={e => e.preventDefault()} onClick={() => { setConceptId(c.id); setOpenDd(null) }}
+                        className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${conceptId === c.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                        <span className="truncate">{c.name}</span>
+                        {conceptId === c.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               {showNewConcept && (
                 <QuickCreateConcept
@@ -607,17 +682,25 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                 </button>
               </div>
               <div className="relative">
-                <select
-                  value={categoryId}
-                  onChange={e => setCategoryId(e.target.value)}
-                  className={`${selectClass} ${categoryId ? 'text-slate-200' : 'text-slate-500'}`}
+                <button
+                  onClick={() => setOpenDd(openDd === 'category' ? null : 'category')}
+                  onBlur={closeDd}
+                  className={`${ddBtn} ${categoryId ? 'text-slate-200' : 'text-slate-500'}`}
                 >
-                  <option value="" disabled>Seleccioná una categoría</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                  <span className="truncate">{categoryId ? categories.find(c => c.id === categoryId)?.name ?? 'Seleccioná una categoría' : 'Seleccioná una categoría'}</span>
+                  <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                </button>
+                {openDd === 'category' && (
+                  <div className={ddPanel}>
+                    {categories.map(cat => (
+                      <button key={cat.id} onMouseDown={e => e.preventDefault()} onClick={() => { setCategoryId(cat.id); setOpenDd(null) }}
+                        className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${categoryId === cat.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                        <span className="truncate">{cat.name}</span>
+                        {categoryId === cat.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               {showNewCategory && (
                 <QuickCreateCategory
@@ -632,23 +715,31 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               <div>
                 <label className={labelClass}>Método de pago</label>
                 <div className="relative">
-                  <select
-                    value={metodoPago}
-                    onChange={e => {
-                      const v = e.target.value as PaymentMethod
-                      setMetodoPago(v)
-                      if (v !== 'tarjeta_credito') setEnCuotas(false)
-                    }}
-                    className={selectClass}
+                  <button
+                    onClick={() => setOpenDd(openDd === 'metodo' ? null : 'metodo')}
+                    onBlur={closeDd}
+                    className={`${ddBtn} text-slate-200`}
                   >
-                    <option value="efectivo">Efectivo</option>
-                    <option value="tarjeta_credito">Tarjeta de crédito</option>
-                    <option value="tarjeta_debito">Tarjeta de débito</option>
-                    <option value="transferencia_bancaria">Transferencia bancaria</option>
-                    <option value="billetera_digital">Billetera digital</option>
-                    <option value="otro">Otro</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                    <span>{METODO_LABELS[metodoPago] ?? metodoPago}</span>
+                    <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                  </button>
+                  {openDd === 'metodo' && (
+                    <div className={ddPanel}>
+                      {Object.entries(METODO_LABELS).map(([val, label]) => (
+                        <button key={val} onMouseDown={e => e.preventDefault()}
+                          onClick={() => {
+                            const v = val as PaymentMethod
+                            setMetodoPago(v)
+                            if (v !== 'tarjeta_credito') setEnCuotas(false)
+                            setOpenDd(null)
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${metodoPago === val ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                          {label}
+                          {metodoPago === val && <span className="text-emerald-400 text-[10px]">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -727,16 +818,25 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                 </button>
                 {isShared && households.length > 1 && (
                   <div className="relative flex-1">
-                    <select
-                      value={householdId}
-                      onChange={e => setHouseholdId(e.target.value)}
-                      className={selectClass}
+                    <button
+                      onClick={() => setOpenDd(openDd === 'household' ? null : 'household')}
+                      onBlur={closeDd}
+                      className={`${ddBtn} text-slate-200`}
                     >
-                      {households.map(h => (
-                        <option key={h.id} value={h.id}>{h.name}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                      <span className="truncate">{households.find(h => h.id === householdId)?.name ?? '—'}</span>
+                      <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                    </button>
+                    {openDd === 'household' && (
+                      <div className={ddPanel}>
+                        {households.map(h => (
+                          <button key={h.id} onMouseDown={e => e.preventDefault()} onClick={() => { setHouseholdId(h.id); setOpenDd(null) }}
+                            className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${householdId === h.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                            <span className="truncate">{h.name}</span>
+                            {householdId === h.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 {isShared && households.length === 1 && (

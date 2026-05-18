@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Mic, X, Home, AlertCircle, Loader2, RotateCcw, CreditCard } from 'lucide-react'
+import { Mic, X, Home, AlertCircle, Loader2, RotateCcw, CreditCard, ChevronDown } from 'lucide-react'
 import { parseVoiceExpense, type VoiceAccount } from '../utils/voiceParser'
 import { fetchAccounts, fetchCategories, fetchConcepts, createTransaction, createInstalmentPlan } from '../api/dashboard'
 import { fetchHouseholds } from '../api/households'
@@ -24,17 +24,9 @@ const isSpeechSupported = !!(
   (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
 )
 
-const baseCls   = 'border border-slate-700 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-emerald-500/60 transition-colors'
-const selectCls = 'w-full ' + baseCls + ' bg-slate-800 text-slate-200'
-const inputCls  = 'w-full ' + baseCls
-// Inline style wins over browser UA overrides (Chrome mobile rewrites <input> backgrounds)
-const inputStyle = {
-  backgroundColor: '#1e293b',
-  color: '#e2e8f0',
-  WebkitTextFillColor: '#e2e8f0',
-  WebkitBoxShadow: '0 0 0 30px #1e293b inset',
-  WebkitAppearance: 'none' as const,
-}
+const inputCls = 'w-full border border-slate-700 rounded-xl px-3 py-2.5 text-sm bg-slate-800 text-slate-200 placeholder:text-slate-500 outline-none focus:border-emerald-500/60 transition-colors'
+const ddBtn    = 'w-full flex items-center justify-between border border-slate-700 rounded-xl px-3 py-2.5 text-sm bg-slate-800 text-left transition-colors cursor-pointer'
+const ddPanel  = 'absolute top-full left-0 mt-1 z-[200] w-full bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-y-auto max-h-52'
 
 export default function VoiceExpenseModal({ open, onClose }: Props) {
   const qc = useQueryClient()
@@ -54,7 +46,6 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const [interim,     setInterim]     = useState('')
   const [speechError, setSpeechError] = useState('')
 
-  // Review fields
   const [amount,      setAmount]      = useState('')
   const [currency,    setCurrency]    = useState(homeCurrency)
   const [conceptId,   setConceptId]   = useState('')
@@ -69,7 +60,6 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const [destAccountId,    setDestAccountId]    = useState('')
 
   const [commission,  setCommission]  = useState('')
-
   const [enCuotas,    setEnCuotas]    = useState(false)
   const [nCuotas,     setNCuotas]     = useState('2')
 
@@ -77,22 +67,22 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const [submitError, setSubmitError] = useState('')
   const [debugInfo,   setDebugInfo]   = useState('')
 
+  const [openDd, setOpenDd] = useState<string | null>(null)
+  const closeDd = () => setTimeout(() => setOpenDd(null), 150)
+
   const recRef         = useRef<any>(null)
   const lastInterimRef = useRef('')
   const appliedRef     = useRef(false)
 
-  // Refs always point to latest data — avoids React closure capturing stale empty arrays
-  const accountsRef  = useRef<Account[]>([])
-  const conceptsRef  = useRef<Concept[]>([])
-  useEffect(() => { accountsRef.current  = accounts  as Account[] },  [accounts])
-  useEffect(() => { conceptsRef.current  = concepts  as Concept[] },  [concepts])
+  const accountsRef = useRef<Account[]>([])
+  const conceptsRef = useRef<Concept[]>([])
+  useEffect(() => { accountsRef.current = accounts as Account[] }, [accounts])
+  useEffect(() => { conceptsRef.current = concepts as Concept[] }, [concepts])
 
-  // Default household when available
   useEffect(() => {
     if (households.length > 0 && !householdId) setHouseholdId(households[0].id)
   }, [households])
 
-  // Reset on open
   useEffect(() => {
     if (open) {
       setPhase('listening')
@@ -106,6 +96,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       setCommission('')
       setEnCuotas(false); setNCuotas('2')
       setSubmitting(false); setSubmitError('')
+      setOpenDd(null)
     } else {
       recRef.current?.abort()
     }
@@ -142,7 +133,6 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       }
     }
 
-    // Fallback: en mobile Chrome el isFinal a veces no llega — usamos el último interim
     rec.onend = () => {
       setListening(false)
       if (!appliedRef.current && lastInterimRef.current.trim()) {
@@ -159,8 +149,8 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   }
 
   function applyTranscript(transcript: string) {
-    const latestAccounts  = accountsRef.current
-    const latestConcepts  = conceptsRef.current
+    const latestAccounts = accountsRef.current
+    const latestConcepts = conceptsRef.current
 
     const parsed = parseVoiceExpense(
       transcript,
@@ -231,7 +221,6 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       if (!n || n < 2) { setSubmitError('El número de cuotas debe ser al menos 2'); return }
     }
 
-    // For transfers, auto-resolve the "Transferencia" concept and "Sin clasificar" category
     let resolvedConceptId  = conceptId
     let resolvedCategoryId = categoryId
     if (txType === 'transfer') {
@@ -285,15 +274,13 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div
-        className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl z-10 flex flex-col max-h-[92vh]"
-        style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.08)' }}
-      >
+      <div className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl z-10 flex flex-col max-h-[92vh] bg-slate-900 border border-slate-800/60">
+
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
           <div className="flex items-center gap-2">
             <Mic size={18} className="text-emerald-400" />
-            <span className="font-semibold text-sm">
+            <span className="font-semibold text-sm text-white">
               {phase === 'listening'
                 ? txType === 'income' ? 'Di tu ingreso' : txType === 'transfer' ? 'Di tu transferencia' : 'Di tu gasto'
                 : 'Fluxo entendió'}
@@ -308,10 +295,10 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
         {phase === 'listening' && (
           <div className="px-5 pb-6 flex flex-col items-center gap-5">
             {/* Type toggle */}
-            <div className="w-full grid grid-cols-3 gap-1.5 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="w-full grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-800/30 border border-slate-700/50">
               {(['income', 'expense', 'transfer'] as const).map(type => {
-                const labels  = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia' }
-                const colors  = {
+                const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia' }
+                const colors = {
                   income:   'bg-cyan-400/15 border-cyan-400/40 text-cyan-400',
                   expense:  'bg-rose-400/15 border-rose-400/40 text-rose-400',
                   transfer: 'bg-amber-400/15 border-amber-400/40 text-amber-400',
@@ -332,7 +319,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             </div>
 
             {/* Hint */}
-            <div className="w-full rounded-xl px-4 py-3 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="w-full rounded-xl px-4 py-3 text-center bg-slate-800/30 border border-slate-700/50">
               <p className="text-slate-400 text-xs mb-1">Formato sugerido:</p>
               {txType === 'expense' && (
                 <p className="text-slate-300 text-sm">
@@ -368,12 +355,11 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 disabled={!dataReady}
                 className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
                   !dataReady
-                    ? 'border-2 border-slate-600 opacity-50 cursor-wait'
+                    ? 'bg-slate-800/30 border-2 border-slate-600 opacity-50 cursor-wait'
                     : listening
                       ? 'bg-rose-500/20 border-2 border-rose-500 animate-pulse'
                       : 'bg-emerald-500/20 border-2 border-emerald-500 hover:bg-emerald-500/30'
                 }`}
-                style={!dataReady ? { background: 'rgba(255,255,255,0.04)' } : undefined}
               >
                 {!dataReady
                   ? <Loader2 size={32} className="text-slate-500 animate-spin" />
@@ -397,7 +383,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
         {phase === 'review' && (
           <div className="px-5 pb-5 space-y-3 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:theme(colors.slate.700)_transparent]">
             {/* Transcript */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/30">
               <Mic size={13} className="text-slate-500 shrink-0" />
               <p className="text-slate-400 text-xs italic truncate">"{rawText}"</p>
               <button
@@ -408,7 +394,6 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 <RotateCcw size={13} />
               </button>
             </div>
-            {/* Debug — remove once matching is stable */}
             {debugInfo && (
               <p className="text-slate-600 text-xs px-1 break-all">{debugInfo}</p>
             )}
@@ -423,12 +408,34 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
                   placeholder="0"
-                  style={inputStyle}
                   className={inputCls + ' flex-1'}
                 />
-                <select value={currency} onChange={e => setCurrency(e.target.value)} className={baseCls + ' w-24 bg-slate-800 text-slate-200'}>
-                  {currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                {/* Currency picker */}
+                <div className="relative">
+                  <button
+                    onClick={() => setOpenDd(openDd === 'currency' ? null : 'currency')}
+                    onBlur={closeDd}
+                    className="flex items-center gap-1.5 w-24 border border-slate-700 rounded-xl px-3 py-2.5 text-sm bg-slate-800 text-slate-200 justify-between transition-colors"
+                  >
+                    <span>{currency}</span>
+                    <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+                  </button>
+                  {openDd === 'currency' && (
+                    <div className="absolute top-full right-0 mt-1 z-[200] bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-hidden min-w-[80px]">
+                      {currencyOpts.map(c => (
+                        <button
+                          key={c}
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setCurrency(c); setOpenDd(null) }}
+                          className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between gap-3 ${currency === c ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
+                        >
+                          {c}
+                          {currency === c && <span className="text-emerald-400 text-[10px]">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -442,23 +449,88 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                       <AlertCircle size={12} /> No encontré "{unmatchedConcept}", elegí uno:
                     </div>
                   )}
-                  <select value={conceptId} onChange={e => {
-                    const id = e.target.value
-                    setConceptId(id)
-                    const c = (concepts as Concept[]).find(x => x.id === id)
-                    if (c?.category_id) setCategoryId(c.category_id)
-                  }} className={selectCls}>
-                    <option value="">Sin concepto</option>
-                    {(concepts as Concept[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <div className="relative">
+                    <button
+                      onClick={() => setOpenDd(openDd === 'concept' ? null : 'concept')}
+                      onBlur={closeDd}
+                      className={`${ddBtn} ${conceptId ? 'text-slate-200' : 'text-slate-400'}`}
+                    >
+                      <span className="truncate">
+                        {conceptId
+                          ? (concepts as Concept[]).find(c => c.id === conceptId)?.name ?? 'Sin concepto'
+                          : 'Sin concepto'}
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                    </button>
+                    {openDd === 'concept' && (
+                      <div className={ddPanel}>
+                        <button
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setConceptId(''); setOpenDd(null) }}
+                          className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${!conceptId ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
+                        >
+                          Sin concepto
+                          {!conceptId && <span className="text-emerald-400 text-[10px]">✓</span>}
+                        </button>
+                        {(concepts as Concept[]).map(c => (
+                          <button
+                            key={c.id}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => {
+                              setConceptId(c.id)
+                              if (c.category_id) setCategoryId(c.category_id)
+                              setOpenDd(null)
+                            }}
+                            className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${conceptId === c.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
+                          >
+                            <span className="truncate">{c.name}</span>
+                            {conceptId === c.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Categoría</label>
-                  <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={selectCls + (categoryId ? '' : ' border-amber-500/50')}>
-                    <option value="">— Elegir categoría —</option>
-                    {(categories as Category[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <div className="relative">
+                    <button
+                      onClick={() => setOpenDd(openDd === 'category' ? null : 'category')}
+                      onBlur={closeDd}
+                      className={`${ddBtn} ${categoryId ? 'text-slate-200' : 'text-slate-400 border-amber-500/50'}`}
+                    >
+                      <span className="truncate">
+                        {categoryId
+                          ? (categories as Category[]).find(c => c.id === categoryId)?.name ?? '— Elegir categoría —'
+                          : '— Elegir categoría —'}
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                    </button>
+                    {openDd === 'category' && (
+                      <div className={ddPanel}>
+                        <button
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setCategoryId(''); setOpenDd(null) }}
+                          className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${!categoryId ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
+                        >
+                          — Elegir categoría —
+                          {!categoryId && <span className="text-emerald-400 text-[10px]">✓</span>}
+                        </button>
+                        {(categories as Category[]).map(c => (
+                          <button
+                            key={c.id}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => { setCategoryId(c.id); setOpenDd(null) }}
+                            className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${categoryId === c.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
+                          >
+                            <span className="truncate">{c.name}</span>
+                            {categoryId === c.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </>
             )}
@@ -473,26 +545,70 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   <AlertCircle size={12} /> No encontré "{unmatchedAccount}", elegí una:
                 </div>
               )}
-              <select value={accountId} onChange={e => setAccountId(e.target.value)} className={selectCls}>
-                <option value="">— Elegir cuenta —</option>
-                {(accounts as Account[]).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              <div className="relative">
+                <button
+                  onClick={() => setOpenDd(openDd === 'account' ? null : 'account')}
+                  onBlur={closeDd}
+                  className={`${ddBtn} ${accountId ? 'text-slate-200' : 'text-slate-400'}`}
+                >
+                  <span className="truncate">
+                    {accountId
+                      ? (accounts as Account[]).find(a => a.id === accountId)?.name ?? '— Elegir cuenta —'
+                      : '— Elegir cuenta —'}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                </button>
+                {openDd === 'account' && (
+                  <div className={ddPanel}>
+                    {(accounts as Account[]).map(a => (
+                      <button
+                        key={a.id}
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => { setAccountId(a.id); setOpenDd(null) }}
+                        className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${accountId === a.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
+                      >
+                        <span className="truncate">{a.name}</span>
+                        {accountId === a.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Dest account — only for transfers */}
             {txType === 'transfer' && (
               <div>
                 <label className="text-xs text-slate-400 mb-1 block">Cuenta destino</label>
-                <select
-                  value={destAccountId}
-                  onChange={e => setDestAccountId(e.target.value)}
-                  className={selectCls + (destAccountId ? '' : ' border-amber-500/50')}
-                >
-                  <option value="">— Elegir cuenta destino —</option>
-                  {(accounts as Account[]).filter(a => a.id !== accountId).map(a => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <button
+                    onClick={() => setOpenDd(openDd === 'destAccount' ? null : 'destAccount')}
+                    onBlur={closeDd}
+                    className={`${ddBtn} ${destAccountId ? 'text-slate-200' : 'text-slate-400 border-amber-500/50'}`}
+                  >
+                    <span className="truncate">
+                      {destAccountId
+                        ? (accounts as Account[]).find(a => a.id === destAccountId)?.name ?? '— Elegir cuenta destino —'
+                        : '— Elegir cuenta destino —'}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                  </button>
+                  {openDd === 'destAccount' && (
+                    <div className={ddPanel}>
+                      {(accounts as Account[]).filter(a => a.id !== accountId).map(a => (
+                        <button
+                          key={a.id}
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setDestAccountId(a.id); setOpenDd(null) }}
+                          className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${destAccountId === a.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
+                        >
+                          <span className="truncate">{a.name}</span>
+                          {destAccountId === a.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -509,7 +625,6 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   value={commission}
                   onChange={e => setCommission(e.target.value)}
                   placeholder="0.00"
-                  style={inputStyle}
                   className={inputCls}
                 />
               </div>
@@ -518,11 +633,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             {/* Cuotas toggle — solo gastos con tarjeta crédito */}
             {txType === 'expense' && isCredit && (
               <div
-                className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors"
-                style={{
-                  background: enCuotas ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${enCuotas ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.07)'}`,
-                }}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors border ${enCuotas ? 'bg-emerald-500/10 border-emerald-500/40' : 'bg-slate-800/30 border-slate-700/50'}`}
                 onClick={() => setEnCuotas(v => !v)}
               >
                 <CreditCard size={16} className={enCuotas ? 'text-emerald-400' : 'text-slate-500'} />
@@ -545,7 +656,6 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   value={nCuotas}
                   onChange={e => setNCuotas(e.target.value)}
                   placeholder="2"
-                  style={inputStyle}
                   className={inputCls}
                 />
               </div>
@@ -560,7 +670,6 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 onChange={e => setDescription(e.target.value)}
                 maxLength={100}
                 placeholder={txType === 'income' ? 'Descripción del ingreso' : txType === 'transfer' ? 'Descripción de la transferencia' : 'Descripción del gasto'}
-                style={inputStyle}
                 className={inputCls}
               />
             </div>
@@ -569,11 +678,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             {txType === 'expense' && (
               <>
                 <div
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors"
-                  style={{
-                    background: isHousehold ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${isHousehold ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.07)'}`,
-                  }}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors border ${isHousehold ? 'bg-indigo-500/10 border-indigo-500/40' : 'bg-slate-800/30 border-slate-700/50'}`}
                   onClick={() => setIsHousehold(v => !v)}
                 >
                   <Home size={16} className={isHousehold ? 'text-indigo-400' : 'text-slate-500'} />
@@ -586,9 +691,35 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 </div>
 
                 {isHousehold && households.length > 1 && (
-                  <select value={householdId} onChange={e => setHouseholdId(e.target.value)} className={selectCls}>
-                    {(households as Household[]).map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                  </select>
+                  <div className="relative">
+                    <button
+                      onClick={() => setOpenDd(openDd === 'household' ? null : 'household')}
+                      onBlur={closeDd}
+                      className={`${ddBtn} ${householdId ? 'text-slate-200' : 'text-slate-400'}`}
+                    >
+                      <span className="truncate">
+                        {householdId
+                          ? (households as Household[]).find(h => h.id === householdId)?.name ?? '—'
+                          : '—'}
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                    </button>
+                    {openDd === 'household' && (
+                      <div className={ddPanel}>
+                        {(households as Household[]).map(h => (
+                          <button
+                            key={h.id}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => { setHouseholdId(h.id); setOpenDd(null) }}
+                            className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${householdId === h.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
+                          >
+                            <span className="truncate">{h.name}</span>
+                            {householdId === h.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </>
             )}
@@ -603,8 +734,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             <div className="flex gap-3 pt-1">
               <button
                 onClick={onClose}
-                className="flex-1 py-3 rounded-xl text-sm text-slate-400 hover:text-slate-200 transition-colors"
-                style={{ border: '1px solid rgba(255,255,255,0.1)' }}
+                className="flex-1 py-3 rounded-xl text-sm text-slate-400 hover:text-slate-200 transition-colors border border-slate-700/50"
               >
                 Cancelar
               </button>

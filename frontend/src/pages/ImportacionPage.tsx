@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import useTheme from '../hooks/useTheme'
 import {
   Upload, ArrowLeft, CheckCircle2, AlertCircle, Activity, BarChart2,
-  Clock, FileSpreadsheet, ChevronRight, Loader2, X, Home,
+  Clock, FileSpreadsheet, ChevronRight, ChevronDown, Loader2, X, Home,
   TriangleAlert, Wand2,
 } from 'lucide-react'
 import {
@@ -383,6 +383,8 @@ export default function ImportacionPage() {
 
   const [duplicateModal, setDuplicateModal] = useState<{ mov: MovimientoImportado; detail: DuplicateDetail }[] | null>(null)
   const [historialOpen, setHistorialOpen] = useState(false)
+  const [openDd, setOpenDd] = useState<string | null>(null)
+  const closeDd = () => setTimeout(() => setOpenDd(null), 150)
 
   const { data: accounts    = [] } = useQuery<Account[]>({ queryKey: ['accounts'],   queryFn: fetchAccounts })
   const { data: categories  = [] } = useQuery<Category[]>({ queryKey: ['categories'], queryFn: fetchCategories })
@@ -590,16 +592,28 @@ export default function ImportacionPage() {
                   No se detectó el banco automáticamente — seleccionalo manualmente.
                 </div>
                 <label className="block text-sm font-medium text-slate-400 mb-1">Banco</label>
-                <select
-                  value={banco}
-                  onChange={e => { setBanco(e.target.value); setDetectError(null) }}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/50"
-                >
-                  <option value="">Seleccionar banco…</option>
-                  {Object.entries(BANCO_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <button
+                    onClick={() => setOpenDd(openDd === 'banco' ? null : 'banco')}
+                    onBlur={closeDd}
+                    className={`w-full flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm transition-colors text-left cursor-pointer ${banco ? 'text-slate-200' : 'text-slate-500'}`}
+                  >
+                    <span>{banco ? BANCO_LABELS[banco] ?? banco : 'Seleccionar banco…'}</span>
+                    <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                  </button>
+                  {openDd === 'banco' && (
+                    <div className="absolute top-full left-0 mt-1 z-[200] w-full bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-y-auto max-h-52">
+                      {Object.entries(BANCO_LABELS).map(([k, v]) => (
+                        <button key={k} onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setBanco(k); setDetectError(null); setOpenDd(null) }}
+                          className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${banco === k ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                          {v}
+                          {banco === k && <span className="text-emerald-400 text-[10px]">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -615,16 +629,30 @@ export default function ImportacionPage() {
             {bancoDetectado && banco !== 'zcuentas' && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-slate-400 mb-1">Cuenta destino</label>
-                <select
-                  value={cuentaId}
-                  onChange={e => setCuentaId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/50"
-                >
-                  <option value="">Seleccionar cuenta…</option>
-                  {accounts.map(a => (
-                    <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <button
+                    onClick={() => setOpenDd(openDd === 'cuenta' ? null : 'cuenta')}
+                    onBlur={closeDd}
+                    className={`w-full flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm transition-colors text-left cursor-pointer ${cuentaId ? 'text-slate-200' : 'text-slate-500'}`}
+                  >
+                    <span className="truncate">
+                      {cuentaId ? (() => { const a = accounts.find(a => a.id === cuentaId); return a ? `${a.name} (${a.currency})` : '—' })() : 'Seleccionar cuenta…'}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                  </button>
+                  {openDd === 'cuenta' && (
+                    <div className="absolute top-full left-0 mt-1 z-[200] w-full bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-y-auto max-h-52">
+                      {accounts.map(a => (
+                        <button key={a.id} onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setCuentaId(a.id); setOpenDd(null) }}
+                          className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${cuentaId === a.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                          <span className="truncate">{a.name} ({a.currency})</span>
+                          {cuentaId === a.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -731,16 +759,32 @@ export default function ImportacionPage() {
                       </span>
                     )}
                   </div>
-                  <select
-                    value={mapeo[c.nombre_zcuentas] ?? ''}
-                    onChange={e => setMapeo(prev => ({ ...prev, [c.nombre_zcuentas]: e.target.value }))}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/50 appearance-none cursor-pointer"
-                  >
-                    <option value="">Seleccionar cuenta…</option>
-                    {accounts.map(a => (
-                      <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <button
+                      onClick={() => setOpenDd(openDd === `mapeo_${c.nombre_zcuentas}` ? null : `mapeo_${c.nombre_zcuentas}`)}
+                      onBlur={closeDd}
+                      className={`w-full flex items-center justify-between bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm transition-colors text-left cursor-pointer ${mapeo[c.nombre_zcuentas] ? 'text-slate-200' : 'text-slate-500'}`}
+                    >
+                      <span className="truncate">
+                        {mapeo[c.nombre_zcuentas]
+                          ? (() => { const a = accounts.find(a => a.id === mapeo[c.nombre_zcuentas]); return a ? `${a.name} (${a.currency})` : '—' })()
+                          : 'Seleccionar cuenta…'}
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                    </button>
+                    {openDd === `mapeo_${c.nombre_zcuentas}` && (
+                      <div className="absolute top-full left-0 mt-1 z-[200] w-full bg-slate-900 border border-slate-700 rounded-xl shadow-xl py-1 overflow-y-auto max-h-52">
+                        {accounts.map(a => (
+                          <button key={a.id} onMouseDown={e => e.preventDefault()}
+                            onClick={() => { setMapeo(prev => ({ ...prev, [c.nombre_zcuentas]: a.id })); setOpenDd(null) }}
+                            className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${mapeo[c.nombre_zcuentas] === a.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                            <span className="truncate">{a.name} ({a.currency})</span>
+                            {mapeo[c.nombre_zcuentas] === a.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
