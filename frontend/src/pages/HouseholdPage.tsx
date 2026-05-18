@@ -5,7 +5,7 @@ import {
   Activity, BarChart2, Upload, Home, Users, Plus, Copy, Check,
   Loader2, X, UserCheck, UserX, ArrowRight,
   AlertTriangle, Settings, Crown, Wallet, TrendingDown,
-  Eye, EyeOff, ChevronLeft, ChevronRight, Search, ChevronDown,
+  Eye, EyeOff, ChevronLeft, ChevronRight, Search, ChevronDown, DollarSign,
 } from 'lucide-react'
 import { useHouseholdEvents } from '../hooks/useHouseholdEvents'
 import { useAuthStore } from '../store/authStore'
@@ -177,32 +177,52 @@ export default function HouseholdPage() {
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
           {/* Month selector */}
-          <div className="flex items-center bg-slate-800/60 border border-slate-700/50 rounded-xl overflow-hidden">
-            <button onClick={prevMonth} className="px-2 py-1.5 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors">
-              <ChevronLeft className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5">
+            <button onClick={prevMonth} className="p-1 text-slate-400 hover:text-slate-200 transition-colors">
+              <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-xs font-semibold text-slate-200 px-1 min-w-[90px] text-center">
-              {MONTH_NAMES[month - 1]} {year}
-            </span>
-            <button onClick={nextMonth} disabled={isMaxMonth} className="px-2 py-1.5 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-              <ChevronRight className="w-3.5 h-3.5" />
+            <select
+              value={month}
+              onChange={e => setMonth(Number(e.target.value))}
+              className="bg-transparent text-sm font-semibold text-slate-200 outline-none cursor-pointer appearance-none text-center"
+            >
+              {MONTH_NAMES.map((m, i) => (
+                <option key={i + 1} value={i + 1} className="bg-slate-900">{m}</option>
+              ))}
+            </select>
+            <select
+              value={year}
+              onChange={e => setYear(Number(e.target.value))}
+              className="bg-transparent text-sm font-semibold text-slate-200 outline-none cursor-pointer appearance-none text-center ml-1"
+            >
+              {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 3 + i).map(y => (
+                <option key={y} value={y} className="bg-slate-900">{y}</option>
+              ))}
+            </select>
+            <button onClick={nextMonth} disabled={isMaxMonth} className="p-1 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-30">
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
           {/* Privacy toggle */}
           <button
             onClick={() => { const next = !privacy; setPrivacy(next); localStorage.setItem('privacy', String(next)) }}
-            className="p-1.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors"
+            className="p-2 text-slate-400 hover:text-indigo-400 bg-slate-950 border border-slate-800 rounded-lg transition-colors"
           >
-            {privacy ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            {privacy ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
           </button>
           {/* Currency selector */}
-          <select
-            value={currency}
-            onChange={e => setCurrency(e.target.value)}
-            className="bg-slate-800/60 border border-slate-700/50 rounded-xl px-2 py-1.5 text-xs font-semibold text-slate-200 focus:outline-none focus:border-indigo-500/50 cursor-pointer"
-          >
-            {[...new Set([homeCurrency, 'USD', 'EUR'])].map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <div className="relative flex items-center bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5">
+            <DollarSign className="w-4 h-4 text-emerald-500 mr-2" />
+            <select
+              value={currency}
+              onChange={e => setCurrency(e.target.value)}
+              className="bg-transparent text-sm font-medium text-slate-300 outline-none appearance-none cursor-pointer pr-4"
+            >
+              {[...new Set([homeCurrency, 'USD', 'EUR'])].map(c => (
+                <option key={c} value={c} translate="no" className="bg-slate-900">{c}</option>
+              ))}
+            </select>
+          </div>
           {/* Export */}
           {analytics && household && (
             <ExportButton
