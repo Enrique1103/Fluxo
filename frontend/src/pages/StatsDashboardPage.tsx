@@ -986,6 +986,12 @@ export default function StatsDashboardPage() {
             )}
           </div>
 
+          {breakdown && (
+            <ExportButton
+              onExport={() => exportMonthlyPDF({ breakdown, year, month, currency, userName: me?.name })}
+            />
+          )}
+
           {/* Settings */}
           <button
             onClick={() => setSettingsOpen(true)}
@@ -993,12 +999,6 @@ export default function StatsDashboardPage() {
           >
             <Settings className="w-5 h-5" />
           </button>
-
-          {breakdown && (
-            <ExportButton
-              onExport={() => exportMonthlyPDF({ breakdown, year, month, currency, userName: me?.name })}
-            />
-          )}
         </div>
       </header>
 
