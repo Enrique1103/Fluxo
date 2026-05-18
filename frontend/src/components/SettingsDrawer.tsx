@@ -845,7 +845,7 @@ export default function SettingsDrawer({ open, onClose, initialSection }: Props)
       />
 
       {/* Drawer panel */}
-      <div className={`fixed top-0 right-0 z-50 h-full w-full max-w-sm bg-slate-900 border-l border-slate-800 flex flex-col transition-transform duration-300 ease-in-out ${open ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed top-3 right-3 bottom-3 z-50 w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl flex flex-col overflow-hidden shadow-2xl transition-transform duration-300 ease-in-out ${open ? 'translate-x-0' : 'translate-x-[calc(100%+12px)]'}`}>
 
         {/* Header — fixed */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800 shrink-0">
