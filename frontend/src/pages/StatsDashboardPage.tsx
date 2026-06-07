@@ -1015,34 +1015,37 @@ export default function StatsDashboardPage() {
           const deltaUp   = delta != null && delta > 0
           const deltaGood = delta != null && (higherIsBetter ? deltaUp : !deltaUp)
           return (
-            <div key={label} className={`bg-slate-900/40 border ${border} rounded-2xl p-5 backdrop-blur-sm flex flex-col justify-between min-h-[148px]`}>
-              {/* Top: icon + label */}
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center shrink-0`}>
-                  <Icon className={`w-5 h-5 ${color}`} />
+            <div key={label} className={`relative bg-slate-900/40 border ${border} rounded-2xl p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-3`}>
+              {/* Fondo decorativo suave */}
+              <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full ${bg} opacity-40 blur-2xl pointer-events-none`} />
+
+              {/* Icon + label */}
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{label}</p>
+                <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center`}>
+                  <Icon className={`w-4 h-4 ${color}`} />
                 </div>
-                <p className="text-[11px] text-slate-400 uppercase font-bold tracking-widest leading-tight">{label}</p>
               </div>
 
-              {/* Value */}
+              {/* Value — hero */}
               {isLoading ? (
-                <div className="h-8 w-28 bg-slate-800 animate-pulse rounded-lg" />
+                <div className="h-9 w-28 bg-slate-800 animate-pulse rounded-lg" />
               ) : (
-                <p className={`text-2xl font-bold tabular-nums ${color}`}>
+                <p className={`text-3xl font-bold tabular-nums leading-none ${color}`}>
                   {extra ?? fmtMoney(value!, currency, privacy)}
                 </p>
               )}
 
               {/* Delta */}
               {!privacy && delta != null && Math.abs(delta) >= 0.5 ? (
-                <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl w-fit ${deltaGood ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}>
-                  <span className={`text-sm font-bold ${deltaGood ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${deltaGood ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
                     {deltaUp ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
                   </span>
-                  <span className="text-[11px] text-slate-500">vs {MONTH_NAMES[prevMonthNum - 1]}</span>
+                  <span className="text-[10px] text-slate-500">vs {MONTH_NAMES[prevMonthNum - 1]}</span>
                 </div>
               ) : (
-                <div className="h-7" />
+                <div className="h-5" />
               )}
             </div>
           )
