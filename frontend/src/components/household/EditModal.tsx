@@ -24,7 +24,6 @@ export default function EditModal({ household, onClose }: Props) {
   const qc = useQueryClient()
   const [name,          setName]          = useState(household.name)
   const [currency,      setCurrency]      = useState(household.base_currency)
-  const [splitType, setSplitType] = useState<SplitType>(household.split_type)
   const [error,         setError]         = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -32,7 +31,6 @@ export default function EditModal({ household, onClose }: Props) {
     mutationFn: () => updateHousehold(household.id, {
       name:          name.trim(),
       base_currency: currency,
-      split_type:    splitType,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['households'] })
@@ -78,29 +76,24 @@ export default function EditModal({ household, onClose }: Props) {
             </div>
           </div>
 
-          {/* División de gastos */}
-          <div>
-            <label className={labelClass + ' mb-2'}>División de gastos</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['equal', 'proportional'] as SplitType[]).map(t => (
-                <button key={t} onClick={() => setSplitType(t)}
-                  className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
-                    splitType === t
-                      ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-                  }`}>
-                  {SPLIT_LABELS[t]}
-                </button>
-              ))}
+          {/* Configuración inmutable — badges de solo lectura */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] uppercase tracking-widest text-slate-500">Contrato del hogar</p>
+            <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
+              <span className="text-xs text-slate-400">División de gastos</span>
+              <span className="text-xs font-semibold text-slate-300">
+                {SPLIT_LABELS[household.split_type]}
+              </span>
             </div>
-          </div>
-
-          {/* Nivel de análisis — inmutable */}
-          <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
-            <span className="text-xs text-slate-400">Nivel de análisis</span>
-            <span className="text-xs font-semibold text-slate-300">
-              {ANALYSIS_LABELS[household.analysis_level ?? 'expenses_only']}
-            </span>
+            <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
+              <span className="text-xs text-slate-400">Nivel de análisis</span>
+              <span className="text-xs font-semibold text-slate-300">
+                {ANALYSIS_LABELS[household.analysis_level ?? 'expenses_only']}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-600 text-center pt-0.5">
+              Para cambiarlos, creá un hogar nuevo.
+            </p>
           </div>
 
           {error && <p className="text-rose-400 text-xs">{error}</p>}

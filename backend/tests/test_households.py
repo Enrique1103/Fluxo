@@ -195,12 +195,13 @@ class TestUpdateHouseholdF03:
         assert r.status_code == 200
         assert r.json()["name"] == "Nuevo nombre"
 
-    def test_update_split_type_ok(self, household):
-        """split_type SÍ se puede cambiar después de crear."""
+    def test_cannot_update_split_type(self, household):
+        """split_type es inmutable — se ignora en PATCH."""
         c, h, hh_id = household
-        r = c.patch(f"{HH}/{hh_id}", json={"split_type": "proportional"}, headers=h)
-        assert r.status_code == 200
-        assert r.json()["split_type"] == "proportional"
+        original = c.get(f"{HH}/{hh_id}", headers=h).json()["split_type"]
+        c.patch(f"{HH}/{hh_id}", json={"split_type": "proportional"}, headers=h)
+        after = c.get(f"{HH}/{hh_id}", headers=h).json()["split_type"]
+        assert after == original
 
     def test_cannot_update_analysis_level(self, household):
         """analysis_level es inmutable — se ignora en PATCH."""

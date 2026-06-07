@@ -41,8 +41,7 @@ class HouseholdCreate(BaseModel):
 class HouseholdUpdate(BaseModel):
     name: str | None = None
     base_currency: str | None = None
-    split_type: SplitType | None = None
-    # analysis_level es inmutable después de crear el hogar
+    # split_type y analysis_level son inmutables — definen el contrato del hogar
 
     @field_validator("base_currency")
     @classmethod
