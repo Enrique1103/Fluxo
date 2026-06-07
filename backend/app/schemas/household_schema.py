@@ -41,7 +41,8 @@ class HouseholdCreate(BaseModel):
 class HouseholdUpdate(BaseModel):
     name: str | None = None
     base_currency: str | None = None
-    # split_type y analysis_level no se editan después de crear (P03 del plan)
+    split_type: SplitType | None = None
+    analysis_level: AnalysisLevel | None = None
 
     @field_validator("base_currency")
     @classmethod
