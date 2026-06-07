@@ -1,15 +1,22 @@
 {
-  "name": "Fluxo",
+  "name": "Fluxo — Finanzas Personales",
   "short_name": "Fluxo",
   "description": "Finanzas personales inteligentes",
+  "id": "/",
   "theme_color": "#3730a3",
   "background_color": "#020817",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "scope": "/",
   "start_url": "/",
   "lang": "es",
   "icons": [
+    {
+      "src": "/favicon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
     {
       "src": "/pwa-192.png",
       "sizes": "192x192",
@@ -26,5 +33,6 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "categories": ["finance", "productivity"]
 }
