@@ -114,13 +114,20 @@ function DonutChart({
   if (total === 0) return null
 
   const SIZE = 178, cx = 89, cy = 89, R = 73, r = 45
-  const GAP = 0.025
+  const GAP = 0.022
   let angle = -Math.PI / 2
 
+  // Enforce minimum visual size (3%) so tiny slices are always visible
+  const MIN_FRAC = 0.03
+  const rawFracs  = categories.map(c => c.total / total)
+  const dispFracs = rawFracs.map(f => Math.max(f, MIN_FRAC))
+  const dispTotal = dispFracs.reduce((a, b) => a + b, 0)
+  const normFracs = dispFracs.map(f => f / dispTotal)
+
   const slices = categories.map((cat, i) => {
-    const frac   = cat.total / total
-    const sweep  = frac * Math.PI * 2
-    const gap    = Math.min(GAP, sweep * 0.25)   // gap adaptativo: porciones pequeñas no desaparecen
+    const frac   = rawFracs[i]
+    const sweep  = normFracs[i] * Math.PI * 2
+    const gap    = Math.min(GAP, sweep * 0.2)
     const start  = angle + gap / 2
     const end    = angle + sweep - gap / 2
     const mid    = angle + sweep / 2
@@ -1160,24 +1167,24 @@ export default function StatsDashboardPage() {
                     return (
                       <div key={cat.name}>
                         <div className="flex items-center gap-2 mb-1.5">
-                          <span className="w-2 h-2 rounded-full shrink-0 self-start mt-1.5" style={{ background: catColor(i) }} />
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0 self-start mt-1.5" style={{ background: catColor(i) }} />
                           <div className="flex-1 min-w-0">
-                            <span className="text-xs text-slate-300 truncate block">{cat.name}</span>
+                            <span className="text-sm text-slate-300 truncate block">{cat.name}</span>
                             {budget && bActualPct !== null && !privacy && bChip && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border tabular-nums mt-0.5 inline-block ${bChip.bg} ${bChip.text}`}>
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold border tabular-nums mt-0.5 inline-block ${bChip.bg} ${bChip.text}`}>
                                 {fmtMoney(budget.spent, currency)}/{fmtMoney(budget.max_amount, currency)}
                                 {' · '}
                                 {bActualPct > 100
-                                  ? <><span className="text-[11px]">+</span>{(bActualPct - 100).toFixed(0)}%</>
+                                  ? <><span className="text-[13px]">+</span>{(bActualPct - 100).toFixed(0)}%</>
                                   : `${bActualPct.toFixed(0)}%`
                                 }
                               </span>
                             )}
                           </div>
-                          <span className="text-xs font-semibold text-slate-300 tabular-nums shrink-0">
+                          <span className="text-sm font-semibold text-slate-300 tabular-nums shrink-0">
                             {fmtMoney(cat.total, currency, privacy)}
                           </span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold shrink-0 ${sem.badge}`}>
+                          <span className={`text-sm px-2 py-0.5 rounded-full font-semibold shrink-0 ${sem.badge}`}>
                             {pct.toFixed(0)}%
                           </span>
                         </div>
