@@ -9,6 +9,24 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 
+class TransactionHousehold(Base):
+    """Tabla intermedia many-to-many: una transacción puede estar en varios hogares (F04)."""
+    __tablename__ = "transaction_households"
+
+    transaction_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("transactions.id", ondelete="CASCADE"), primary_key=True
+    )
+    household_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("households.id", ondelete="CASCADE"), primary_key=True
+    )
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    transaction: Mapped["Transaction"] = relationship(back_populates="household_links")
+    household  = relationship("Household", back_populates="transaction_links")
+
+
 class TransactionType(str, Enum):
     INCOME = "income"
     EXPENSE = "expense"
@@ -98,3 +116,15 @@ class Transaction(Base):
     )
     external_account = relationship("ExternalAccount")
     household        = relationship("Household", back_populates="transactions")
+    household_links: Mapped[list["TransactionHousehold"]] = relationship(
+        "TransactionHousehold",
+        back_populates="transaction",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def household_ids(self) -> list[uuid.UUID]:
+        try:
+            return [link.household_id for link in self.household_links]
+        except Exception:
+            return [self.household_id] if self.household_id else []

@@ -338,3 +338,129 @@ class TestDeleteTransactionScopes:
 
         r = c.delete(f"{BASE}/transactions/{tx['id']}", headers=h2)
         assert r.status_code in (403, 404)
+
+
+class TestMultipleHouseholdsF04:
+    """F04 — Múltiples hogares por transacción."""
+
+    def _make_household(self, c, h, name="Hogar F04") -> str:
+        r = c.post(f"{BASE}/households", json={"name": name, "base_currency": "UYU"}, headers=h)
+        assert r.status_code == 201, r.text
+        return r.json()["id"]
+
+    def _make_expense(self, c, h, acc_id, cid, cat_id, household_ids=None) -> dict:
+        payload = {
+            "account_id": acc_id, "concept_id": cid, "category_id": cat_id,
+            "amount": "500.00", "type": "expense", "date": TODAY,
+        }
+        if household_ids:
+            payload["household_ids"] = household_ids
+        r = c.post(f"{BASE}/transactions", json=payload, headers=h)
+        assert r.status_code == 201, r.text
+        return r.json()
+
+    def test_create_with_no_households(self, tx_setup):
+        """Transacción sin hogares: household_ids vacío."""
+        c, h, acc_id, cid, cat_id = tx_setup
+        tx = self._make_expense(c, h, acc_id, cid, cat_id)
+        assert tx["household_id"] is None
+        assert tx["household_ids"] == []
+
+    def test_create_with_one_household(self, tx_setup):
+        """Transacción con un hogar: household_id y household_ids poblados."""
+        c, h, acc_id, cid, cat_id = tx_setup
+        hh_id = self._make_household(c, h)
+        tx = self._make_expense(c, h, acc_id, cid, cat_id, household_ids=[hh_id])
+        assert tx["household_id"] == hh_id
+        assert hh_id in tx["household_ids"]
+
+    def test_create_with_multiple_households(self, tx_setup):
+        """Transacción en 2 hogares: ambos aparecen en household_ids."""
+        c, h, acc_id, cid, cat_id = tx_setup
+        hh1 = self._make_household(c, h, "Hogar A")
+        hh2 = self._make_household(c, h, "Hogar B")
+        tx = self._make_expense(c, h, acc_id, cid, cat_id, household_ids=[hh1, hh2])
+        assert set(tx["household_ids"]) == {hh1, hh2}
+
+    def test_analytics_counts_in_each_household(self, tx_setup):
+        """Si tx está en 2 hogares, ambos la cuentan en analytics."""
+        from datetime import date
+        c, h, acc_id, cid, cat_id = tx_setup
+        hh1 = self._make_household(c, h, "H1")
+        hh2 = self._make_household(c, h, "H2")
+        self._make_expense(c, h, acc_id, cid, cat_id, household_ids=[hh1, hh2])
+
+        today = date.today()
+        r1 = c.get(f"{BASE}/households/{hh1}/analytics",
+                   params={"year": today.year, "month": today.month}, headers=h)
+        r2 = c.get(f"{BASE}/households/{hh2}/analytics",
+                   params={"year": today.year, "month": today.month}, headers=h)
+
+        assert float(r1.json()["total_shared"]) == 500.0
+        assert float(r2.json()["total_shared"]) == 500.0
+
+    def test_remove_from_one_household_keeps_other(self, tx_setup):
+        """DELETE scope=household&household_id=X solo saca de ese hogar."""
+        c, h, acc_id, cid, cat_id = tx_setup
+        hh1 = self._make_household(c, h, "H1")
+        hh2 = self._make_household(c, h, "H2")
+        tx = self._make_expense(c, h, acc_id, cid, cat_id, household_ids=[hh1, hh2])
+
+        # Quitar solo de hh1
+        r = c.delete(f"{BASE}/transactions/{tx['id']}?scope=household&household_id={hh1}", headers=h)
+        assert r.status_code == 204
+
+        # Tx sigue viva
+        r = c.get(f"{BASE}/transactions/{tx['id']}", headers=h)
+        assert r.status_code == 200
+        body = r.json()
+        # hh1 ya no está, hh2 sí
+        assert hh1 not in body["household_ids"]
+        assert hh2 in body["household_ids"]
+
+    def test_delete_transaction_cascades_all_associations(self, tx_setup):
+        """Borrado personal elimina la tx y todas sus asociaciones."""
+        c, h, acc_id, cid, cat_id = tx_setup
+        hh1 = self._make_household(c, h, "H1")
+        hh2 = self._make_household(c, h, "H2")
+        tx = self._make_expense(c, h, acc_id, cid, cat_id, household_ids=[hh1, hh2])
+
+        c.delete(f"{BASE}/transactions/{tx['id']}?scope=personal", headers=h)
+
+        r = c.get(f"{BASE}/transactions/{tx['id']}", headers=h)
+        assert r.status_code == 404
+
+    def test_cannot_associate_non_member_household(self, tx_setup):
+        """No se puede asociar a un hogar del que no soy miembro."""
+        from tests.conftest import next_email
+        c, h, acc_id, cid, cat_id = tx_setup
+
+        # Otro usuario crea un hogar
+        email2 = next_email()
+        c.post(f"{BASE}/users/register", json={
+            "name": "Otro", "email": email2, "password": "Test1234!", "currency_default": "UYU",
+        })
+        r2 = c.post(f"{BASE}/auth/login", data={"username": email2, "password": "Test1234!"})
+        h2 = {"Authorization": f"Bearer {r2.json()['access_token']}"}
+        hh_other = c.post(f"{BASE}/households", json={"name": "Ajeno", "base_currency": "UYU"}, headers=h2).json()["id"]
+
+        # Usuario 1 intenta asociar su tx al hogar de usuario 2
+        tx = self._make_expense(c, h, acc_id, cid, cat_id, household_ids=[hh_other])
+        # La asociación debe ser ignorada (no es miembro)
+        assert tx["household_id"] is None
+        assert tx["household_ids"] == []
+
+    def test_legacy_household_id_still_works(self, tx_setup):
+        """El campo legacy household_id (singular) sigue funcionando."""
+        c, h, acc_id, cid, cat_id = tx_setup
+        hh_id = self._make_household(c, h)
+        payload = {
+            "account_id": acc_id, "concept_id": cid, "category_id": cat_id,
+            "amount": "300.00", "type": "expense", "date": TODAY,
+            "household_id": hh_id,  # legado, no household_ids
+        }
+        r = c.post(f"{BASE}/transactions", json=payload, headers=h)
+        assert r.status_code == 201
+        body = r.json()
+        assert body["household_id"] == hh_id
+        assert hh_id in body["household_ids"]

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.crud import household_crud, exchange_rate_crud
 from app.exceptions.household_exceptions import HouseholdNotFound, UnauthorizedHouseholdAccess
 from app.models.household_models import MemberStatus, SplitType, AnalysisLevel
-from app.models.transactions_models import Transaction, TransactionType
+from app.models.transactions_models import Transaction, TransactionHousehold, TransactionType
 from app.models.users_models import User
 from app.schemas.household_schema import (
     HouseholdAnalyticsResponse, MemberContribution,
@@ -119,20 +119,22 @@ def get_analytics(
     period = f"{year}-{month:02d}"
     alerts: list[HouseholdAlert] = []
 
-    # ── Shared expenses for the period ──────────────────────────────────────
+    # ── Shared expenses for the period (F04: via junction table) ────────────
+    date_from = PyDate(year, month, 1)
+    date_to   = PyDate(year, month, cal_module.monthrange(year, month)[1])
+
     shared_txs = (
         db.query(Transaction)
         .options(joinedload(Transaction.account))
+        .join(TransactionHousehold, TransactionHousehold.transaction_id == Transaction.id)
         .filter(
-            Transaction.household_id == household_id,
+            TransactionHousehold.household_id == household_id,
             Transaction.is_deleted == False,
+            Transaction.date >= date_from,
+            Transaction.date <= date_to,
         )
         .all()
     )
-    shared_txs = [
-        tx for tx in shared_txs
-        if tx.date.year == year and tx.date.month == month
-    ]
 
     # ── Convert expenses to base currency ───────────────────────────────────
     # expenses_paid[user_id] = total paid in base currency
@@ -305,8 +307,9 @@ def get_analytics(
     prev_txs = (
         db.query(Transaction)
         .options(joinedload(Transaction.account))
+        .join(TransactionHousehold, TransactionHousehold.transaction_id == Transaction.id)
         .filter(
-            Transaction.household_id == household_id,
+            TransactionHousehold.household_id == household_id,
             Transaction.is_deleted == False,
             Transaction.date >= prev_date_from,
             Transaction.date <= prev_date_to,

@@ -227,9 +227,8 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   const [enCuotas,  setEnCuotas]  = useState(false)
   const [nCuotas,   setNCuotas]   = useState('2')
 
-  // Household
-  const [isShared,     setIsShared]     = useState(false)
-  const [householdId,  setHouseholdId]  = useState('')
+  // Household (F04: múltiples hogares)
+  const [selectedHouseholdIds, setSelectedHouseholdIds] = useState<string[]>([])
 
   // Quick-create panels
   const [showNewConcept,  setShowNewConcept]  = useState(false)
@@ -276,19 +275,14 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
     setDate(editTx.date)
     setDescription(editTx.description ?? '')
     setMetodoPago(editTx.metodo_pago)
-    setIsShared(!!editTx.household_id)
+    // F04: restaurar household_ids al editar
+    setSelectedHouseholdIds(editTx.household_ids ?? (editTx.household_id ? [editTx.household_id] : []))
   }, [editTx])
 
+  // Cuando se abre un modal nuevo (no edición), limpiar la selección
   useEffect(() => {
-    if (!open) return
-    if (editTx?.household_id) {
-      setHouseholdId(editTx.household_id)
-    } else if (households.length > 0 && !isEditing) {
-      setHouseholdId(households[0].id)
-    } else if (households.length > 0 && !householdId) {
-      setHouseholdId(households[0].id)
-    }
-  }, [open, households, editTx])
+    if (open && !isEditing) setSelectedHouseholdIds([])
+  }, [open, isEditing])
 
   useEffect(() => { setDestAccountId('') }, [accountId])
 
@@ -357,7 +351,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
           concept_id:   conceptId || undefined,
           category_id:  categoryId,
           ...(txType === 'expense' ? { metodo_pago: metodoPago } : {}),
-          household_id: isShared && householdId && txType === 'expense' ? householdId : null,
+          ...(txType === 'expense' && selectedHouseholdIds.length > 0 ? { household_ids: selectedHouseholdIds } : {}),
         })
       } else if (enCuotas && txType === 'expense') {
         await createInstalmentPlan({
@@ -386,9 +380,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
             ? { commission: parseFloat(commission) }
             : {}),
           ...(txType === 'expense' ? { metodo_pago: metodoPago } : {}),
-          ...(isShared && householdId && txType === 'expense'
-            ? { household_id: householdId }
-            : {}),
+          ...(txType === 'expense' && selectedHouseholdIds.length > 0 ? { household_ids: selectedHouseholdIds } : {}),
         })
       }
       await invalidateFinancialData(queryClient)
@@ -796,51 +788,38 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               <DatePicker value={date} onChange={setDate} />
             </div>
 
-            {/* Hogar toggle — solo para gastos */}
+            {/* Hogares — multi-select, solo para gastos (F04) */}
             {txType === 'expense' && (
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => households.length > 0 && setIsShared(v => !v)}
-                  title={households.length === 0 ? 'Primero creá un hogar' : isShared ? 'Quitar del hogar' : 'Marcar como gasto del hogar'}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                    households.length === 0
-                      ? 'bg-slate-800/40 border-slate-800 text-slate-600 cursor-not-allowed'
-                      : isShared
-                        ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'
-                        : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  <Home className="w-4 h-4 shrink-0" />
-                  <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${isShared && households.length > 0 ? 'bg-indigo-500' : 'bg-slate-600'}`}>
-                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${isShared && households.length > 0 ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
-                  </span>
-                </button>
-                {isShared && households.length > 1 && (
-                  <div className="relative flex-1">
-                    <button
-                      onClick={() => setOpenDd(openDd === 'household' ? null : 'household')}
-                      onBlur={closeDd}
-                      className={`${ddBtn} text-slate-200`}
-                    >
-                      <span className="truncate">{households.find(h => h.id === householdId)?.name ?? '—'}</span>
-                      <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
-                    </button>
-                    {openDd === 'household' && (
-                      <div className={ddPanel}>
-                        {households.map(h => (
-                          <button key={h.id} onMouseDown={e => e.preventDefault()} onClick={() => { setHouseholdId(h.id); setOpenDd(null) }}
-                            className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${householdId === h.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
-                            <span className="truncate">{h.name}</span>
-                            {householdId === h.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+              <div className="space-y-1.5">
+                <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                  <Home className="w-3.5 h-3.5" />
+                  {households.length === 0 ? 'Creá un hogar para asociar este gasto' : 'Asociar a hogares (opcional)'}
+                </p>
+                {households.length > 0 && (
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {households.map(hh => {
+                      const selected = selectedHouseholdIds.includes(hh.id)
+                      return (
+                        <label key={hh.id}
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border cursor-pointer transition-all ${
+                            selected ? 'bg-indigo-500/15 border-indigo-500/40' : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                          }`}>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => setSelectedHouseholdIds(prev =>
+                              prev.includes(hh.id) ? prev.filter(id => id !== hh.id) : [...prev, hh.id]
+                            )}
+                            className="accent-indigo-500 w-3.5 h-3.5 shrink-0"
+                          />
+                          <span className={`text-sm truncate ${selected ? 'text-indigo-300 font-medium' : 'text-slate-400'}`}>
+                            {hh.name}
+                          </span>
+                          {selected && <Check className="w-3.5 h-3.5 text-indigo-400 ml-auto shrink-0" />}
+                        </label>
+                      )
+                    })}
                   </div>
-                )}
-                {isShared && households.length === 1 && (
-                  <span className="text-xs text-indigo-400">{households[0].name}</span>
                 )}
               </div>
             )}

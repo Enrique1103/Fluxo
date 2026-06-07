@@ -61,7 +61,8 @@ class Household(Base):
     created_by_user = relationship("User", foreign_keys=[created_by])
     members  = relationship("HouseholdMember",  back_populates="household", cascade="all, delete-orphan")
     invites  = relationship("HouseholdInvite",  back_populates="household", cascade="all, delete-orphan")
-    transactions = relationship("Transaction", back_populates="household")
+    transactions     = relationship("Transaction", back_populates="household")
+    transaction_links = relationship("TransactionHousehold", back_populates="household", cascade="all, delete-orphan")
 
 
 class HouseholdMember(Base):

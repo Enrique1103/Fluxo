@@ -121,6 +121,8 @@ export interface MonthlyTx {
   transfer_dest_name: string | null
   metodo_pago: PaymentMethod | null
   instalment_plan_id: string | null
+  household_id: string | null
+  household_ids: string[]
 }
 
 export interface MonthlyBreakdown {
@@ -189,7 +191,7 @@ export const createTransaction = async (payload: {
   type: 'income' | 'expense' | 'transfer'; date: string; description?: string
   transfer_to_account_id?: string; external_account_id?: string
   commission?: number
-  metodo_pago?: PaymentMethod; household_id?: string
+  metodo_pago?: PaymentMethod; household_id?: string; household_ids?: string[]
 }): Promise<void> => {
   await client.post('/v1/transactions', payload)
 }
@@ -286,7 +288,9 @@ export interface TransactionDetail {
   amount: number; type: 'income' | 'expense' | 'transfer'; date: string
   description: string | null; metodo_pago: PaymentMethod
   commission: number | null
-  household_id: string | null; instalment_plan_id: string | null
+  household_id: string | null
+  household_ids: string[]
+  instalment_plan_id: string | null
 }
 
 export const fetchTransaction = async (id: string): Promise<TransactionDetail> => {

@@ -23,7 +23,7 @@ from app.exceptions.account_exceptions import UnauthorizedAccountAccess
 from app.exceptions.category_exceptions import CategoryNotFound
 from app.exceptions.exchange_rate_exceptions import ExchangeRateMissing
 from app.models.accounts_models import Account, AccountType
-from app.models.transactions_models import Transaction, TransactionType, TransferRole, PaymentMethod
+from app.models.transactions_models import Transaction, TransactionHousehold, TransactionType, TransferRole, PaymentMethod
 from app.models.users_models import User
 from app.schemas.transaction_schema import TransactionCreate, TransactionUpdate, DeleteScope
 
@@ -253,14 +253,19 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
     else:
         _apply_income(source_account, tx_in.amount)
 
-    # Validate household membership before associating the transaction
-    resolved_household_id: uuid.UUID | None = None
-    if tx_in.type == TransactionType.EXPENSE and tx_in.household_id is not None:
+    # Validar membresía y resolver household_ids (F04)
+    resolved_ids: list[uuid.UUID] = []
+    if tx_in.type == TransactionType.EXPENSE:
         from app.crud import household_crud
         from app.models.household_models import MemberStatus
-        member = household_crud.get_member(db, tx_in.household_id, user.id)
-        if member and member.status == MemberStatus.ACTIVE:
-            resolved_household_id = tx_in.household_id
+        # household_ids tiene precedencia; si no, usar household_id legado
+        candidates = tx_in.household_ids or (
+            [tx_in.household_id] if tx_in.household_id else []
+        )
+        for hh_id in candidates:
+            member = household_crud.get_member(db, hh_id, user.id)
+            if member and member.status == MemberStatus.ACTIVE:
+                resolved_ids.append(hh_id)
 
     db_tx = transaction_crud.create(
         db,
@@ -273,8 +278,13 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         date=tx_in.date,
         description=tx_in.description,
         metodo_pago=tx_in.metodo_pago if tx_in.type == TransactionType.EXPENSE else PaymentMethod.OTRO,
-        household_id=resolved_household_id,
+        household_id=resolved_ids[0] if resolved_ids else None,
     )
+
+    # Insertar en tabla junction (F04)
+    for hh_id in resolved_ids:
+        db.add(TransactionHousehold(transaction_id=db_tx.id, household_id=hh_id))
+
     if concept:
         concept_crud.increment_frequency(db, concept)
         concept_crud.update_category(db, concept, category_id)
@@ -402,15 +412,37 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
     return tx
 
 
-def delete(db: Session, user: User, tx_id: uuid.UUID, scope: DeleteScope = DeleteScope.PERSONAL) -> None:
+def delete(
+    db: Session,
+    user: User,
+    tx_id: uuid.UUID,
+    scope: DeleteScope = DeleteScope.PERSONAL,
+    target_household_id: uuid.UUID | None = None,
+) -> None:
     tx = _get_owned_tx(db, tx_id, user.id)
 
     if scope == DeleteScope.HOUSEHOLD:
-        if not tx.household_id:
+        # Eliminar entradas de la junction table (F04)
+        q = db.query(TransactionHousehold).filter(
+            TransactionHousehold.transaction_id == tx_id
+        )
+        if target_household_id is not None:
+            q = q.filter(TransactionHousehold.household_id == target_household_id)
+
+        links = q.all()
+        if not links:
             raise InvalidScopeOperation(
                 "No se puede borrar del hogar una transacción que no pertenece a ningún hogar"
             )
-        tx.household_id = None
+        for link in links:
+            db.delete(link)
+        db.flush()
+
+        # Actualizar campo legacy household_id con lo que quede en la junction table
+        remaining = db.query(TransactionHousehold).filter(
+            TransactionHousehold.transaction_id == tx_id
+        ).all()
+        tx.household_id = remaining[0].household_id if remaining else None
         db.commit()
         return
 

@@ -47,8 +47,10 @@ class TransactionCreate(BaseModel):
     commission: Decimal | None = Field(default=None, ge=0)
     # Método de pago — solo aplica para EXPENSE, ignorado para otros tipos
     metodo_pago: PaymentMethod = PaymentMethod.OTRO
-    # Hogar compartido — solo aplica para EXPENSE, ignorado para otros tipos
+    # Hogar(es) compartido(s) — solo aplica para EXPENSE, ignorado para otros tipos.
+    # household_ids reemplaza a household_id (F04); se acepta household_id por legado.
     household_id: uuid.UUID | None = None
+    household_ids: list[uuid.UUID] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_transfer_fields(self):
@@ -99,6 +101,7 @@ class TransactionResponse(BaseModel):
     metodo_pago: PaymentMethod
     instalment_plan_id: uuid.UUID | None = None
     household_id: uuid.UUID | None = None
+    household_ids: list[uuid.UUID] = Field(default_factory=list)
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -72,7 +72,8 @@ def update_transaction(
 def delete_transaction(
     tx_id: uuid.UUID,
     scope: DeleteScope = Query(default=DeleteScope.PERSONAL),
+    household_id: uuid.UUID | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    transaction_service.delete(db, current_user, tx_id, scope)
+    transaction_service.delete(db, current_user, tx_id, scope, household_id)

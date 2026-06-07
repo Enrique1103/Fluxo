@@ -3,7 +3,7 @@ from .users_models import User
 from .accounts_models import Account, AccountType
 from .categories_models import Category
 from .concepts_models import Concept
-from .transactions_models import Transaction, TransactionType, TransferRole
+from .transactions_models import Transaction, TransactionHousehold, TransactionType, TransferRole
 from .fin_goals_models import FinGoal
 from .revoked_tokens_models import RevokedToken
 from .external_account_models import ExternalAccount
