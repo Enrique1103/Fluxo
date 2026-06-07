@@ -1010,7 +1010,7 @@ export default function StatsDashboardPage() {
             extra: privacy ? '••••' : `${fmtMoney(dailyAverage, currency, false)}/día` },
         ] as Array<{ label: string; value: number | null; prevValue: number | undefined; color: string; icon: React.ElementType; border: string; bg: string; higherIsBetter: boolean; extra?: string }>).map(({ label, value, prevValue, color, icon: Icon, border, bg, extra, higherIsBetter }) => {
           const delta = value != null && prevValue != null && prevValue !== 0
-            ? ((value - prevValue) / prevValue) * 100
+            ? ((value - prevValue) / Math.abs(prevValue)) * 100
             : null
           const deltaUp   = delta != null && delta > 0
           const deltaGood = delta != null && (higherIsBetter ? deltaUp : !deltaUp)
