@@ -15,7 +15,6 @@ import {
 } from '../api/households'
 import CategoryDonut from '../components/household/CategoryDonut'
 import HouseholdKPICards from '../components/household/HouseholdKPICards'
-import HouseholdTopConcepts from '../components/household/HouseholdTopConcepts'
 import SpiderChart from '../components/household/SpiderChart'
 import CreateModal from '../components/household/CreateModal'
 import JoinModal from '../components/household/JoinModal'
@@ -546,30 +545,31 @@ export default function HouseholdPage() {
                     />
 
                     {/* ══════════════════════════════════════════════════ */}
-                    {/* 1. DONUT GRUPAL                                    */}
+                    {/* 1. DONUT + SPIDER (lado a lado)                   */}
                     {/* ══════════════════════════════════════════════════ */}
-                    {analytics.expense_by_category.length > 0 && (
-                      <div id="fluxo-export-household-donut" className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
-                        <div className={`px-5 py-4 border-b border-slate-800`}>
-                          <div className="flex items-center justify-between">
-                            <p className={sectionTitle}>Gastos del grupo</p>
-                            <span className={`text-xs font-bold tabular-nums text-slate-300`}>
-                              {fmt(Number(analytics.total_shared))}
-                              <span className={`font-normal ml-1 text-slate-500`}>{analytics.base_currency}</span>
-                            </span>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+
+                      {/* Gastos del grupo */}
+                      {analytics.expense_by_category.length > 0 && (
+                        <div id="fluxo-export-household-donut" className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
+                          <div className={`px-5 py-4 border-b border-slate-800`}>
+                            <div className="flex items-center justify-between">
+                              <p className={sectionTitle}>Gastos del grupo</p>
+                              <span className={`text-xs font-bold tabular-nums text-slate-300`}>
+                                {fmt(Number(analytics.total_shared))}
+                                <span className={`font-normal ml-1 text-slate-500`}>{analytics.base_currency}</span>
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
-                          {/* Left half: donut + category bars */}
-                          <div className="space-y-4">
-                            <div className="flex justify-center">
+                          <div className="p-5 flex items-start gap-5">
+                            <div className="shrink-0">
                               <CategoryDonut
                                 categories={analytics.expense_by_category.map(c => ({ name: c.category_name, total: Number(c.total) }))}
                                 total={Number(analytics.total_shared)}
                                 currency={analytics.base_currency}
                               />
                             </div>
-                            <div className="space-y-3">
+                            <div className="flex-1 space-y-3 pt-1 min-w-0">
                               {analytics.expense_by_category.map((cat, i) => {
                                 const pct = Number(analytics.total_shared) > 0
                                   ? Number(cat.total) / Number(analytics.total_shared) : 0
@@ -595,11 +595,18 @@ export default function HouseholdPage() {
                               })}
                             </div>
                           </div>
-                          {/* Right half: spider/radar chart by concept */}
-                          <div className="flex flex-col gap-3">
-                            <p className={sectionTitle}>Mapa de conceptos</p>
+                        </div>
+                      )}
+
+                      {/* Top conceptos como spider chart */}
+                      {analytics.top_concepts.length > 0 && (
+                        <div className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
+                          <div className={`px-5 py-4 border-b border-slate-800`}>
+                            <p className={sectionTitle}>Top conceptos</p>
+                          </div>
+                          <div className="p-5 flex items-center justify-center">
                             {analytics.top_concepts.length >= 3 ? (
-                              <div className="w-full aspect-square max-w-[240px] mx-auto">
+                              <div className="w-full aspect-square max-w-[280px]">
                                 <SpiderChart
                                   data={analytics.top_concepts.slice(0, 12).map(c => ({
                                     label: c.concept_name,
@@ -608,24 +615,15 @@ export default function HouseholdPage() {
                                 />
                               </div>
                             ) : (
-                              <div className="flex items-center justify-center h-32 text-xs text-slate-500 text-center">
+                              <div className="flex items-center justify-center h-48 text-xs text-slate-500 text-center">
                                 Al menos 3 conceptos para mostrar el gráfico
                               </div>
                             )}
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* ══════════════════════════════════════════════════ */}
-                    {/* 1b. TOP CONCEPTS (F01)                             */}
-                    {/* ══════════════════════════════════════════════════ */}
-                    <HouseholdTopConcepts
-                      concepts={analytics.top_concepts}
-                      totalShared={Number(analytics.total_shared)}
-                      currency={analytics.base_currency}
-                      privacy={privacy}
-                    />
+                    </div>
 
                     {/* ══════════════════════════════════════════════════ */}
                     {/* 1c. INGRESOS DEL HOGAR (F03 — solo FULL)          */}

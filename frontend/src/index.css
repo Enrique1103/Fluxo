@@ -170,6 +170,7 @@ html.light .bg-slate-950\/60 { background-color: rgba(248,250,252,0.8) !importan
 html.light .bg-slate-950\/40 { background-color: rgba(248,250,252,0.6) !important; }
 /* Text */
 html.light .text-white     { color: #0f172a !important; }
+html.light .text-slate-100 { color: #0f172a !important; }
 html.light .text-slate-200 { color: #1e293b !important; }
 html.light .text-slate-300 { color: #334155 !important; }
 html.light .text-slate-400 { color: #475569 !important; }
