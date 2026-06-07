@@ -18,6 +18,7 @@ import {
   updateFinGoalAllocation,
   deleteFinGoal,
   fetchPatrimonio,
+  fetchExchangeRates,
   type MonthlyStat,
   type FinGoal,
   type MonthlyPatrimonio,
@@ -964,6 +965,11 @@ export default function DashboardPage() {
     retry: 1,
   })
 
+  const { data: exchangeRates = [] } = useQuery({
+    queryKey: ['exchange-rates'],
+    queryFn:  fetchExchangeRates,
+  })
+
   // Auto-scroll patrimonio chart to current month on data load
   useEffect(() => {
     const el = patChartRef.current
@@ -1075,11 +1081,17 @@ export default function DashboardPage() {
     const todayLabel = new Date().toISOString().slice(0, 7)
     const closed = chartData
       .filter(d => d.month < todayLabel && (d.ingresos > 0 || d.gastos > 0))
-      .slice(-6)
-    if (closed.length === 0) return { avg: 0, avgExpenses: 0, count: 0 }
-    const avg        = closed.reduce((s, d) => s + d.ahorro, 0) / closed.length
-    const avgExpenses = closed.reduce((s, d) => s + d.gastos, 0) / closed.length
-    return { avg, avgExpenses, count: closed.length }
+      .slice(-3)
+    if (closed.length > 0) {
+      const avg         = closed.reduce((s, d) => s + d.ahorro, 0) / closed.length
+      const avgExpenses = closed.reduce((s, d) => s + d.gastos, 0) / closed.length
+      return { avg, avgExpenses, count: closed.length, usingCurrent: false }
+    }
+    const current = chartData.find(d => d.month === todayLabel)
+    if (current && (current.ingresos > 0 || current.gastos > 0)) {
+      return { avg: current.ahorro, avgExpenses: current.gastos, count: 0, usingCurrent: true }
+    }
+    return { avg: 0, avgExpenses: 0, count: 0, usingCurrent: false }
   }, [chartData])
 
   const avgMonthlySavings = closedMonthsStats.avg
@@ -1113,7 +1125,7 @@ export default function DashboardPage() {
       monthsToTarget = (targetNW - netWorth) / avgMonthlySavings
     }
 
-    return { months, days, pct, monthsToTarget, closedCount, baseExpenses }
+    return { months, days, pct, monthsToTarget, closedCount, baseExpenses, usingCurrent: closedMonthsStats.usingCurrent }
   }, [summary, runwayYears, avgMonthlySavings, closedMonthsStats, chartData])
 
   return (
@@ -1350,7 +1362,7 @@ export default function DashboardPage() {
         </div>
 
         {!summaryLoading && runway.pct > 0 && !privacyMode && (() => {
-          if (runway.closedCount === 0) return (
+          if (runway.closedCount === 0 && !runway.usingCurrent) return (
             <p className="text-[11px] text-slate-600 mt-2">
               Completá al menos un mes para estimar el plazo hacia tu objetivo.
             </p>
@@ -1891,12 +1903,7 @@ export default function DashboardPage() {
                         if (progPct >= 100) return (
                           <p className="text-xs text-emerald-400 font-medium mb-2">¡Meta alcanzada!</p>
                         )
-                        if (goal.currency !== currency) return (
-                          <p className="text-xs text-slate-500 mb-2">
-                            Meta en {goal.currency} · estimación de plazo no disponible en monedas mixtas.
-                          </p>
-                        )
-                        if (closedMonthsStats.count === 0) return (
+                        if (closedMonthsStats.count === 0 && !closedMonthsStats.usingCurrent) return (
                           <p className="text-xs text-slate-400 mb-2">
                             Completá al menos un mes para estimar el plazo.
                           </p>
@@ -1906,15 +1913,34 @@ export default function DashboardPage() {
                         )
                         const monthlyContrib = avgMonthlySavings * alloc / 100
                         if (monthlyContrib <= 0) return null
-                        const remaining = target - current
+                        let remaining = target - current
+                        if (goal.currency !== currency) {
+                          const rate = [...exchangeRates]
+                            .filter(r =>
+                              (r.from_currency === goal.currency && r.to_currency === currency) ||
+                              (r.from_currency === currency && r.to_currency === goal.currency)
+                            )
+                            .sort((a, b) => a.year !== b.year ? b.year - a.year : b.month - a.month)[0]
+                          if (!rate) return (
+                            <p className="text-xs text-slate-500 mb-2">
+                              Meta en {goal.currency} · configurá la tasa {goal.currency}/{currency} para estimar el plazo.
+                            </p>
+                          )
+                          remaining = rate.from_currency === goal.currency
+                            ? remaining * rate.rate
+                            : remaining / rate.rate
+                        }
                         const mths = remaining / monthlyContrib
+                        const basedOnLabel = closedMonthsStats.usingCurrent
+                          ? 'mes en curso'
+                          : `${closedMonthsStats.count} mes${closedMonthsStats.count !== 1 ? 'es' : ''}`
                         return (
                           <p className="text-xs text-slate-400 mb-2">
                             A este ritmo,{' '}
                             <span className="text-slate-300 font-medium">{fmtDuration(mths)}</span>
                             {' '}para completar la meta
-                            {closedMonthsStats.count < 3 && (
-                              <span className="text-slate-500"> (basado en {closedMonthsStats.count} mes{closedMonthsStats.count !== 1 ? 'es' : ''})</span>
+                            {(closedMonthsStats.count < 3 || closedMonthsStats.usingCurrent) && (
+                              <span className="text-slate-500"> (basado en {basedOnLabel})</span>
                             )}
                             .
                           </p>
