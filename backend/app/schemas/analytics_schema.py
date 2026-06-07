@@ -31,6 +31,14 @@ class MonthlyTx(BaseModel):
     instalment_plan_id: str | None = None
 
 
+class AccountBalanceStat(BaseModel):
+    id: str
+    name: str
+    type: str
+    currency: str
+    balance: float
+
+
 class MonthlyBreakdown(BaseModel):
     income: float
     expenses: float
@@ -39,6 +47,7 @@ class MonthlyBreakdown(BaseModel):
     income_categories: list[CategoryStat]
     daily_expenses: list[DailyExpense]
     transactions: list[MonthlyTx]
+    account_balances: list[AccountBalanceStat] = []
 
 
 class MonthlyPatrimonio(BaseModel):

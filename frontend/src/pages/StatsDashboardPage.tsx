@@ -1049,15 +1049,18 @@ export default function StatsDashboardPage() {
         <div className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-5 backdrop-blur-sm flex flex-col gap-4">
           <div>
             <h2 className="text-sm font-semibold text-slate-200">Estado de Cuentas</h2>
-            <p className="text-sm text-slate-500 mt-0.5">{MONTH_NAMES[month - 1]} {year}</p>
+            <p className="text-sm text-slate-500 mt-0.5">Cierre · {MONTH_NAMES[month - 1]} {year}</p>
           </div>
 
           {/* Cuentas */}
           <div className="flex-1 space-y-1.5">
-            <p className="text-xs text-slate-600 uppercase tracking-widest mb-1">Desglose por Cuenta</p>
-            {(summary?.accounts ?? []).length === 0 ? (
+            {isLoading ? (
+              <div className="space-y-2">
+                {[1,2,3].map(i => <div key={i} className="h-10 bg-slate-800 animate-pulse rounded-xl" />)}
+              </div>
+            ) : (breakdown?.account_balances ?? []).length === 0 ? (
               <p className="text-sm text-slate-600">Sin cuentas registradas</p>
-            ) : (summary?.accounts ?? []).map(acc => {
+            ) : (breakdown?.account_balances ?? []).map(acc => {
               const isCredit = acc.type === 'credit'
               const iconBg: Record<string, string> = {
                 cash: 'text-emerald-400 bg-emerald-400/10',
@@ -1082,7 +1085,8 @@ export default function StatsDashboardPage() {
                     <p className="text-xs text-slate-500">{typeDesc[acc.type] ?? 'Cuenta'}</p>
                   </div>
                   <span className={`text-sm font-bold tabular-nums shrink-0 ${isCredit || acc.balance < 0 ? 'text-rose-400' : 'text-slate-200'}`}>
-                    {fmtMoney(acc.balance, acc.currency, privacy)}
+                    {privacy ? '••••' : acc.balance.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <span className="text-xs font-normal text-slate-500 ml-1">{acc.currency}</span>
                   </span>
                 </div>
               )

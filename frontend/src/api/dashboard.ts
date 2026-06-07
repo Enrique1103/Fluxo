@@ -127,6 +127,14 @@ export interface MonthlyTx {
 
 
 
+export interface AccountBalanceStat {
+  id: string
+  name: string
+  type: string
+  currency: string
+  balance: number
+}
+
 export interface MonthlyBreakdown {
   income: number
   expenses: number
@@ -135,6 +143,7 @@ export interface MonthlyBreakdown {
   income_categories: CategoryStat[]
   daily_expenses: DailyExpense[]
   transactions: MonthlyTx[]
+  account_balances: AccountBalanceStat[]
 }
 
 /** GET /api/v1/analytics/monthly-breakdown?year=N&month=N */

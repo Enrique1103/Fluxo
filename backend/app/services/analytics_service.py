@@ -15,7 +15,7 @@ from app.models.concepts_models import Concept
 from app.models.external_account_models import ExternalAccount
 from app.models.transactions_models import Transaction, TransactionType, TransferRole
 from app.models.users_models import User
-from app.schemas.analytics_schema import MonthlyBreakdown, CategoryStat, DailyExpense, MonthlyTx, MonthlyPatrimonio
+from app.schemas.analytics_schema import MonthlyBreakdown, CategoryStat, DailyExpense, MonthlyTx, MonthlyPatrimonio, AccountBalanceStat
 from app.services import exchange_rate_service
 from app.crud import account_crud
 
@@ -448,6 +448,38 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
         for tx, cat_name, con_name, acc_name, acc_currency, dest_acc_name, ext_acc_name in rows
     ]
 
+    # Historical account balances: current balance minus net flow that occurred after month end
+    accounts = (
+        db.query(Account)
+        .filter(Account.user_id == user.id, Account.is_deleted == False)
+        .all()
+    )
+    account_balances: list[AccountBalanceStat] = []
+    for acc in accounts:
+        post_txs = (
+            db.query(Transaction)
+            .filter(
+                Transaction.account_id == acc.id,
+                Transaction.is_deleted == False,
+                Transaction.date > date_to,
+            )
+            .all()
+        )
+        flow_after = Decimal("0")
+        for tx in post_txs:
+            if tx.type == TransactionType.INCOME:
+                flow_after += tx.amount
+            else:
+                flow_after -= tx.amount
+        historical = acc.balance - flow_after
+        account_balances.append(AccountBalanceStat(
+            id=str(acc.id),
+            name=acc.name,
+            type=acc.type.value,
+            currency=acc.currency,
+            balance=round(float(historical), 2),
+        ))
+
     return MonthlyBreakdown(
         income=income,
         expenses=expenses,
@@ -456,6 +488,7 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
         income_categories=income_categories,
         daily_expenses=daily_expenses,
         transactions=transactions,
+        account_balances=account_balances,
     )
 
 
