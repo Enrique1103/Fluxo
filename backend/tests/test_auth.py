@@ -23,12 +23,15 @@ class TestRegister:
         assert r.status_code == 409
 
     def test_register_seeds_categories_and_concepts(self, client, auth_headers):
-        """Al registrarse se crean 10 categorías y 30 conceptos semilla."""
+        """Al registrarse se crean las categorías y conceptos semilla definidos en constants."""
+        from app.core.constants import INITIAL_USER_CATEGORIES
+        expected_cats = len(INITIAL_USER_CATEGORIES)
+        expected_concepts = sum(len(c["concepts"]) for c in INITIAL_USER_CATEGORIES)
         c = client
         cats = c.get(f"{BASE}/categories", headers=auth_headers).json()
         concepts = c.get(f"{BASE}/concepts", headers=auth_headers).json()
-        assert len(cats) == 10
-        assert len(concepts) == 30
+        assert len(cats) == expected_cats
+        assert len(concepts) == expected_concepts
 
     def test_register_invalid_password_missing(self, client):
         r = client.post(REG, json={"name": "X", "email": next_email(), "currency_default": "UYU"})

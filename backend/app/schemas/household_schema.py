@@ -5,6 +5,13 @@ from pydantic import BaseModel, field_validator
 from app.models.household_models import SplitType, MemberRole, MemberStatus, InviteStatus
 
 
+class ConceptBreakdown(BaseModel):
+    concept_name: str
+    total: Decimal
+    currency: str
+    transaction_count: int
+
+
 # ---------------------------------------------------------------------------
 # Household
 # ---------------------------------------------------------------------------
@@ -142,3 +149,9 @@ class HouseholdAnalyticsResponse(BaseModel):
     expense_by_category: list[CategoryBreakdown]
     total_shared: Decimal
     base_currency: str
+    # F01: campos nuevos para el dashboard mejorado
+    daily_average: Decimal
+    top_concepts: list[ConceptBreakdown]
+    expenses_by_day: dict[int, Decimal]
+    prev_month_total: Decimal
+    prev_month_change_pct: Decimal | None

@@ -1,4 +1,6 @@
+import calendar as cal_module
 import uuid
+from datetime import date as PyDate
 from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
 
@@ -10,6 +12,7 @@ from app.models.users_models import User
 from app.schemas.household_schema import (
     HouseholdAnalyticsResponse, MemberContribution,
     SettlementItem, SharedExpense, HouseholdAlert, CategoryBreakdown,
+    ConceptBreakdown,
 )
 
 
@@ -259,6 +262,70 @@ def get_analytics(
         for name, total in sorted(category_totals.items(), key=lambda x: x[1], reverse=True)
     ]
 
+    # ── F01: Daily average ───────────────────────────────────────────────────
+    days_in_month = cal_module.monthrange(year, month)[1]
+    today = PyDate.today()
+    elapsed = today.day if (year == today.year and month == today.month) else days_in_month
+    daily_average = (total_shared / elapsed).quantize(Decimal("0.01")) if elapsed > 0 else Decimal("0.00")
+
+    # ── F01: Top concepts ────────────────────────────────────────────────────
+    concept_totals: dict[str, Decimal] = {}
+    concept_counts: dict[str, int] = {}
+    for tx in shared_txs:
+        name = tx.concept.name if tx.concept else "Sin concepto"
+        account_currency = tx.account.currency if tx.account else base_currency
+        converted, _ = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id)
+        concept_totals[name] = concept_totals.get(name, Decimal("0.00")) + converted
+        concept_counts[name] = concept_counts.get(name, 0) + 1
+
+    top_concepts = [
+        ConceptBreakdown(
+            concept_name=cname,
+            total=ctotal.quantize(Decimal("0.01")),
+            currency=base_currency,
+            transaction_count=concept_counts[cname],
+        )
+        for cname, ctotal in sorted(concept_totals.items(), key=lambda x: x[1], reverse=True)[:5]
+    ]
+
+    # ── F01: Expenses by day (heatmap) ───────────────────────────────────────
+    expenses_by_day: dict[int, Decimal] = {}
+    for tx in shared_txs:
+        day = tx.date.day
+        account_currency = tx.account.currency if tx.account else base_currency
+        converted, _ = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id)
+        expenses_by_day[day] = (expenses_by_day.get(day, Decimal("0.00")) + converted).quantize(Decimal("0.01"))
+
+    # ── F01: Previous month total ────────────────────────────────────────────
+    prev_year, prev_month_num = (year - 1, 12) if month == 1 else (year, month - 1)
+    prev_last_day = cal_module.monthrange(prev_year, prev_month_num)[1]
+    prev_date_from = PyDate(prev_year, prev_month_num, 1)
+    prev_date_to = PyDate(prev_year, prev_month_num, prev_last_day)
+
+    prev_txs = (
+        db.query(Transaction)
+        .options(joinedload(Transaction.account))
+        .filter(
+            Transaction.household_id == household_id,
+            Transaction.is_deleted == False,
+            Transaction.date >= prev_date_from,
+            Transaction.date <= prev_date_to,
+        )
+        .all()
+    )
+    prev_month_total = Decimal("0.00")
+    for tx in prev_txs:
+        account_currency = tx.account.currency if tx.account else base_currency
+        converted, _ = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id)
+        prev_month_total += converted
+    prev_month_total = prev_month_total.quantize(Decimal("0.01"))
+
+    prev_month_change_pct: Decimal | None = None
+    if prev_month_total > 0:
+        prev_month_change_pct = (
+            (total_shared - prev_month_total) / prev_month_total * 100
+        ).quantize(Decimal("0.01"))
+
     # ── Pending member alerts ────────────────────────────────────────────────
     pending = household_crud.get_pending_members(db, household_id)
     for p in pending:
@@ -279,4 +346,9 @@ def get_analytics(
         expense_by_category=expense_by_category,
         total_shared=total_shared.quantize(Decimal("0.01")),
         base_currency=base_currency,
+        daily_average=daily_average,
+        top_concepts=top_concepts,
+        expenses_by_day=expenses_by_day,
+        prev_month_total=prev_month_total,
+        prev_month_change_pct=prev_month_change_pct,
     )

@@ -78,6 +78,13 @@ export interface CategoryBreakdown {
   currency: string
 }
 
+export interface ConceptBreakdown {
+  concept_name: string
+  total: number
+  currency: string
+  transaction_count: number
+}
+
 export interface HouseholdAnalytics {
   household_id: string
   period: string
@@ -89,6 +96,11 @@ export interface HouseholdAnalytics {
   expense_by_category: CategoryBreakdown[]
   total_shared: number
   base_currency: string
+  daily_average: number
+  top_concepts: ConceptBreakdown[]
+  expenses_by_day: Record<string, number>
+  prev_month_total: number
+  prev_month_change_pct: number | null
 }
 
 // --- API calls ---

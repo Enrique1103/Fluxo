@@ -14,6 +14,9 @@ import {
   fetchHouseholdAnalytics,
 } from '../api/households'
 import CategoryDonut from '../components/household/CategoryDonut'
+import HouseholdKPICards from '../components/household/HouseholdKPICards'
+import HouseholdHeatmap from '../components/household/HouseholdHeatmap'
+import HouseholdTopConcepts from '../components/household/HouseholdTopConcepts'
 import CreateModal from '../components/household/CreateModal'
 import JoinModal from '../components/household/JoinModal'
 import EditModal from '../components/household/EditModal'
@@ -523,6 +526,22 @@ export default function HouseholdPage() {
                 ) : (
                   <>
                     {/* ══════════════════════════════════════════════════ */}
+                    {/* 0. KPI CARDS (F01)                                 */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    <HouseholdKPICards
+                      totalShared={Number(analytics.total_shared)}
+                      dailyAverage={Number(analytics.daily_average)}
+                      topCategory={
+                        analytics.expense_by_category[0]
+                          ? { name: analytics.expense_by_category[0].category_name, total: Number(analytics.expense_by_category[0].total) }
+                          : null
+                      }
+                      prevChangePct={analytics.prev_month_change_pct !== null ? Number(analytics.prev_month_change_pct) : null}
+                      currency={analytics.base_currency}
+                      privacy={privacy}
+                    />
+
+                    {/* ══════════════════════════════════════════════════ */}
                     {/* 1. DONUT GRUPAL                                    */}
                     {/* ══════════════════════════════════════════════════ */}
                     {analytics.expense_by_category.length > 0 && (
@@ -572,6 +591,25 @@ export default function HouseholdPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* 1b. HEATMAP + TOP CONCEPTS (F01)                  */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      <HouseholdHeatmap
+                        expensesByDay={analytics.expenses_by_day}
+                        year={year}
+                        month={month}
+                        currency={analytics.base_currency}
+                        privacy={privacy}
+                      />
+                      <HouseholdTopConcepts
+                        concepts={analytics.top_concepts}
+                        totalShared={Number(analytics.total_shared)}
+                        currency={analytics.base_currency}
+                        privacy={privacy}
+                      />
+                    </div>
 
                     {/* ══════════════════════════════════════════════════ */}
                     {/* 2. ANÁLISIS POR MIEMBRO                           */}
