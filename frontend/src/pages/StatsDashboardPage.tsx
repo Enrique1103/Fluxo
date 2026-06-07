@@ -120,8 +120,9 @@ function DonutChart({
   const slices = categories.map((cat, i) => {
     const frac   = cat.total / total
     const sweep  = frac * Math.PI * 2
-    const start  = angle + GAP / 2
-    const end    = angle + sweep - GAP / 2
+    const gap    = Math.min(GAP, sweep * 0.25)   // gap adaptativo: porciones pequeñas no desaparecen
+    const start  = angle + gap / 2
+    const end    = angle + sweep - gap / 2
     const mid    = angle + sweep / 2
     angle       += sweep
     return { frac, sweep, start, end, mid, color: catColor(i), name: cat.name, total: cat.total }
@@ -145,7 +146,7 @@ function DonutChart({
     privacy ? '****' : v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${Math.round(v)}`
 
   return (
-    <div className="shrink-0">
+    <div className="shrink-0" onClick={() => onCategoryClick?.(null)}>
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ width: size, height: size }}>
         {slices.map((s, i) => {
           const isSelected = selectedCategory === s.name
@@ -167,34 +168,34 @@ function DonutChart({
               }}
               onMouseEnter={() => setHovered(i)}
               onMouseLeave={() => setHovered(null)}
-              onClick={() => onCategoryClick?.(isSelected ? null : s.name)}
+              onClick={(e) => { e.stopPropagation(); onCategoryClick?.(isSelected ? null : s.name) }}
             />
           )
         })}
 
         {hovSeg ? (
           <>
-            <text x={cx} y={cy - 14} textAnchor="middle"
-              style={{ fontSize: '7px', fontWeight: 600, fill: hovSeg.color, letterSpacing: '0.02em' }}>
-              {hovSeg.name.length > 14 ? hovSeg.name.slice(0, 13) + '…' : hovSeg.name}
+            <text x={cx} y={cy - 16} textAnchor="middle"
+              style={{ fontSize: '9px', fontWeight: 600, fill: hovSeg.color, letterSpacing: '0.02em' }}>
+              {hovSeg.name.length > 12 ? hovSeg.name.slice(0, 11) + '…' : hovSeg.name}
             </text>
-            <text x={cx} y={cy + 2} textAnchor="middle" fill={textColor} fontSize="13" fontWeight="700">
+            <text x={cx} y={cy + 4} textAnchor="middle" fill={textColor} fontSize="16" fontWeight="700">
               {fmtAmt(hovSeg.total)}
             </text>
-            <text x={cx} y={cy + 15} textAnchor="middle" fill={subColor} fontSize="8">
+            <text x={cx} y={cy + 19} textAnchor="middle" fill={subColor} fontSize="10">
               {privacy ? '**%' : `${(hovSeg.frac * 100).toFixed(1)}%`}
             </text>
           </>
         ) : (
           <>
-            <text x={cx} y={cy - 9} textAnchor="middle" fill={textColor} fontSize="12" fontWeight="700">
+            <text x={cx} y={cy - 8} textAnchor="middle" fill={textColor} fontSize="15" fontWeight="700">
               {fmtAmt(total)}
             </text>
-            <text x={cx} y={cy + 5} textAnchor="middle" fill={subColor} fontSize="7.5">
+            <text x={cx} y={cy + 8} textAnchor="middle" fill={subColor} fontSize="9">
               {mode === 'income' ? 'en ingresos' : 'en gastos'}
             </text>
             {mode === 'expense' && income > 0 && (
-              <text x={cx} y={cy + 18} textAnchor="middle" fill={isLight ? '#059669' : '#34d399'} fontSize="8" fontWeight="600">
+              <text x={cx} y={cy + 22} textAnchor="middle" fill={isLight ? '#059669' : '#34d399'} fontSize="9.5" fontWeight="600">
                 {privacy ? '**%' : `${((total / income) * 100).toFixed(0)}% del ing.`}
               </text>
             )}
