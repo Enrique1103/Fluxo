@@ -675,7 +675,7 @@ export default function HouseholdPage() {
                         <div className={`px-5 py-4 border-b border-slate-800`}>
                           <p className={sectionTitle}>Análisis por miembro</p>
                         </div>
-                        <div className={`p-4 grid gap-4 ${analytics.members.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                        <div className={`p-4 grid gap-4 ${analytics.members.length >= 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
                           {analytics.members.map(m => {
                             const breakdown = getMemberBreakdown(analytics.shared_expenses, m.user_id)
                             const balance   = Number(m.balance)
@@ -731,11 +731,11 @@ export default function HouseholdPage() {
 
                                 <div className={`pt-3 border-t grid grid-cols-2 gap-2 border-slate-700/60`}>
                                   <div>
-                                    <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-0.5">Pagó</p>
+                                    <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-0.5">Pagó</p>
                                     <p className={`text-sm font-bold tabular-nums text-slate-200`}>{fmt(Number(m.expenses_paid))}</p>
                                   </div>
                                   <div>
-                                    <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-0.5">Corresponde</p>
+                                    <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-0.5">Corresponde</p>
                                     <p className={`text-sm font-bold tabular-nums text-slate-200`}>{fmt(Number(m.should_pay))}</p>
                                   </div>
                                 </div>
