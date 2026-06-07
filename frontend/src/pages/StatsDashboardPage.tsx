@@ -1131,7 +1131,7 @@ export default function StatsDashboardPage() {
               </div>
             )
             return (
-              <div className="flex gap-5 items-start">
+              <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 items-center sm:items-start">
                 <DonutChart
                   data={{ ...breakdown, categories: cats, income: total }}
                   privacy={privacy}
@@ -1139,7 +1139,7 @@ export default function StatsDashboardPage() {
                   onCategoryClick={setSelectedCategory}
                   mode={donutMode}
                 />
-                <div className="flex-1 min-w-0 space-y-3 overflow-y-auto" style={{ maxHeight: 244 }}>
+                <div className="flex-1 min-w-0 space-y-3 w-full">
                   {cats.map((cat: CategoryStat, i: number) => {
                     const pct    = total > 0 ? (cat.total / total) * 100 : 0
                     const sem    = donutMode === 'expense' ? semColor(cat.total / (breakdown.income || 1) * 100) : { badge: 'bg-emerald-500/15 text-emerald-400', bar: '#10b981' }
@@ -1150,11 +1150,11 @@ export default function StatsDashboardPage() {
                       <div key={cat.name}>
                         <div className="flex items-center gap-2 mb-1.5">
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: catColor(i) }} />
-                          <span className="text-sm text-slate-300 flex-1 truncate">{cat.name}</span>
-                          <span className="text-sm font-semibold text-slate-300 tabular-nums">
+                          <span className="text-xs sm:text-sm text-slate-300 flex-1 truncate">{cat.name}</span>
+                          <span className="text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
                             {fmtMoney(cat.total, currency, privacy)}
                           </span>
-                          <span className={`text-sm px-1.5 py-0.5 rounded-full font-semibold ${sem.badge}`}>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${sem.badge}`}>
                             {pct.toFixed(0)}%
                           </span>
                         </div>

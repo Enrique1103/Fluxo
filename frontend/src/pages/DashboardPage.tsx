@@ -32,6 +32,8 @@ import GoalModal from '../components/GoalModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import TransactionModal from '../components/TransactionModal'
 import VoiceExpenseModal from '../components/VoiceExpenseModal'
+import ExportButton from '../components/ExportButton'
+import { exportGlobalPDF } from '../lib/exportPDF'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -1210,6 +1212,23 @@ export default function DashboardPage() {
             )}
           </div>
 
+          {summary && (
+            <ExportButton
+              onExport={() => exportGlobalPDF({
+                netWorth:    Number(summary.net_worth),
+                totalAssets: Number(summary.total_assets),
+                totalDebt:   Number(summary.total_debt),
+                income:      Number(summary.income_this_month),
+                expenses:    Number(summary.expense_this_month),
+                savings:     Number(summary.net_this_month),
+                accounts:    summary.accounts.map(a => ({ name: a.name, type: a.type, balance: a.balance, currency: a.currency })),
+                goals:       finGoals.map(g => ({ name: g.name, current: Number(g.current_amount ?? 0), target: Number(g.target_amount), deadline: g.deadline ?? undefined })),
+                currency,
+                userName: me?.name,
+              })}
+            />
+          )}
+
           <button
             onClick={() => setSettingsOpen(true)}
             className="p-2 text-slate-400 hover:text-emerald-400 bg-slate-950 border border-slate-800 rounded-lg transition-colors"
@@ -1506,7 +1525,7 @@ export default function DashboardPage() {
           <div id="fluxo-export-chart" className="bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm">
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm font-medium text-slate-400">Ingresos · Gastos · Ahorro</h2>
-              <span className="text-[10px] text-slate-600 uppercase">mové el cursor para ver detalle</span>
+              <span className="text-[10px] text-slate-600 uppercase hidden sm:inline">mové el cursor para ver detalle</span>
             </div>
             {chartLoading ? (
               <div className="h-48 bg-slate-800/50 animate-pulse rounded-xl mt-4" />
