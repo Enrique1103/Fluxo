@@ -1900,9 +1900,7 @@ export default function DashboardPage() {
                           <p className="text-xs text-slate-400 mb-2">Sin flujo asignado — no es posible estimar el plazo.</p>
                         )
                         const monthlyContrib = avgMonthlySavings * alloc / 100
-                        if (monthlyContrib <= 0) return (
-                          <p className="text-xs text-amber-500/80 mb-2">Ahorro promedio negativo — revisá tus gastos.</p>
-                        )
+                        if (monthlyContrib <= 0) return null
                         const remaining = target - current
                         const mths = remaining / monthlyContrib
                         return (
