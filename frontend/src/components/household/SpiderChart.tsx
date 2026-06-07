@@ -48,7 +48,7 @@ export default function SpiderChart({ data, color = '#818cf8' }: Props) {
   const labels = data.map((d, i) => {
     const p   = polarXY(CX, CY, LABEL_R, i, N)
     const dx  = p.x - CX
-    const anchor = Math.abs(dx) < 6 ? 'middle' : dx < 0 ? 'end' : 'start'
+    const anchor = (Math.abs(dx) < 6 ? 'middle' : dx < 0 ? 'end' : 'start') as 'middle' | 'end' | 'start'
     const text   = d.label.length > 12 ? d.label.slice(0, 11) + '…' : d.label
     return { ...p, anchor, text }
   })
