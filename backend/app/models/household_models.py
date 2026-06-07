@@ -47,7 +47,9 @@ class Household(Base):
         SQLEnum(SplitType), nullable=False, default=SplitType.EQUAL
     )
     analysis_level: Mapped[AnalysisLevel | None] = mapped_column(
-        SQLEnum(AnalysisLevel), nullable=True, default=AnalysisLevel.EXPENSES_ONLY
+        SQLEnum(AnalysisLevel, values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+        default=AnalysisLevel.EXPENSES_ONLY,
     )
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
