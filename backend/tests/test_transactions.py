@@ -255,3 +255,86 @@ class TestDeleteTransaction:
         debit = c.get(f"{BASE}/accounts/{debit_id}", headers=h).json()
         assert float(cash["balance"])  == 10000.00
         assert float(debit["balance"]) == 50000.00
+
+
+class TestDeleteTransactionScopes:
+    """F02 — Borrado granular: scope=personal (cascada) vs scope=household (solo hogar)."""
+
+    def _make_household(self, c, h) -> str:
+        r = c.post(f"{BASE}/households", json={"name": "Hogar F02", "base_currency": "UYU"}, headers=h)
+        assert r.status_code == 201, r.text
+        return r.json()["id"]
+
+    def _make_expense(self, c, h, acc_id, cid, cat_id, household_id=None) -> dict:
+        payload = {
+            "account_id": acc_id, "concept_id": cid, "category_id": cat_id,
+            "amount": "500.00", "type": "expense", "date": TODAY,
+        }
+        if household_id:
+            payload["household_id"] = household_id
+        r = c.post(f"{BASE}/transactions", json=payload, headers=h)
+        assert r.status_code == 201, r.text
+        return r.json()
+
+    def test_delete_household_keeps_personal(self, tx_setup):
+        """scope=household quita el hogar pero la transacción sigue en personal."""
+        c, h, acc_id, cid, cat_id = tx_setup
+        hh_id = self._make_household(c, h)
+        tx = self._make_expense(c, h, acc_id, cid, cat_id, household_id=hh_id)
+
+        r = c.delete(f"{BASE}/transactions/{tx['id']}?scope=household", headers=h)
+        assert r.status_code == 204
+
+        # La transacción sigue viva en personal
+        r = c.get(f"{BASE}/transactions/{tx['id']}", headers=h)
+        assert r.status_code == 200
+        assert r.json()["household_id"] is None
+
+    def test_delete_personal_removes_transaction(self, tx_setup):
+        """scope=personal (cascada total): la transacción desaparece."""
+        c, h, acc_id, cid, cat_id = tx_setup
+        hh_id = self._make_household(c, h)
+        tx = self._make_expense(c, h, acc_id, cid, cat_id, household_id=hh_id)
+
+        r = c.delete(f"{BASE}/transactions/{tx['id']}?scope=personal", headers=h)
+        assert r.status_code == 204
+
+        r = c.get(f"{BASE}/transactions/{tx['id']}", headers=h)
+        assert r.status_code == 404
+
+    def test_delete_default_scope_is_personal(self, tx_setup):
+        """Sin pasar scope, el default es personal (backward compat)."""
+        c, h, acc_id, cid, cat_id = tx_setup
+        tx = self._make_expense(c, h, acc_id, cid, cat_id)
+
+        r = c.delete(f"{BASE}/transactions/{tx['id']}", headers=h)
+        assert r.status_code == 204
+
+        r = c.get(f"{BASE}/transactions/{tx['id']}", headers=h)
+        assert r.status_code == 404
+
+    def test_delete_household_without_household_422(self, tx_setup):
+        """scope=household en tx sin hogar → 422."""
+        c, h, acc_id, cid, cat_id = tx_setup
+        tx = self._make_expense(c, h, acc_id, cid, cat_id)
+
+        r = c.delete(f"{BASE}/transactions/{tx['id']}?scope=household", headers=h)
+        assert r.status_code == 422
+        assert "hogar" in r.json()["detail"].lower()
+
+    def test_delete_only_owner_can_delete_403(self, tx_setup):
+        """Solo el creador puede borrar su transacción."""
+        from tests.conftest import next_email
+        c, h, acc_id, cid, cat_id = tx_setup
+        tx = self._make_expense(c, h, acc_id, cid, cat_id)
+
+        # Crear otro usuario
+        email2 = next_email()
+        c.post(f"{BASE}/users/register", json={
+            "name": "Otro", "email": email2, "password": "Test1234!", "currency_default": "UYU",
+        })
+        r2 = c.post(f"{BASE}/auth/login", data={"username": email2, "password": "Test1234!"})
+        h2 = {"Authorization": f"Bearer {r2.json()['access_token']}"}
+
+        r = c.delete(f"{BASE}/transactions/{tx['id']}", headers=h2)
+        assert r.status_code in (403, 404)

@@ -23,6 +23,7 @@ import {
 import SettingsDrawer from '../components/SettingsDrawer'
 import TransactionModal from '../components/TransactionModal'
 import ConfirmDialog from '../components/ConfirmDialog'
+import DeleteTransactionModal from '../components/DeleteTransactionModal'
 import FAB from '../components/FAB'
 import VoiceExpenseModal from '../components/VoiceExpenseModal'
 import { invalidateFinancialData } from '../lib/queryClient'
@@ -329,7 +330,7 @@ function TxTable({
   transactions: MonthlyBreakdown['transactions']
   privacy: boolean
   currency: string
-  onDelete?: (id: string) => Promise<void>
+  onDelete?: (id: string, scope?: 'personal' | 'household') => Promise<void>
   onEdit?: (id: string) => void
   onConfirmOpenChange?: (open: boolean) => void
   categoryFilter?: string | null
@@ -341,8 +342,8 @@ function TxTable({
   const [internalCategory, setInternalCategory] = useState<string | null>(categoryFilter ?? null)
   const [amountFilter, setAmountFilter] = useState('')
   const [openDropdown, setOpenDropdown] = useState<'tipo' | 'categoria' | 'metodo' | null>(null)
-  const [deletingId,  setDeletingId]  = useState<string | null>(null)
-  const [confirmId,   setConfirmId]   = useState<string | null>(null)
+  const [deletingId,   setDeletingId]   = useState<string | null>(null)
+  const [confirmTx,    setConfirmTx]    = useState<MonthlyBreakdown['transactions'][number] | null>(null)
   const [cuotaConfirm, setCuotaConfirm] = useState<{ txId: string; planId: string } | null>(null)
 
   useEffect(() => { setInternalCategory(categoryFilter ?? null) }, [categoryFilter])
@@ -358,24 +359,24 @@ function TxTable({
       setCuotaConfirm({ txId: tx.id, planId: tx.instalment_plan_id })
       onConfirmOpenChange?.(true)
     } else {
-      setConfirmId(tx.id)
+      setConfirmTx(tx)
       onConfirmOpenChange?.(true)
     }
   }
 
   const cancelDelete = () => {
-    setConfirmId(null)
+    setConfirmTx(null)
     setCuotaConfirm(null)
     onConfirmOpenChange?.(false)
   }
 
-  const handleDelete = async () => {
-    if (!onDelete || !confirmId) return
-    const id = confirmId
-    setConfirmId(null)
+  const handleDelete = async (scope: 'personal' | 'household') => {
+    if (!onDelete || !confirmTx) return
+    const id = confirmTx.id
+    setConfirmTx(null)
     onConfirmOpenChange?.(false)
     setDeletingId(id)
-    try { await onDelete(id) } finally { setDeletingId(null) }
+    try { await onDelete(id, scope) } finally { setDeletingId(null) }
   }
 
   const handleDeleteCuota = async () => {
@@ -718,12 +719,14 @@ function TxTable({
         )}
       </div>
 
-      <ConfirmDialog
-        open={confirmId !== null}
-        title="Eliminar movimiento"
-        message="Esta acción no se puede deshacer. ¿Confirmás que querés eliminar este movimiento?"
-        confirmLabel="Eliminar"
-        danger
+      <DeleteTransactionModal
+        tx={confirmTx ? {
+          id: confirmTx.id,
+          concept_name: confirmTx.concept_name,
+          amount: confirmTx.amount,
+          date: confirmTx.date,
+          household_id: confirmTx.household_id,
+        } : null}
         onConfirm={handleDelete}
         onCancel={cancelDelete}
       />
@@ -1201,8 +1204,8 @@ export default function StatsDashboardPage() {
             categoryFilter={selectedCategory}
             onConfirmOpenChange={setTxConfirmOpen}
             onEdit={id => { setEditTxId(id); setTxModalOpen(true) }}
-            onDelete={async (id) => {
-              await deleteTransaction(id)
+            onDelete={async (id, scope = 'personal') => {
+              await deleteTransaction(id, scope)
               await invalidateFinancialData(queryClient)
             }}
           />

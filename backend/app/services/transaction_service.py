@@ -17,6 +17,7 @@ from app.exceptions.transaction_exceptions import (
     SameAccountTransferNotAllowed,
     ConceptNotBelongsToUser,
     InstalmentPlanTransactionEditNotAllowed,
+    InvalidScopeOperation,
 )
 from app.exceptions.account_exceptions import UnauthorizedAccountAccess
 from app.exceptions.category_exceptions import CategoryNotFound
@@ -24,7 +25,7 @@ from app.exceptions.exchange_rate_exceptions import ExchangeRateMissing
 from app.models.accounts_models import Account, AccountType
 from app.models.transactions_models import Transaction, TransactionType, TransferRole, PaymentMethod
 from app.models.users_models import User
-from app.schemas.transaction_schema import TransactionCreate, TransactionUpdate
+from app.schemas.transaction_schema import TransactionCreate, TransactionUpdate, DeleteScope
 
 
 # ---------------------------------------------------------------------------
@@ -401,8 +402,18 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
     return tx
 
 
-def delete(db: Session, user: User, tx_id: uuid.UUID) -> None:
+def delete(db: Session, user: User, tx_id: uuid.UUID, scope: DeleteScope = DeleteScope.PERSONAL) -> None:
     tx = _get_owned_tx(db, tx_id, user.id)
+
+    if scope == DeleteScope.HOUSEHOLD:
+        if not tx.household_id:
+            raise InvalidScopeOperation(
+                "No se puede borrar del hogar una transacción que no pertenece a ningún hogar"
+            )
+        tx.household_id = None
+        db.commit()
+        return
+
     account = account_crud.get_by_id(db, tx.account_id)
 
     if tx.transfer_role is not None:

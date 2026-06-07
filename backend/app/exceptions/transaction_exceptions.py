@@ -24,3 +24,7 @@ class ConceptNotBelongsToUser(TransactionException):
 
 class InstalmentPlanTransactionEditNotAllowed(TransactionException):
     pass
+
+
+class InvalidScopeOperation(TransactionException):
+    pass

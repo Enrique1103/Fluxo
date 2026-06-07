@@ -302,8 +302,8 @@ export const updateTransaction = async (id: string, payload: {
   await client.patch(`/v1/transactions/${id}`, payload)
 }
 
-export const deleteTransaction = async (id: string): Promise<void> => {
-  await client.delete(`/v1/transactions/${id}`)
+export const deleteTransaction = async (id: string, scope: 'personal' | 'household' = 'personal'): Promise<void> => {
+  await client.delete(`/v1/transactions/${id}`, { params: { scope } })
 }
 
 // --- Category management ---

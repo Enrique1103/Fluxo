@@ -44,6 +44,7 @@ from app.exceptions.transaction_exceptions import (
     SameAccountTransferNotAllowed,
     ConceptNotBelongsToUser,
     InstalmentPlanTransactionEditNotAllowed,
+    InvalidScopeOperation,
 )
 from app.exceptions.instalment_plan_exceptions import (
     InstalmentPlanNotFound,
@@ -310,6 +311,11 @@ async def handle_instalment_plan_account_type(r: Request, exc: InstalmentPlanAcc
 
 @app.exception_handler(InstalmentPlanTransactionEditNotAllowed)
 async def handle_instalment_plan_tx_edit(r: Request, exc: InstalmentPlanTransactionEditNotAllowed):
+    return _json(_422, str(exc))
+
+
+@app.exception_handler(InvalidScopeOperation)
+async def handle_invalid_scope(r: Request, exc: InvalidScopeOperation):
     return _json(_422, str(exc))
 
 

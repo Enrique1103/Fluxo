@@ -11,6 +11,11 @@ class TransactionType(str, Enum):
     TRANSFER = "transfer"
 
 
+class DeleteScope(str, Enum):
+    PERSONAL  = "personal"
+    HOUSEHOLD = "household"
+
+
 class TransferRole(str, Enum):
     SOURCE = "source"
     DESTINATION = "destination"
