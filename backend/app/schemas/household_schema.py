@@ -42,7 +42,7 @@ class HouseholdUpdate(BaseModel):
     name: str | None = None
     base_currency: str | None = None
     split_type: SplitType | None = None
-    analysis_level: AnalysisLevel | None = None
+    # analysis_level es inmutable después de crear el hogar
 
     @field_validator("base_currency")
     @classmethod

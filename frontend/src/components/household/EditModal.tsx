@@ -24,17 +24,15 @@ export default function EditModal({ household, onClose }: Props) {
   const qc = useQueryClient()
   const [name,          setName]          = useState(household.name)
   const [currency,      setCurrency]      = useState(household.base_currency)
-  const [splitType,     setSplitType]     = useState<SplitType>(household.split_type)
-  const [analysisLevel, setAnalysisLevel] = useState<AnalysisLevel>(household.analysis_level ?? 'expenses_only')
+  const [splitType, setSplitType] = useState<SplitType>(household.split_type)
   const [error,         setError]         = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const updateMutation = useMutation({
     mutationFn: () => updateHousehold(household.id, {
-      name:           name.trim(),
-      base_currency:  currency,
-      split_type:     splitType,
-      analysis_level: analysisLevel,
+      name:          name.trim(),
+      base_currency: currency,
+      split_type:    splitType,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['households'] })
@@ -97,21 +95,12 @@ export default function EditModal({ household, onClose }: Props) {
             </div>
           </div>
 
-          {/* Nivel de análisis */}
-          <div>
-            <label className={labelClass + ' mb-2'}>Nivel de análisis</label>
-            <div className="flex flex-col gap-1.5">
-              {(['expenses_only', 'expenses_and_goals', 'full'] as AnalysisLevel[]).map(level => (
-                <button key={level} onClick={() => setAnalysisLevel(level)}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold border text-left transition-all ${
-                    analysisLevel === level
-                      ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-                  }`}>
-                  {ANALYSIS_LABELS[level]}
-                </button>
-              ))}
-            </div>
+          {/* Nivel de análisis — inmutable */}
+          <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
+            <span className="text-xs text-slate-400">Nivel de análisis</span>
+            <span className="text-xs font-semibold text-slate-300">
+              {ANALYSIS_LABELS[household.analysis_level ?? 'expenses_only']}
+            </span>
           </div>
 
           {error && <p className="text-rose-400 text-xs">{error}</p>}

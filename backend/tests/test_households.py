@@ -202,12 +202,13 @@ class TestUpdateHouseholdF03:
         assert r.status_code == 200
         assert r.json()["split_type"] == "proportional"
 
-    def test_update_analysis_level_ok(self, household):
-        """analysis_level SÍ se puede cambiar después de crear."""
+    def test_cannot_update_analysis_level(self, household):
+        """analysis_level es inmutable — se ignora en PATCH."""
         c, h, hh_id = household
-        r = c.patch(f"{HH}/{hh_id}", json={"analysis_level": "full"}, headers=h)
-        assert r.status_code == 200
-        assert r.json()["analysis_level"] == "full"
+        original = c.get(f"{HH}/{hh_id}", headers=h).json()["analysis_level"]
+        c.patch(f"{HH}/{hh_id}", json={"analysis_level": "full"}, headers=h)
+        after = c.get(f"{HH}/{hh_id}", headers=h).json()["analysis_level"]
+        assert after == original
 
 
 class TestHouseholdAnalyticsF03:
