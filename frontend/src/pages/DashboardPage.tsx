@@ -1876,7 +1876,7 @@ export default function DashboardPage() {
                       <p className="text-xs text-slate-400 mb-1">
                         {privacyMode
                           ? `**** / **** · vas al ${progPct.toFixed(0)}% de alcanzar tu objetivo`
-                          : `${fmtMoney(current, currency, false)} / ${fmtMoney(target, currency, false)} · vas al `
+                          : `${fmtMoney(current, goal.currency, false)} / ${fmtMoney(target, goal.currency, false)} · vas al `
                         }
                         {!privacyMode && (
                           <span className={`font-bold ${progPct >= 100 ? 'text-emerald-400' : 'text-white'}`}>
@@ -1890,6 +1890,11 @@ export default function DashboardPage() {
                       {!privacyMode && (() => {
                         if (progPct >= 100) return (
                           <p className="text-xs text-emerald-400 font-medium mb-2">¡Meta alcanzada!</p>
+                        )
+                        if (goal.currency !== currency) return (
+                          <p className="text-xs text-slate-500 mb-2">
+                            Meta en {goal.currency} · estimación de plazo no disponible en monedas mixtas.
+                          </p>
                         )
                         if (closedMonthsStats.count === 0) return (
                           <p className="text-xs text-slate-400 mb-2">

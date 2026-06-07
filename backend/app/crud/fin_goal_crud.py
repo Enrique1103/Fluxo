@@ -43,11 +43,13 @@ def create(
     name: str,
     target_amount: Decimal,
     allocation_pct: Decimal,
+    currency: str = 'UYU',
     deadline: PyDate | None = None,
 ) -> FinGoal:
     db_goal = FinGoal(
         user_id=user_id,
         name=name,
+        currency=currency,
         target_amount=target_amount,
         allocation_pct=allocation_pct,
         deadline=deadline,

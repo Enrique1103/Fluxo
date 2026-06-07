@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from decimal import Decimal
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,7 @@ MAX_GOALS = 3
 from app.models.fin_goals_models import FinGoal
 from app.models.users_models import User
 from app.schemas.fin_goal_schema import FinGoalCreate, FinGoalUpdate, FinGoalResponse
+from app.services import exchange_rate_service
 
 
 # ---------------------------------------------------------------------------
@@ -30,10 +32,26 @@ def _get_owned(db: Session, goal_id: uuid.UUID, user_id: uuid.UUID) -> FinGoal:
 
 
 def _calculate_current_amount(db: Session, goal: FinGoal) -> Decimal:
-    """Patrimonio neto × allocation_pct / 100."""
+    """Patrimonio neto × allocation_pct / 100, convertido a la moneda de la meta."""
     accounts = account_crud.get_all_by_user(db, goal.user_id)
-    total_balance = sum((a.balance for a in accounts), Decimal("0.00"))
-    return (total_balance * goal.allocation_pct / Decimal("100")).quantize(Decimal("0.01"))
+    today = date.today()
+    goal_currency = str(goal.currency)
+
+    total = Decimal("0.00")
+    for acc in accounts:
+        acc_currency = str(acc.currency)
+        balance = Decimal(str(acc.balance))
+        if acc_currency == goal_currency:
+            total += balance
+        else:
+            rate = exchange_rate_service.get_rate_for_month(
+                db, goal.user_id, acc_currency, goal_currency, today.year, today.month
+            )
+            if rate is not None:
+                total += balance * rate
+            # Si no hay tasa, se omite la cuenta (comportamiento conservador)
+
+    return (total * goal.allocation_pct / Decimal("100")).quantize(Decimal("0.01"))
 
 
 def _to_response(db: Session, goal: FinGoal) -> FinGoalResponse:
@@ -77,6 +95,7 @@ def create(db: Session, user: User, goal_in: FinGoalCreate) -> FinGoalResponse:
         db,
         user_id=user.id,
         name=goal_in.name,
+        currency=str(goal_in.currency).upper(),
         target_amount=goal_in.target_amount,
         allocation_pct=goal_in.allocation_pct,
         deadline=goal_in.deadline,
@@ -110,6 +129,9 @@ def update(db: Session, user: User, goal_id: uuid.UUID, goal_update: FinGoalUpda
 
     if goal_update.name is not None:
         fields["name"] = goal_update.name
+
+    if goal_update.currency is not None:
+        fields["currency"] = str(goal_update.currency).upper()
 
     if goal_update.target_amount is not None:
         fields["target_amount"] = goal_update.target_amount

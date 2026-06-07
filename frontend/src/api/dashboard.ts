@@ -38,6 +38,7 @@ export interface Summary {
 export interface FinGoal {
   id: string
   name: string
+  currency: string
   target_amount: number
   allocation_pct: number
   current_amount: number | null
@@ -223,14 +224,14 @@ export const createInstalmentPlan = async (payload: {
 
 // --- FinGoals full CRUD ---
 export const createFinGoal = async (payload: {
-  name: string; target_amount: number; allocation_pct: number; deadline?: string
+  name: string; currency: string; target_amount: number; allocation_pct: number; deadline?: string
 }): Promise<FinGoal> => {
   const { data } = await client.post<FinGoal>('/v1/fin-goals', payload)
   return data
 }
 
 export const updateFinGoalFull = async (id: string, payload: {
-  name?: string; target_amount?: number; allocation_pct?: number; deadline?: string | null
+  name?: string; currency?: string; target_amount?: number; allocation_pct?: number; deadline?: string | null
 }): Promise<FinGoal> => {
   const { data } = await client.patch<FinGoal>(`/v1/fin-goals/${id}`, payload)
   return data

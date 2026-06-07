@@ -23,6 +23,7 @@ class FinGoal(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default='UYU')
     target_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     allocation_pct: Mapped[Decimal] = mapped_column(
         Numeric(5, 2), nullable=False, default=Decimal("0.00")

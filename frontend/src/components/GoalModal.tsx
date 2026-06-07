@@ -34,6 +34,7 @@ export default function GoalModal({ open, onClose, goal, existingGoals }: Props)
   const isEdit = Boolean(goal)
 
   const [name,          setName]          = useState('')
+  const [currency,      setCurrency]      = useState('UYU')
   const [targetAmount,  setTargetAmount]  = useState('')
   const [allocationPct, setAllocationPct] = useState(0)
   const [deadline,      setDeadline]      = useState('')
@@ -44,6 +45,7 @@ export default function GoalModal({ open, onClose, goal, existingGoals }: Props)
   useEffect(() => {
     if (goal && open) {
       setName(goal.name)
+      setCurrency(goal.currency ?? 'UYU')
       setTargetAmount(String(goal.target_amount))
       setAllocationPct(goal.allocation_pct)
       setDeadline(goal.deadline ?? '')
@@ -54,6 +56,7 @@ export default function GoalModal({ open, onClose, goal, existingGoals }: Props)
   useEffect(() => {
     if (!open) {
       setName('')
+      setCurrency('UYU')
       setTargetAmount('')
       setAllocationPct(0)
       setDeadline('')
@@ -95,6 +98,7 @@ export default function GoalModal({ open, onClose, goal, existingGoals }: Props)
       if (isEdit && goal) {
         await updateFinGoalFull(goal.id, {
           name:           name.trim(),
+          currency,
           target_amount:  amt,
           allocation_pct: allocationPct,
           deadline:       deadline || null,
@@ -102,6 +106,7 @@ export default function GoalModal({ open, onClose, goal, existingGoals }: Props)
       } else {
         await createFinGoal({
           name:           name.trim(),
+          currency,
           target_amount:  amt,
           allocation_pct: allocationPct,
           deadline:       deadline || undefined,
@@ -150,18 +155,36 @@ export default function GoalModal({ open, onClose, goal, existingGoals }: Props)
             />
           </div>
 
-          {/* Meta ($) */}
+          {/* Moneda + Monto — en la misma fila */}
           <div>
-            <label className={labelClass}>Meta ($)</label>
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={targetAmount}
-              onChange={e => setTargetAmount(e.target.value)}
-              placeholder="0.00"
-              className={inputClass}
-            />
+            <label className={labelClass}>Monto objetivo</label>
+            <div className="flex gap-2">
+              <select
+                value={currency}
+                onChange={e => setCurrency(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-emerald-500/60 transition-colors w-24 shrink-0"
+              >
+                <option value="UYU">UYU</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="ARS">ARS</option>
+                <option value="BRL">BRL</option>
+              </select>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={targetAmount}
+                onChange={e => setTargetAmount(e.target.value)}
+                placeholder="0.00"
+                className={inputClass}
+              />
+            </div>
+            {currency !== 'UYU' && (
+              <p className="text-[10px] text-amber-400/70 mt-1.5">
+                El progreso se calculará usando la tasa de cambio del mes actual.
+              </p>
+            )}
           </div>
 
           {/* % del flujo asignado */}

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 # --- Creación ---
 class FinGoalCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
+    currency: str = Field('UYU', min_length=3, max_length=3)
     target_amount: Decimal = Field(..., gt=0)
     allocation_pct: Decimal = Field(..., ge=0, le=100)
     deadline: PyDate | None = None
@@ -15,6 +16,7 @@ class FinGoalCreate(BaseModel):
 # --- Actualización ---
 class FinGoalUpdate(BaseModel):
     name: str | None = Field(None, min_length=2, max_length=100)
+    currency: str | None = Field(None, min_length=3, max_length=3)
     target_amount: Decimal | None = Field(None, gt=0)
     allocation_pct: Decimal | None = Field(None, ge=0, le=100)
     deadline: PyDate | None = None
@@ -25,6 +27,7 @@ class FinGoalResponse(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
     name: str
+    currency: str
     target_amount: Decimal
     allocation_pct: Decimal
     deadline: PyDate | None
