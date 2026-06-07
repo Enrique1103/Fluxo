@@ -96,13 +96,14 @@ function PaymentBadge({ method }: { method: PaymentMethod }) {
 // ─── Donut ────────────────────────────────────────────────────────────────────
 
 function DonutChart({
-  data, privacy, selectedCategory, onCategoryClick, mode = 'expense',
+  data, privacy, selectedCategory, onCategoryClick, mode = 'expense', size = 210,
 }: {
   data: MonthlyBreakdown
   privacy: boolean
   selectedCategory?: string | null
   onCategoryClick?: (name: string | null) => void
   mode?: 'expense' | 'income'
+  size?: number
 }) {
   const { theme } = useTheme()
   const isLight = theme === 'light'
@@ -145,7 +146,7 @@ function DonutChart({
 
   return (
     <div className="shrink-0">
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ width: SIZE, height: SIZE }}>
+      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ width: size, height: size }}>
         {slices.map((s, i) => {
           const isSelected = selectedCategory === s.name
           const dimmed = hovered !== null ? hovered !== i : hasSelection && !isSelected
@@ -1140,7 +1141,7 @@ export default function StatsDashboardPage() {
                   onCategoryClick={setSelectedCategory}
                   mode={donutMode}
                 />
-                <div className="flex-1 min-w-0 min-h-0 overflow-y-auto space-y-3 w-full pb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+                <div className="flex-1 min-w-0 min-h-0 overflow-y-auto space-y-2 w-full pb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
                   {cats.map((cat: CategoryStat, i: number) => {
                     const pct    = total > 0 ? (cat.total / total) * 100 : 0
                     const sem    = donutMode === 'expense' ? semColor(cat.total / (breakdown.income || 1) * 100) : { badge: 'bg-emerald-500/15 text-emerald-400', bar: '#10b981' }
@@ -1160,7 +1161,7 @@ export default function StatsDashboardPage() {
                         <div className="flex items-center gap-2 mb-1.5">
                           <span className="w-2 h-2 rounded-full shrink-0 self-start mt-1.5" style={{ background: catColor(i) }} />
                           <div className="flex-1 min-w-0">
-                            <span className="text-xs sm:text-sm text-slate-300 truncate block">{cat.name}</span>
+                            <span className="text-xs text-slate-300 truncate block">{cat.name}</span>
                             {budget && bActualPct !== null && !privacy && bChip && (
                               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border tabular-nums mt-0.5 inline-block ${bChip.bg} ${bChip.text}`}>
                                 {fmtMoney(budget.spent, currency)}/{fmtMoney(budget.max_amount, currency)}
@@ -1172,16 +1173,16 @@ export default function StatsDashboardPage() {
                               </span>
                             )}
                           </div>
-                          <span className="text-xs sm:text-sm font-semibold text-slate-300 tabular-nums shrink-0">
+                          <span className="text-xs font-semibold text-slate-300 tabular-nums shrink-0">
                             {fmtMoney(cat.total, currency, privacy)}
                           </span>
                           <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold shrink-0 ${sem.badge}`}>
                             {pct.toFixed(0)}%
                           </span>
                         </div>
-                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-700"
-                            style={{ width: `${Math.min(pct, 100)}%`, background: sem.bar }} />
+                            style={{ width: `${Math.max(Math.min(pct, 100), 3)}%`, background: sem.bar }} />
                         </div>
                       </div>
                     )
