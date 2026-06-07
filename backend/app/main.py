@@ -22,6 +22,7 @@ from app.api.routers import (
 from app.api.routers import instalment_plan_router
 from app.api.routers import household_router
 from app.api.routers import reviews_router
+from app.api.routers import budgets_router
 from app.exceptions.user_exceptions import (
     EmailAlreadyExists,
     UserNotFound,
@@ -82,6 +83,11 @@ from app.exceptions.review_exceptions import (
     UnauthorizedReviewAccess,
     ReviewAlreadyResolved,
     TransactionNotInHousehold,
+)
+from app.exceptions.budget_exceptions import (
+    BudgetNotFound,
+    BudgetAlreadyExists,
+    UnauthorizedBudgetAccess,
 )
 
 app = FastAPI(title="Fluxo API", version="2.0.0")
@@ -346,6 +352,21 @@ async def handle_tx_not_in_household(r: Request, exc: TransactionNotInHousehold)
     return _json(_422, str(exc))
 
 
+@app.exception_handler(BudgetNotFound)
+async def handle_budget_not_found(r: Request, exc: BudgetNotFound):
+    return _json(_404, str(exc))
+
+
+@app.exception_handler(BudgetAlreadyExists)
+async def handle_budget_exists(r: Request, exc: BudgetAlreadyExists):
+    return _json(_409, str(exc))
+
+
+@app.exception_handler(UnauthorizedBudgetAccess)
+async def handle_unauthorized_budget(r: Request, exc: UnauthorizedBudgetAccess):
+    return _json(_403, str(exc))
+
+
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
@@ -368,3 +389,4 @@ app.include_router(importacion_router.router, prefix=API_PREFIX)
 app.include_router(instalment_plan_router.router, prefix=API_PREFIX)
 app.include_router(household_router.router, prefix=API_PREFIX)
 app.include_router(reviews_router.router, prefix=API_PREFIX)
+app.include_router(budgets_router.router, prefix=API_PREFIX)

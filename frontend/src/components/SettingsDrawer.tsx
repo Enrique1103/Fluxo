@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   X, LogOut, KeyRound, Globe, Loader2, CheckCircle, AlertCircle,
   User, Trash2, Edit3, Camera, CreditCard, Tag, TrendingUp,
-  ChevronRight, ArrowLeft, Plus, Target, Eye, EyeOff, Sun, Moon,
+  ChevronRight, ArrowLeft, Plus, Target, Eye, EyeOff, Sun, Moon, Wallet,
 } from 'lucide-react'
 import useTheme from '../hooks/useTheme'
 import { useHomeCurrency } from '../hooks/useHomeCurrency'
@@ -20,8 +20,9 @@ import EtiquetasContent from './EtiquetasDrawer'
 import ExchangeRateManager from './ExchangeRateManager'
 import AccountModal from './AccountModal'
 import GoalModal from './GoalModal'
+import BudgetsContent from './BudgetsContent'
 
-export type Section = null | 'perfil' | 'cuentas' | 'etiquetas' | 'tasas' | 'metas' | 'eliminar-cuenta'
+export type Section = null | 'perfil' | 'cuentas' | 'etiquetas' | 'tasas' | 'metas' | 'presupuestos' | 'eliminar-cuenta'
 
 type Status = { type: 'success' | 'error'; msg: string } | null
 
@@ -65,6 +66,14 @@ function MainMenu({ open, onNavigate }: {
   const { data: concepts = [] } = useQuery({ queryKey: ['concepts'],             queryFn: fetchConcepts,       enabled: open })
   const { data: rateCheck }     = useQuery({ queryKey: ['exchange-rates-check'], queryFn: checkExchangeRates, enabled: open })
   const { data: finGoals = [] } = useQuery({ queryKey: ['fin-goals'],            queryFn: fetchFinGoals,       enabled: open })
+  const { data: budgets  = [] } = useQuery({
+    queryKey: ['budgets', new Date().getMonth() + 1, new Date().getFullYear()],
+    queryFn: () => import('../api/budgets').then(m => m.fetchBudgets({
+      month: new Date().getMonth() + 1,
+      year:  new Date().getFullYear(),
+    })),
+    enabled: open,
+  })
 
   const photoKey = me?.id ? `avatar_${me.id}` : null
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
@@ -114,6 +123,13 @@ function MainMenu({ open, onNavigate }: {
       label:    'Metas financieras',
       subtitle: finGoals.length === 0 ? 'Sin metas' : `${finGoals.length} meta${finGoals.length !== 1 ? 's' : ''} activa${finGoals.length !== 1 ? 's' : ''}`,
       warning:  false,
+    },
+    {
+      key:      'presupuestos' as const,
+      Icon:     Wallet,
+      label:    'Presupuestos',
+      subtitle: budgets.length === 0 ? 'Sin presupuestos este mes' : `${budgets.length} presupuesto${budgets.length !== 1 ? 's' : ''} este mes`,
+      warning:  budgets.some(b => b.spent >= b.max_amount),
     },
   ]
 
@@ -833,6 +849,7 @@ export default function SettingsDrawer({ open, onClose, initialSection }: Props)
     etiquetas:        'Etiquetas',
     tasas:            'Tasas de cambio',
     metas:            'Metas financieras',
+    presupuestos:     'Presupuestos',
     'eliminar-cuenta':'Eliminar cuenta',
   }
 
@@ -886,6 +903,7 @@ export default function SettingsDrawer({ open, onClose, initialSection }: Props)
               onEditGoal={goal => { setEditGoal(goal); setGoalModalOpen(true) }}
             />
           )}
+          {section === 'presupuestos'     && <BudgetsContent />}
           {section === 'eliminar-cuenta' && <DeleteAccountSection />}
         </div>
 

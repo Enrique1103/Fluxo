@@ -8,7 +8,7 @@ import {
   Lock, LockOpen, BarChart2,
   Edit3, Trash2, Plus, Loader2,
   CreditCard, Wallet, TrendingUp, Upload, Home,
-  Users, ArrowRight,
+  Users, ArrowRight, AlertTriangle, CalendarDays,
 } from 'lucide-react'
 import {
   fetchIncomeVsExpenses,
@@ -19,11 +19,14 @@ import {
   deleteFinGoal,
   fetchPatrimonio,
   fetchExchangeRates,
+  fetchWeeklyExpenses,
   type MonthlyStat,
   type FinGoal,
   type MonthlyPatrimonio,
   type ExchangeRate,
 } from '../api/dashboard'
+import { fetchBudgets } from '../api/budgets'
+import type { Budget } from '../api/budgets'
 import SettingsDrawer, { type Section as SettingsSection } from '../components/SettingsDrawer'
 import GoalModal from '../components/GoalModal'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -974,6 +977,28 @@ export default function DashboardPage() {
     queryFn:  fetchExchangeRates,
   })
 
+  // Budgets — for alert cards
+  const todayDate = new Date()
+  const { data: budgetsThisMonth = [] } = useQuery({
+    queryKey: ['budgets', todayDate.getMonth() + 1, todayDate.getFullYear()],
+    queryFn:  () => fetchBudgets({ month: todayDate.getMonth() + 1, year: todayDate.getFullYear(), currency }),
+    enabled:  !!me,
+  })
+
+  // Weekly expenses summary
+  const weekStart = (() => {
+    const d = new Date(todayDate)
+    const day = d.getDay() === 0 ? 6 : d.getDay() - 1  // Monday=0
+    d.setDate(d.getDate() - day)
+    return d.toISOString().slice(0, 10)
+  })()
+  const weekEnd = todayDate.toISOString().slice(0, 10)
+  const { data: weeklySummary } = useQuery({
+    queryKey: ['weekly-expenses', weekStart],
+    queryFn:  () => fetchWeeklyExpenses(weekStart, weekEnd),
+    enabled:  !!me,
+  })
+
   // Initialize currency from user preference
   useEffect(() => {
     if (me?.currency_default) setCurrency(me.currency_default)
@@ -1411,6 +1436,68 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* ── ALERTAS DE PRESUPUESTO ─────────────────────────────────────────── */}
+      {!privacyMode && budgetsThisMonth.filter((b: Budget) => b.max_amount > 0 && b.spent / b.max_amount >= 0.8).length > 0 && (
+        <div className="space-y-2 mb-4 sm:mb-6">
+          {budgetsThisMonth
+            .filter((b: Budget) => b.max_amount > 0 && b.spent / b.max_amount >= 0.8)
+            .map((b: Budget) => {
+              const pct  = Math.min((b.spent / b.max_amount) * 100, 100)
+              const over = pct >= 100
+              return (
+                <div key={b.id} className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${over ? 'bg-red-500/10 border-red-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
+                  <AlertTriangle className={`w-4 h-4 shrink-0 ${over ? 'text-red-400' : 'text-amber-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-semibold ${over ? 'text-red-300' : 'text-amber-300'}`}>
+                      {over ? 'Superaste' : `Llevás el ${pct.toFixed(0)}% de`} el presupuesto de <span className="font-bold">{b.category_name}</span>
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {fmtMoney(b.spent, currency)} gastado de {fmtMoney(b.max_amount, currency)} límite
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { setSettingsOpen(true); setSettingsSection('presupuestos') }}
+                    className={`shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-lg border ${over ? 'border-red-500/30 text-red-400 hover:bg-red-500/20' : 'border-amber-500/30 text-amber-400 hover:bg-amber-500/20'} transition-colors`}
+                  >
+                    Ver
+                  </button>
+                </div>
+              )
+            })}
+        </div>
+      )}
+
+      {/* ── RESUMEN SEMANAL ────────────────────────────────────────────────── */}
+      {weeklySummary && weeklySummary.tx_count > 0 && !summaryLoading && (() => {
+        const curMonthData = chartData.find(d => d.month === todayDate.toISOString().slice(0, 7))
+        const daysThisMonth = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0).getDate()
+        const dailyAvg = curMonthData ? curMonthData.gastos / daysThisMonth : 0
+        const weekAvg  = dailyAvg * 7
+        const delta    = weekAvg > 0 ? ((weeklySummary.spent - weekAvg) / weekAvg) * 100 : null
+        const over     = delta !== null && delta > 0
+        return (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border bg-slate-900/40 border-slate-800/50 mb-4 sm:mb-6">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center shrink-0">
+              <CalendarDays className="w-4 h-4 text-indigo-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-slate-300">
+                Esta semana gastaste{' '}
+                <span className="font-bold text-slate-100">{privacyMode ? '••••' : fmtMoney(weeklySummary.spent, currency)}</span>
+              </p>
+              {delta !== null && Math.abs(delta) >= 5 && (
+                <p className={`text-[10px] mt-0.5 ${over ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {over ? '↑' : '↓'}{Math.abs(delta).toFixed(0)}% vs promedio semanal del mes
+                </p>
+              )}
+              {delta === null || Math.abs(delta) < 5 ? (
+                <p className="text-[10px] text-slate-500 mt-0.5">En línea con el promedio semanal del mes</p>
+              ) : null}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* GRID PRINCIPAL */}
       <div className="space-y-4 sm:space-y-6">

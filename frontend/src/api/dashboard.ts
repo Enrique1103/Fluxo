@@ -428,3 +428,26 @@ export const fetchPatrimonio = async (
   })
   return data
 }
+
+export interface WeeklyExpensesSummary {
+  spent: number
+  tx_count: number
+  date_from: string
+  date_to: string
+}
+
+export const fetchWeeklyExpenses = async (
+  date_from: string,
+  date_to: string,
+): Promise<WeeklyExpensesSummary> => {
+  const { data } = await client.get<{ id: string; amount: number; type: string }[]>(
+    '/v1/transactions',
+    { params: { date_from, date_to, type: 'expense', limit: 200 } },
+  )
+  return {
+    spent: data.reduce((sum, tx) => sum + tx.amount, 0),
+    tx_count: data.length,
+    date_from,
+    date_to,
+  }
+}

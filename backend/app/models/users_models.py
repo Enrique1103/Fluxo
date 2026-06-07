@@ -30,3 +30,4 @@ class User(Base):
     fin_goals = relationship("FinGoal", back_populates="user", cascade="all, delete-orphan")
     exchange_rates = relationship("ExchangeRate", back_populates="user", cascade="all, delete-orphan")
     importaciones = relationship("Importacion", back_populates="user", cascade="all, delete-orphan")
+    budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")

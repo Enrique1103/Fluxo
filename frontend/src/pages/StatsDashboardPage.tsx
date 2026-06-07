@@ -20,6 +20,8 @@ import {
   type CategoryStat,
   type PaymentMethod,
 } from '../api/dashboard'
+import { fetchBudgets } from '../api/budgets'
+import type { Budget } from '../api/budgets'
 import SettingsDrawer from '../components/SettingsDrawer'
 import TransactionModal from '../components/TransactionModal'
 import DeleteTransactionModal from '../components/DeleteTransactionModal'
@@ -829,6 +831,11 @@ export default function StatsDashboardPage() {
     queryFn:  () => fetchMonthlyBreakdown(prevMonthYear, prevMonthNum, currency),
   })
 
+  const { data: budgets = [] } = useQuery({
+    queryKey: ['budgets', month, year],
+    queryFn:  () => fetchBudgets({ month, year, currency }),
+  })
+
   const { data: summary } = useQuery({
     queryKey: ['summary'],
     queryFn: fetchSummary,
@@ -1134,8 +1141,11 @@ export default function StatsDashboardPage() {
                 />
                 <div className="flex-1 min-w-0 space-y-3 overflow-y-auto" style={{ maxHeight: 244 }}>
                   {cats.map((cat: CategoryStat, i: number) => {
-                    const pct = total > 0 ? (cat.total / total) * 100 : 0
-                    const sem = donutMode === 'expense' ? semColor(cat.total / (breakdown.income || 1) * 100) : { badge: 'bg-emerald-500/15 text-emerald-400', bar: '#10b981' }
+                    const pct    = total > 0 ? (cat.total / total) * 100 : 0
+                    const sem    = donutMode === 'expense' ? semColor(cat.total / (breakdown.income || 1) * 100) : { badge: 'bg-emerald-500/15 text-emerald-400', bar: '#10b981' }
+                    const budget = donutMode === 'expense' ? budgets.find((b: Budget) => b.category_name === cat.name) : null
+                    const bPct   = budget && budget.max_amount > 0 ? Math.min((budget.spent / budget.max_amount) * 100, 100) : null
+                    const bColor = bPct !== null ? (bPct >= 100 ? '#ef4444' : bPct >= 80 ? '#f59e0b' : '#10b981') : null
                     return (
                       <div key={cat.name}>
                         <div className="flex items-center gap-2 mb-1.5">
@@ -1158,6 +1168,20 @@ export default function StatsDashboardPage() {
                               style={{ left: '30%' }} title="Umbral recomendado: 30% del ingreso" />
                           )}
                         </div>
+                        {budget && bPct !== null && !privacy && (
+                          <div className="mt-1.5">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-[9px] text-slate-600 uppercase tracking-widest">Presupuesto</span>
+                              <span className="text-[9px] tabular-nums" style={{ color: bColor ?? '#10b981' }}>
+                                {fmtMoney(budget.spent, currency)} / {fmtMoney(budget.max_amount, currency)} · {bPct.toFixed(0)}%
+                              </span>
+                            </div>
+                            <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all duration-700"
+                                style={{ width: `${bPct}%`, backgroundColor: bColor ?? '#10b981' }} />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
