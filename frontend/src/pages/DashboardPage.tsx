@@ -1071,40 +1071,47 @@ export default function DashboardPage() {
   // Un mes "cierra" automáticamente cuando el usuario registra su primer
   // movimiento del mes siguiente — no requiere lógica extra.
   const closedMonthsStats = useMemo(() => {
-    const today  = new Date().toISOString().slice(0, 7) // "2026-03"
+    const todayLabel = new Date().toISOString().slice(0, 7)
     const closed = chartData
-      .filter(d => d.month < today && d.ingresos > 0)  // estrictamente anterior
-      .slice(-6)                                         // máx. 6 meses
-    if (closed.length === 0) return { avg: 0, count: 0 }
-    const avg = closed.reduce((s, d) => s + d.ahorro, 0) / closed.length
-    return { avg, count: closed.length }
+      .filter(d => d.month < todayLabel && (d.ingresos > 0 || d.gastos > 0))
+      .slice(-6)
+    if (closed.length === 0) return { avg: 0, avgExpenses: 0, count: 0 }
+    const avg        = closed.reduce((s, d) => s + d.ahorro, 0) / closed.length
+    const avgExpenses = closed.reduce((s, d) => s + d.gastos, 0) / closed.length
+    return { avg, avgExpenses, count: closed.length }
   }, [chartData])
 
   const avgMonthlySavings = closedMonthsStats.avg
 
   // Libertad Financiera
   const runway = useMemo(() => {
-    const expenses    = Number(summary?.expense_this_month ?? 0)
-    const savings     = Number(summary?.net_worth          ?? 0)
+    const netWorth    = Number(summary?.net_worth ?? 0)
     const closedCount = closedMonthsStats.count
-    if (expenses <= 0) return { months: 0, days: 0, pct: 0, monthsToTarget: null as number | null, closedCount }
-    const raw    = savings / expenses
+
+    // Promedio de gastos: últimos 6 meses cerrados (o menos si no hay);
+    // si no hay historial, usa el mes actual en curso (currency-safe via chartData)
+    const todayLabel = new Date().toISOString().slice(0, 7)
+    const currentMonthGastos = chartData.find(d => d.month === todayLabel)?.gastos
+      ?? Number(summary?.expense_this_month ?? 0)
+    const baseExpenses = closedCount > 0 ? closedMonthsStats.avgExpenses : currentMonthGastos
+
+    if (baseExpenses <= 0) return { months: 0, days: 0, pct: 0, monthsToTarget: null as number | null, closedCount, baseExpenses: 0 }
+
+    const raw    = netWorth / baseExpenses
     const months = Math.floor(raw)
     const days   = Math.round((raw - months) * 30)
     const pct    = Math.min((raw / (runwayYears * 12)) * 100, 100)
 
+    const targetNW = runwayYears * 12 * baseExpenses
     let monthsToTarget: number | null = null
-    if (closedCount >= 1) {
-      const targetNW = runwayYears * 12 * expenses
-      if (savings >= targetNW) {
-        monthsToTarget = 0
-      } else if (avgMonthlySavings > 0) {
-        monthsToTarget = (targetNW - savings) / avgMonthlySavings
-      }
+    if (netWorth >= targetNW) {
+      monthsToTarget = 0
+    } else if (avgMonthlySavings > 0) {
+      monthsToTarget = (targetNW - netWorth) / avgMonthlySavings
     }
 
-    return { months, days, pct, monthsToTarget, closedCount }
-  }, [summary, runwayYears, avgMonthlySavings, closedMonthsStats.count])
+    return { months, days, pct, monthsToTarget, closedCount, baseExpenses }
+  }, [summary, runwayYears, avgMonthlySavings, closedMonthsStats, chartData])
 
   return (
     <>
@@ -1223,22 +1230,29 @@ export default function DashboardPage() {
                 Registrá gastos este mes para calcular tu autonomía financiera.
               </p>
             ) : (
-              <p className="text-sm text-slate-300">
-                Con tu ritmo actual podés vivir&nbsp;
-                {privacyMode ? (
-                  <span className="font-bold text-white">**** meses</span>
-                ) : (
-                  <>
-                    <span className="font-bold text-white text-base">{runway.months}</span>
-                    <span className="text-slate-400"> meses</span>
-                    {runway.days > 0 && (
-                      <> y <span className="font-bold text-white text-base">{runway.days}</span>
-                        <span className="text-slate-400"> días</span></>
-                    )}
-                    <span className="text-slate-500 text-xs ml-2">sin ingresos</span>
-                  </>
-                )}
-              </p>
+              <>
+                <p className="text-sm text-slate-300">
+                  Con tu ritmo actual podés vivir&nbsp;
+                  {privacyMode ? (
+                    <span className="font-bold text-white">**** meses</span>
+                  ) : (
+                    <>
+                      <span className="font-bold text-white text-base">{runway.months}</span>
+                      <span className="text-slate-400"> meses</span>
+                      {runway.days > 0 && (
+                        <> y <span className="font-bold text-white text-base">{runway.days}</span>
+                          <span className="text-slate-400"> días</span></>
+                      )}
+                      <span className="text-slate-500 text-xs ml-2">sin ingresos</span>
+                    </>
+                  )}
+                </p>
+                <p className="text-[10px] text-slate-600 mt-0.5">
+                  {runway.closedCount > 0
+                    ? `Basado en promedio de gastos de los últimos ${runway.closedCount} mes${runway.closedCount !== 1 ? 'es' : ''}`
+                    : 'Basado en gastos del mes en curso'}
+                </p>
+              </>
             )}
           </div>
           <div className="flex items-center gap-4 shrink-0">
