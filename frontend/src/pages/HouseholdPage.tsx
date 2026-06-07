@@ -599,29 +599,50 @@ export default function HouseholdPage() {
                       )}
 
                       {/* Top conceptos como spider chart */}
-                      {analytics.top_concepts.length > 0 && (
-                        <div className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
-                          <div className={`px-5 py-4 border-b border-slate-800`}>
-                            <p className={sectionTitle}>Top conceptos</p>
-                          </div>
-                          <div className="p-5 flex items-center justify-center">
-                            {analytics.top_concepts.length >= 3 ? (
-                              <div className="w-full aspect-square max-w-[280px]">
+                      <div className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
+                        <div className={`px-5 py-4 border-b border-slate-800`}>
+                          <p className={sectionTitle}>Top conceptos</p>
+                        </div>
+                        <div className="p-5">
+                          {analytics.top_concepts.length >= 3 ? (
+                            <div className="w-full aspect-square max-w-[280px] mx-auto">
+                              <SpiderChart
+                                data={analytics.top_concepts.slice(0, 12).map(c => ({
+                                  label: c.concept_name,
+                                  value: c.total,
+                                }))}
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-4">
+                              <div className="w-full max-w-[200px] mx-auto opacity-20 pointer-events-none select-none">
                                 <SpiderChart
-                                  data={analytics.top_concepts.slice(0, 12).map(c => ({
-                                    label: c.concept_name,
-                                    value: c.total,
-                                  }))}
+                                  data={[
+                                    { label: 'Comida', value: 80 },
+                                    { label: 'Transporte', value: 55 },
+                                    { label: 'Entretenimiento', value: 40 },
+                                    { label: 'Salud', value: 65 },
+                                    { label: 'Ropa', value: 30 },
+                                  ]}
+                                  color="#64748b"
                                 />
                               </div>
-                            ) : (
-                              <div className="flex items-center justify-center h-48 text-xs text-slate-500 text-center">
-                                Al menos 3 conceptos para mostrar el gráfico
-                              </div>
-                            )}
-                          </div>
+                              <p className="text-xs text-slate-500 text-center leading-relaxed">
+                                Registrá al menos 3 conceptos distintos<br />para ver tu análisis aquí
+                              </p>
+                              {analytics.top_concepts.length > 0 && (
+                                <div className="flex flex-wrap gap-2 justify-center">
+                                  {analytics.top_concepts.map((c, i) => (
+                                    <span key={i} className="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full">
+                                      {c.concept_name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
 
                     </div>
 
