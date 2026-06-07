@@ -46,8 +46,8 @@ class Household(Base):
     split_type: Mapped[SplitType] = mapped_column(
         SQLEnum(SplitType), nullable=False, default=SplitType.EQUAL
     )
-    analysis_level: Mapped[AnalysisLevel] = mapped_column(
-        SQLEnum(AnalysisLevel), nullable=False, default=AnalysisLevel.EXPENSES_ONLY
+    analysis_level: Mapped[AnalysisLevel | None] = mapped_column(
+        SQLEnum(AnalysisLevel), nullable=True, default=AnalysisLevel.EXPENSES_ONLY
     )
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False

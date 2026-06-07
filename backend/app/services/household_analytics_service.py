@@ -334,7 +334,8 @@ def get_analytics(
     net_savings: Decimal | None = None
     total_group_income_out: Decimal | None = None
 
-    if household.analysis_level == AnalysisLevel.FULL:
+    effective_level = household.analysis_level or AnalysisLevel.EXPENSES_ONLY
+    if effective_level == AnalysisLevel.FULL:
         member_incomes = [
             MemberIncome(
                 user_id=m.user_id,
@@ -372,7 +373,7 @@ def get_analytics(
         expenses_by_day=expenses_by_day,
         prev_month_total=prev_month_total,
         prev_month_change_pct=prev_month_change_pct,
-        analysis_level=household.analysis_level,
+        analysis_level=effective_level,
         member_incomes=member_incomes,
         net_savings=net_savings,
         total_group_income=total_group_income_out,

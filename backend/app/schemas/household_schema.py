@@ -58,7 +58,7 @@ class HouseholdResponse(BaseModel):
     name: str
     base_currency: str
     split_type: SplitType
-    analysis_level: AnalysisLevel
+    analysis_level: AnalysisLevel = AnalysisLevel.EXPENSES_ONLY  # default si la columna es NULL en filas viejas
     created_by: uuid.UUID
     created_at: datetime
 
