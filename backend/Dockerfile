@@ -6,7 +6,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source
+# Force cache invalidation — bump this value when migrations need to run
+ARG CACHE_BUST=20260606b
+RUN echo "Cache bust: $CACHE_BUST"
+
+# Copy source (invalidated by ARG above)
 COPY . .
 
 EXPOSE 8000
