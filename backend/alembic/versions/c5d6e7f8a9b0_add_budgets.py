@@ -1,6 +1,6 @@
 """Add budgets table
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: c5d6e7f8a9b0
 Revises: f6a7b8c9e0d1
 Create Date: 2026-06-07
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = 'a1b2c3d4e5f6'
+revision: str = 'c5d6e7f8a9b0'
 down_revision: Union[str, None] = 'f6a7b8c9e0d1'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
