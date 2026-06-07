@@ -534,7 +534,7 @@ def patrimonio(
     # --- Step 1: current net worth in target_currency ---
     current_net_worth = Decimal("0")
     for acc in accounts:
-        acc_currency = acc.currency.value
+        acc_currency = acc.currency.value if hasattr(acc.currency, 'value') else str(acc.currency)
         balance = Decimal(str(acc.balance))
         if acc_currency == target_currency:
             current_net_worth += balance
