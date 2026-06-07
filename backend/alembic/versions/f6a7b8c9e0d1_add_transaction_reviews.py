@@ -18,27 +18,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("""
-        DO $$
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'reviewtype') THEN
-                CREATE TYPE reviewtype AS ENUM (
-                    'innecesario', 'monto_alto', 'categoria_incorrecta',
-                    'no_es_del_hogar', 'sospechoso', 'pregunta', 'otra'
-                );
-            END IF;
-        END$$;
-    """)
-    op.execute("""
-        DO $$
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'reviewstatus') THEN
-                CREATE TYPE reviewstatus AS ENUM (
-                    'pendiente', 'respondida', 'descartada', 'resuelta'
-                );
-            END IF;
-        END$$;
-    """)
+    bind = op.get_bind()
+
+    reviewtype = postgresql.ENUM(
+        'innecesario', 'monto_alto', 'categoria_incorrecta',
+        'no_es_del_hogar', 'sospechoso', 'pregunta', 'otra',
+        name='reviewtype',
+    )
+    reviewstatus = postgresql.ENUM(
+        'pendiente', 'respondida', 'descartada', 'resuelta',
+        name='reviewstatus',
+    )
+    reviewtype.create(bind, checkfirst=True)
+    reviewstatus.create(bind, checkfirst=True)
 
     op.create_table(
         'transaction_reviews',
