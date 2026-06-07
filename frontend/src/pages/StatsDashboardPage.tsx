@@ -1046,14 +1046,14 @@ export default function StatsDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-6 mb-4 sm:mb-6">
 
         {/* Estado de Cuentas — 1/4 */}
-        <div className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-5 backdrop-blur-sm flex flex-col gap-4">
-          <div>
+        <div className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-5 backdrop-blur-sm flex flex-col gap-4 h-[360px]">
+          <div className="shrink-0">
             <h2 className="text-sm font-semibold text-slate-200">Estado de Cuentas</h2>
             <p className="text-sm text-slate-500 mt-0.5">Cierre · {MONTH_NAMES[month - 1]} {year}</p>
           </div>
 
-          {/* Cuentas */}
-          <div className="flex-1 space-y-1.5">
+          {/* Cuentas — scroll después de 5 */}
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-0.5" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
             {isLoading ? (
               <div className="space-y-2">
                 {[1,2,3].map(i => <div key={i} className="h-10 bg-slate-800 animate-pulse rounded-xl" />)}
@@ -1095,7 +1095,7 @@ export default function StatsDashboardPage() {
         </div>
 
         {/* Donut + Categories — 2/4 */}
-        <div id="fluxo-export-distribution" className="lg:col-span-2 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm">
+        <div id="fluxo-export-distribution" className="lg:col-span-2 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col h-[360px]">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl mb-1.5">
@@ -1131,19 +1131,19 @@ export default function StatsDashboardPage() {
           </div>
 
           {isLoading ? (
-            <div className="h-48 bg-slate-800/50 animate-pulse rounded-xl" />
+            <div className="flex-1 bg-slate-800/50 animate-pulse rounded-xl" />
           ) : (() => {
             const cats = donutMode === 'expense' ? breakdown?.categories : breakdown?.income_categories
             const total = donutMode === 'expense' ? (breakdown?.expenses ?? 0) : (breakdown?.income ?? 0)
             if (!breakdown || !cats || cats.length === 0) return (
-              <div className="h-48 flex items-center justify-center">
+              <div className="flex-1 flex items-center justify-center">
                 <p className="text-slate-600 text-sm">
                   {donutMode === 'expense' ? 'Sin gastos en este mes' : 'Sin ingresos en este mes'}
                 </p>
               </div>
             )
             return (
-              <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 items-center sm:items-start">
+              <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 items-center sm:items-start flex-1 min-h-0">
                 <DonutChart
                   data={{ ...breakdown, categories: cats, income: total }}
                   privacy={privacy}
@@ -1151,7 +1151,7 @@ export default function StatsDashboardPage() {
                   onCategoryClick={setSelectedCategory}
                   mode={donutMode}
                 />
-                <div className="flex-1 min-w-0 space-y-3 w-full">
+                <div className="flex-1 min-w-0 min-h-0 overflow-y-auto space-y-3 w-full pb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
                   {cats.map((cat: CategoryStat, i: number) => {
                     const pct    = total > 0 ? (cat.total / total) * 100 : 0
                     const sem    = donutMode === 'expense' ? semColor(cat.total / (breakdown.income || 1) * 100) : { badge: 'bg-emerald-500/15 text-emerald-400', bar: '#10b981' }
@@ -1204,7 +1204,7 @@ export default function StatsDashboardPage() {
         </div>
 
         {/* Heatmap — 1/3, compacto */}
-        <div id="fluxo-export-heatmap" className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm">
+        <div id="fluxo-export-heatmap" className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm flex flex-col h-[360px]">
           <div className="mb-3">
             <h2 className="text-sm font-semibold text-slate-200">Mapa de Gastos</h2>
             <p className="text-sm text-slate-500 mt-0.5">Intensidad diaria</p>
