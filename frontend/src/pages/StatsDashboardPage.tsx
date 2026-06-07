@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
   Activity, BarChart2, ChevronLeft, ChevronRight, ChevronDown,
-  Eye, EyeOff, TrendingUp, TrendingDown, Settings,
+  Eye, EyeOff, TrendingUp, TrendingDown, Settings, Calendar,
   CreditCard, Wallet, Upload, X, Search, Home, Pencil, DollarSign,
 } from 'lucide-react'
 import ExportButton from '../components/ExportButton'
@@ -861,6 +861,11 @@ export default function StatsDashboardPage() {
   const expenses = breakdown?.expenses ?? 0
   const savings  = breakdown?.savings  ?? 0
   const savingsRate = income > 0 ? (savings / income) * 100 : 0
+  const daysInMonth  = new Date(year, month, 0).getDate()
+  const daysElapsed  = (year === today.getFullYear() && month === today.getMonth() + 1)
+    ? today.getDate()
+    : daysInMonth
+  const dailyAverage = expenses / Math.max(daysElapsed, 1)
 
   return (
     <>
@@ -986,7 +991,7 @@ export default function StatsDashboardPage() {
       </header>
 
       {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4 sm:mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4 sm:mb-6">
         {([
           { label: 'Ingresos',  value: income,   prevValue: prevBreakdown?.income,   color: 'text-cyan-400',   icon: TrendingUp,   border: 'border-cyan-500/20',   bg: 'bg-cyan-500/10',    higherIsBetter: true  },
           { label: 'Gastos',    value: expenses, prevValue: prevBreakdown?.expenses, color: 'text-rose-400',   icon: TrendingDown, border: 'border-rose-500/20',   bg: 'bg-rose-500/10',    higherIsBetter: false },
@@ -997,6 +1002,9 @@ export default function StatsDashboardPage() {
           { label: 'Tasa ahorro', value: null, prevValue: undefined, color: savingsRate >= 0 ? 'text-violet-400' : 'text-red-400',
             icon: TrendingUp, border: 'border-violet-500/20', bg: 'bg-violet-500/10',
             extra: privacy ? '**%' : `${savingsRate.toFixed(1)}%`,                 higherIsBetter: true  },
+          { label: 'Gasto diario', value: null, prevValue: undefined, color: 'text-amber-400',
+            icon: Calendar, border: 'border-amber-500/20', bg: 'bg-amber-500/10',
+            extra: privacy ? '••••' : `${fmtMoney(dailyAverage, currency, false)}/día`,  higherIsBetter: false },
         ] as Array<{ label: string; value: number | null; prevValue: number | undefined; color: string; icon: React.ElementType; border: string; bg: string; higherIsBetter: boolean; extra?: string }>).map(({ label, value, prevValue, color, icon: Icon, border, bg, extra, higherIsBetter }) => {
           const delta = value != null && prevValue != null && prevValue > 0
             ? ((value - prevValue) / prevValue) * 100
