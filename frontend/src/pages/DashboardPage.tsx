@@ -898,6 +898,7 @@ export default function DashboardPage() {
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['summary', currency],
     queryFn:  () => fetchSummary(currency),
+    placeholderData: keepPreviousData,
   })
 
   // How many months back to the first transaction
@@ -1085,12 +1086,14 @@ export default function DashboardPage() {
 
   // Libertad Financiera
   const runway = useMemo(() => {
-    const netWorth    = Number(summary?.net_worth ?? 0)
+    const todayLabel  = new Date().toISOString().slice(0, 7)
+    // Usar patrimonioData para net worth (tiene keepPreviousData → estable al cambiar moneda)
+    const netWorth    = patrimonioData.find(p => p.month === todayLabel)?.value
+      ?? Number(summary?.net_worth ?? 0)
     const closedCount = closedMonthsStats.count
 
     // Promedio de gastos: últimos 6 meses cerrados (o menos si no hay);
     // si no hay historial, usa el mes actual en curso (currency-safe via chartData)
-    const todayLabel = new Date().toISOString().slice(0, 7)
     const currentMonthGastos = chartData.find(d => d.month === todayLabel)?.gastos
       ?? Number(summary?.expense_this_month ?? 0)
     const baseExpenses = closedCount > 0 ? closedMonthsStats.avgExpenses : currentMonthGastos
@@ -1352,11 +1355,7 @@ export default function DashboardPage() {
               Completá al menos un mes para estimar el plazo hacia tu objetivo.
             </p>
           )
-          if (runway.monthsToTarget === null) return (
-            <p className="text-[11px] text-amber-500/80 mt-2">
-              El ahorro promedio es negativo — no es posible estimar el plazo.
-            </p>
-          )
+          if (runway.monthsToTarget === null) return null
           return (
             <p className="text-[11px] text-slate-500 mt-2">
               {runway.monthsToTarget === 0
