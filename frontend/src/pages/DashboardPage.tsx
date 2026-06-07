@@ -1547,55 +1547,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-        {/* ── Resumen mes actual + deltas ────────────────────────────────── */}
-        {(() => {
-          const todayM = new Date().toISOString().slice(0, 7)
-          const cur  = chartData.find(d => d.month === todayM)
-          const idx  = chartData.findIndex(d => d.month === todayM)
-          const prev = idx > 0 ? chartData[idx - 1] : null
-          if (!cur || (cur.ingresos === 0 && cur.gastos === 0)) return null
-
-          const delta = (val: number, prevVal: number | undefined) => {
-            if (!prevVal || prevVal === 0) return null
-            return ((val - prevVal) / prevVal) * 100
-          }
-          const [, prevMonthName] = [
-            MONTH_NAMES[todayM.slice(5, 7)],
-            prev ? MONTH_NAMES[prev.month.slice(5, 7)] : '',
-          ]
-
-          const cards = [
-            { label: 'Ingresos este mes',  value: cur.ingresos, prev: prev?.ingresos, color: 'text-cyan-400',    higherIsBetter: true  },
-            { label: 'Gastos este mes',    value: cur.gastos,   prev: prev?.gastos,   color: 'text-rose-400',    higherIsBetter: false },
-            { label: 'Ahorro este mes',    value: cur.ahorro,   prev: prev?.ahorro,   color: cur.ahorro >= 0 ? 'text-emerald-400' : 'text-red-400', higherIsBetter: true  },
-          ]
-
-          return (
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              {cards.map(({ label, value, prev: pv, color, higherIsBetter }) => {
-                const d     = delta(value, pv)
-                const up    = d !== null && d > 0
-                const good  = d !== null && (higherIsBetter ? up : !up)
-                return (
-                  <div key={label} className="bg-slate-900/40 border border-slate-800/50 rounded-2xl px-3 sm:px-4 py-3 backdrop-blur-sm">
-                    <p className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider mb-1.5 leading-tight">{label}</p>
-                    <p className={`text-sm sm:text-base font-bold tabular-nums ${color}`}>
-                      {privacyMode ? '••••' : fmtMoney(value, currency)}
-                    </p>
-                    {!privacyMode && d !== null && Math.abs(d) >= 0.5 && (
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <span className={`text-[10px] sm:text-xs font-bold ${good ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {up ? '↑' : '↓'}{Math.abs(d).toFixed(1)}%
-                        </span>
-                        {prevMonthName && <span className="text-[9px] sm:text-[10px] text-slate-600">vs {prevMonthName}</span>}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })()}
 
         {/* Patrimonio + Cuentas */}
         <div className="space-y-4 sm:space-y-6">
