@@ -20,30 +20,40 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     bind = op.get_bind()
 
-    reviewtype = postgresql.ENUM(
+    # Crear ENUMs de forma explícita e idempotente
+    postgresql.ENUM(
         'innecesario', 'monto_alto', 'categoria_incorrecta',
         'no_es_del_hogar', 'sospechoso', 'pregunta', 'otra',
         name='reviewtype',
-    )
-    reviewstatus = postgresql.ENUM(
+    ).create(bind, checkfirst=True)
+    postgresql.ENUM(
         'pendiente', 'respondida', 'descartada', 'resuelta',
         name='reviewstatus',
+    ).create(bind, checkfirst=True)
+
+    # postgresql.ENUM con create_type=False evita que _on_table_create los recree
+    flag_type_col = postgresql.ENUM(
+        'innecesario', 'monto_alto', 'categoria_incorrecta',
+        'no_es_del_hogar', 'sospechoso', 'pregunta', 'otra',
+        name='reviewtype', create_type=False,
     )
-    reviewtype.create(bind, checkfirst=True)
-    reviewstatus.create(bind, checkfirst=True)
+    status_col = postgresql.ENUM(
+        'pendiente', 'respondida', 'descartada', 'resuelta',
+        name='reviewstatus', create_type=False,
+    )
 
     op.create_table(
         'transaction_reviews',
-        sa.Column('id',                  postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column('transaction_id',      postgresql.UUID(as_uuid=True), sa.ForeignKey('transactions.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('household_id',        postgresql.UUID(as_uuid=True), sa.ForeignKey('households.id',   ondelete='CASCADE'), nullable=False),
-        sa.Column('flagged_by_user_id',  postgresql.UUID(as_uuid=True), sa.ForeignKey('users.id'),        nullable=False),
-        sa.Column('flag_type',           sa.Enum(name='reviewtype',   create_type=False), nullable=False),
-        sa.Column('comment',             sa.String(500),                                  nullable=True),
-        sa.Column('status',              sa.Enum(name='reviewstatus', create_type=False), nullable=False, server_default='pendiente'),
-        sa.Column('created_at',          sa.DateTime(timezone=True),   server_default=sa.func.now(), nullable=False),
-        sa.Column('response_comment',    sa.String(500),                nullable=True),
-        sa.Column('response_at',         sa.DateTime(timezone=True),   nullable=True),
+        sa.Column('id',                 postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column('transaction_id',     postgresql.UUID(as_uuid=True), sa.ForeignKey('transactions.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('household_id',       postgresql.UUID(as_uuid=True), sa.ForeignKey('households.id',   ondelete='CASCADE'), nullable=False),
+        sa.Column('flagged_by_user_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('users.id'),        nullable=False),
+        sa.Column('flag_type',          flag_type_col,  nullable=False),
+        sa.Column('comment',            sa.String(500), nullable=True),
+        sa.Column('status',             status_col,     nullable=False, server_default='pendiente'),
+        sa.Column('created_at',         sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('response_comment',   sa.String(500), nullable=True),
+        sa.Column('response_at',        sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index('ix_reviews_transaction', 'transaction_reviews', ['transaction_id'])
     op.create_index('ix_reviews_household',   'transaction_reviews', ['household_id'])
