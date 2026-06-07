@@ -997,49 +997,52 @@ export default function StatsDashboardPage() {
       {/* SUMMARY CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4 sm:mb-6">
         {([
-          { label: 'Ingresos',  value: income,   prevValue: prevBreakdown?.income,   color: 'text-cyan-400',   icon: TrendingUp,   border: 'border-cyan-500/20',   bg: 'bg-cyan-500/10',    higherIsBetter: true  },
-          { label: 'Gastos',    value: expenses, prevValue: prevBreakdown?.expenses, color: 'text-rose-400',   icon: TrendingDown, border: 'border-rose-500/20',   bg: 'bg-rose-500/10',    higherIsBetter: false },
-          { label: 'Ahorro',    value: savings,  prevValue: prevBreakdown?.savings,  color: savings >= 0 ? 'text-emerald-400' : 'text-red-400',
+          { label: 'Ingresos',             value: income,   prevValue: prevBreakdown?.income,   color: 'text-cyan-400',    icon: TrendingUp,   border: 'border-cyan-500/25',    bg: 'bg-cyan-500/10',     higherIsBetter: true  },
+          { label: 'Gastos',               value: expenses, prevValue: prevBreakdown?.expenses, color: 'text-rose-400',    icon: TrendingDown, border: 'border-rose-500/25',    bg: 'bg-rose-500/10',     higherIsBetter: false },
+          { label: 'Ahorro',               value: savings,  prevValue: prevBreakdown?.savings,  color: savings >= 0 ? 'text-emerald-400' : 'text-red-400',
             icon: savings >= 0 ? TrendingUp : TrendingDown,
-            border: savings >= 0 ? 'border-emerald-500/20' : 'border-red-500/20',
-            bg: savings >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10',             higherIsBetter: true  },
-          { label: 'Tasa ahorro', value: null, prevValue: undefined, color: savingsRate >= 0 ? 'text-violet-400' : 'text-red-400',
-            icon: TrendingUp, border: 'border-violet-500/20', bg: 'bg-violet-500/10',
-            extra: privacy ? '**%' : `${savingsRate.toFixed(1)}%`,                 higherIsBetter: true  },
-          { label: 'Gasto diario', value: null, prevValue: undefined, color: 'text-amber-400',
-            icon: Calendar, border: 'border-amber-500/20', bg: 'bg-amber-500/10',
-            extra: privacy ? '••••' : `${fmtMoney(dailyAverage, currency, false)}/día`,  higherIsBetter: false },
+            border: savings >= 0 ? 'border-emerald-500/25' : 'border-red-500/25',
+            bg: savings >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10',                                                                                                           higherIsBetter: true  },
+          { label: 'Tasa de Ahorro',       value: null,     prevValue: undefined,               color: savingsRate >= 0 ? 'text-violet-400' : 'text-red-400',
+            icon: TrendingUp, border: 'border-violet-500/25', bg: 'bg-violet-500/10',
+            extra: privacy ? '**%' : `${savingsRate.toFixed(1)}%`,                                                                                                              higherIsBetter: true  },
+          { label: 'Gasto Diario Promedio', value: null,    prevValue: undefined,               color: 'text-amber-400',   icon: Calendar,     border: 'border-amber-500/25',   bg: 'bg-amber-500/10',    higherIsBetter: false,
+            extra: privacy ? '••••' : `${fmtMoney(dailyAverage, currency, false)}/día` },
         ] as Array<{ label: string; value: number | null; prevValue: number | undefined; color: string; icon: React.ElementType; border: string; bg: string; higherIsBetter: boolean; extra?: string }>).map(({ label, value, prevValue, color, icon: Icon, border, bg, extra, higherIsBetter }) => {
-          const delta = value != null && prevValue != null && prevValue > 0
+          const delta = value != null && prevValue != null && prevValue !== 0
             ? ((value - prevValue) / prevValue) * 100
             : null
-          const deltaUp = delta != null && delta > 0
+          const deltaUp   = delta != null && delta > 0
+          const deltaGood = delta != null && (higherIsBetter ? deltaUp : !deltaUp)
           return (
-            <div key={label} className={`bg-slate-900/40 border ${border} rounded-2xl p-4 backdrop-blur-sm`}>
-              <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center mb-3`}>
-                <Icon className={`w-4 h-4 ${color}`} />
+            <div key={label} className={`bg-slate-900/40 border ${border} rounded-2xl p-5 backdrop-blur-sm flex flex-col justify-between min-h-[148px]`}>
+              {/* Top: icon + label */}
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center shrink-0`}>
+                  <Icon className={`w-5 h-5 ${color}`} />
+                </div>
+                <p className="text-[11px] text-slate-400 uppercase font-bold tracking-widest leading-tight">{label}</p>
               </div>
-              <p className="text-sm text-slate-500 uppercase font-bold tracking-widest mb-1">{label}</p>
+
+              {/* Value */}
               {isLoading ? (
-                <div className="h-6 w-24 bg-slate-800 animate-pulse rounded" />
+                <div className="h-8 w-28 bg-slate-800 animate-pulse rounded-lg" />
               ) : (
-                <>
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <p className={`text-lg font-bold ${color} tabular-nums`}>
-                      {extra ?? fmtMoney(value!, currency, privacy)}
-                    </p>
-                  </div>
-                  {!privacy && delta != null && Math.abs(delta) >= 0.5 && (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <span className={`text-xs font-bold ${
-                        (higherIsBetter ? deltaUp : !deltaUp) ? 'text-emerald-400' : 'text-rose-400'
-                      }`}>
-                        {deltaUp ? '↑' : '↓'}{Math.abs(delta).toFixed(1)}%
-                      </span>
-                      <span className="text-[10px] text-slate-600">vs {MONTH_NAMES[prevMonthNum - 1]}</span>
-                    </div>
-                  )}
-                </>
+                <p className={`text-2xl font-bold tabular-nums ${color}`}>
+                  {extra ?? fmtMoney(value!, currency, privacy)}
+                </p>
+              )}
+
+              {/* Delta */}
+              {!privacy && delta != null && Math.abs(delta) >= 0.5 ? (
+                <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl w-fit ${deltaGood ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}>
+                  <span className={`text-sm font-bold ${deltaGood ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {deltaUp ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
+                  </span>
+                  <span className="text-[11px] text-slate-500">vs {MONTH_NAMES[prevMonthNum - 1]}</span>
+                </div>
+              ) : (
+                <div className="h-7" />
               )}
             </div>
           )
