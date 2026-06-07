@@ -12,7 +12,6 @@ import MonthYearPicker from '../components/MonthYearPicker'
 import { exportMonthlyPDF } from '../lib/exportPDF'
 import {
   fetchMonthlyBreakdown,
-  fetchSummary,
   fetchMe,
   deleteTransaction,
   cancelInstalmentPlan,
@@ -836,10 +835,6 @@ export default function StatsDashboardPage() {
     queryFn:  () => fetchBudgets({ month, year, currency }),
   })
 
-  const { data: summary } = useQuery({
-    queryKey: ['summary'],
-    queryFn: fetchSummary,
-  })
 
   function prevMonth() {
     if (month === 1) { setYear(y => y - 1); setMonth(12) }

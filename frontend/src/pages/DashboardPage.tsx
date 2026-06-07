@@ -7,7 +7,7 @@ import {
   Activity, DollarSign, ChevronDown,
   Lock, LockOpen, BarChart2,
   Edit3, Trash2, Plus, Loader2,
-  CreditCard, Wallet, TrendingUp, Upload, Home,
+  Wallet, TrendingUp, Upload, Home,
   Users, ArrowRight, AlertTriangle, CalendarDays,
 } from 'lucide-react'
 import {
@@ -18,12 +18,10 @@ import {
   updateFinGoalAllocation,
   deleteFinGoal,
   fetchPatrimonio,
-  fetchExchangeRates,
   fetchWeeklyExpenses,
   type MonthlyStat,
   type FinGoal,
   type MonthlyPatrimonio,
-  type ExchangeRate,
 } from '../api/dashboard'
 import { fetchBudgets } from '../api/budgets'
 import type { Budget } from '../api/budgets'
@@ -974,10 +972,6 @@ export default function DashboardPage() {
     el.scrollLeft = el.scrollWidth
   }, [patrimonioData])
 
-  const { data: exchangeRates = [] } = useQuery<ExchangeRate[]>({
-    queryKey: ['exchange-rates'],
-    queryFn:  fetchExchangeRates,
-  })
 
   // Budgets — for alert cards
   const todayDate = new Date()
