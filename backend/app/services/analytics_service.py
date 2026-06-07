@@ -409,15 +409,20 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
 
     cat_totals: dict[str, float] = {}
     income_cat_totals: dict[str, float] = {}
+    con_totals: dict[str, float] = {}
+    income_con_totals: dict[str, float] = {}
     daily_totals: dict[str, float] = {}
     for tx, cat_name, con_name, acc_name, acc_currency, dest_acc_name, ext_acc_name in rows:
         converted = _convert(tx.amount, acc_currency, tx.date)
+        concept_key = con_name or 'Sin concepto'
         if tx.type == TransactionType.EXPENSE:
             cat_totals[cat_name] = cat_totals.get(cat_name, 0.0) + converted
+            con_totals[concept_key] = con_totals.get(concept_key, 0.0) + converted
             key = tx.date.isoformat()
             daily_totals[key] = daily_totals.get(key, 0.0) + converted
         elif tx.type == TransactionType.INCOME:
             income_cat_totals[cat_name] = income_cat_totals.get(cat_name, 0.0) + converted
+            income_con_totals[concept_key] = income_con_totals.get(concept_key, 0.0) + converted
 
     categories = [
         CategoryStat(name=k, total=v)
@@ -426,6 +431,14 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
     income_categories = [
         CategoryStat(name=k, total=v)
         for k, v in sorted(income_cat_totals.items(), key=lambda x: -x[1])
+    ]
+    concepts = [
+        CategoryStat(name=k, total=v)
+        for k, v in sorted(con_totals.items(), key=lambda x: -x[1])
+    ]
+    income_concepts = [
+        CategoryStat(name=k, total=v)
+        for k, v in sorted(income_con_totals.items(), key=lambda x: -x[1])
     ]
     daily_expenses = [
         DailyExpense(date=k, total=v)
@@ -486,6 +499,8 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
         savings=income - expenses,
         categories=categories,
         income_categories=income_categories,
+        concepts=concepts,
+        income_concepts=income_concepts,
         daily_expenses=daily_expenses,
         transactions=transactions,
         account_balances=account_balances,

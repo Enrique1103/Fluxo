@@ -805,6 +805,7 @@ export default function StatsDashboardPage() {
   const [txConfirmOpen,     setTxConfirmOpen]     = useState(false)
   const [selectedCategory,  setSelectedCategory]  = useState<string | null>(null)
   const [donutMode,         setDonutMode]         = useState<'expense' | 'income'>('expense')
+  const [groupBy,           setGroupBy]           = useState<'category' | 'concept'>('category')
   const [openHeaderDd,      setOpenHeaderDd]      = useState<'fecha' | 'moneda' | null>(null)
   const closeHeaderDd = () => setTimeout(() => setOpenHeaderDd(null), 150)
 
@@ -1130,14 +1131,40 @@ export default function StatsDashboardPage() {
                   Ingresos
                 </button>
               </div>
-              <p className="text-xs text-slate-500">Por categoría · {MONTH_NAMES[month - 1]} {year}</p>
+              <p className="text-xs text-slate-500">
+                Por {groupBy === 'category' ? 'categoría' : 'concepto'} · {MONTH_NAMES[month - 1]} {year}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl">
+              <button
+                onClick={() => { setGroupBy('category'); setSelectedCategory(null) }}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  groupBy === 'category'
+                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                Categorías
+              </button>
+              <button
+                onClick={() => { setGroupBy('concept'); setSelectedCategory(null) }}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  groupBy === 'concept'
+                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                Conceptos
+              </button>
             </div>
           </div>
 
           {isLoading ? (
             <div className="flex-1 bg-slate-800/50 animate-pulse rounded-xl" />
           ) : (() => {
-            const cats = donutMode === 'expense' ? breakdown?.categories : breakdown?.income_categories
+            const cats = donutMode === 'expense'
+              ? (groupBy === 'category' ? breakdown?.categories : breakdown?.concepts)
+              : (groupBy === 'category' ? breakdown?.income_categories : breakdown?.income_concepts)
             const total = donutMode === 'expense' ? (breakdown?.expenses ?? 0) : (breakdown?.income ?? 0)
             if (!breakdown || !cats || cats.length === 0) return (
               <div className="flex-1 flex items-center justify-center">
@@ -1159,7 +1186,9 @@ export default function StatsDashboardPage() {
                   {cats.map((cat: CategoryStat, i: number) => {
                     const pct    = total > 0 ? (cat.total / total) * 100 : 0
                     const sem    = donutMode === 'expense' ? semColor(cat.total / (breakdown.income || 1) * 100) : { badge: 'bg-emerald-500/15 text-emerald-400', bar: '#10b981' }
-                    const budget = donutMode === 'expense' ? budgets.find((b: Budget) => b.category_name === cat.name) : null
+                    const budget = (donutMode === 'expense' && groupBy === 'category')
+                      ? budgets.find((b: Budget) => b.category_name === cat.name)
+                      : null
                     const bActualPct = budget && budget.max_amount > 0 ? (budget.spent / budget.max_amount) * 100 : null
                     const bChip = bActualPct !== null ? (
                       bActualPct >= 100
@@ -1240,7 +1269,7 @@ export default function StatsDashboardPage() {
             transactions={breakdown.transactions}
             privacy={privacy}
             currency={currency}
-            categoryFilter={selectedCategory}
+            categoryFilter={groupBy === 'category' ? selectedCategory : null}
             onConfirmOpenChange={setTxConfirmOpen}
             onEdit={id => { setEditTxId(id); setTxModalOpen(true) }}
             onDelete={async (id, scope = 'personal') => {

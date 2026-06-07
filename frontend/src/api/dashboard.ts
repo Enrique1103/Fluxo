@@ -144,6 +144,8 @@ export interface MonthlyBreakdown {
   savings: number
   categories: CategoryStat[]
   income_categories: CategoryStat[]
+  concepts: CategoryStat[]
+  income_concepts: CategoryStat[]
   daily_expenses: DailyExpense[]
   transactions: MonthlyTx[]
   account_balances: AccountBalanceStat[]

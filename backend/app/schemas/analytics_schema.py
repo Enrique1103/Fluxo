@@ -45,6 +45,8 @@ class MonthlyBreakdown(BaseModel):
     savings: float
     categories: list[CategoryStat]
     income_categories: list[CategoryStat]
+    concepts: list[CategoryStat] = []
+    income_concepts: list[CategoryStat] = []
     daily_expenses: list[DailyExpense]
     transactions: list[MonthlyTx]
     account_balances: list[AccountBalanceStat] = []
