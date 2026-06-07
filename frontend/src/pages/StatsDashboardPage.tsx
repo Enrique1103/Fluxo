@@ -1117,12 +1117,6 @@ export default function StatsDashboardPage() {
               </div>
               <p className="text-xs text-slate-500">Por categoría · {MONTH_NAMES[month - 1]} {year}</p>
             </div>
-            {donutMode === 'expense' && (
-              <div className="flex items-center gap-1.5">
-                <div className="w-px h-3 bg-slate-500/60 rounded-full" />
-                <span className="text-sm text-slate-600">Umbral 30%</span>
-              </div>
-            )}
           </div>
 
           {isLoading ? (
@@ -1151,44 +1145,43 @@ export default function StatsDashboardPage() {
                     const pct    = total > 0 ? (cat.total / total) * 100 : 0
                     const sem    = donutMode === 'expense' ? semColor(cat.total / (breakdown.income || 1) * 100) : { badge: 'bg-emerald-500/15 text-emerald-400', bar: '#10b981' }
                     const budget = donutMode === 'expense' ? budgets.find((b: Budget) => b.category_name === cat.name) : null
-                    const bPct   = budget && budget.max_amount > 0 ? Math.min((budget.spent / budget.max_amount) * 100, 100) : null
-                    const bColor = bPct !== null ? (bPct >= 100 ? '#ef4444' : bPct >= 80 ? '#f59e0b' : '#10b981') : null
+                    const bActualPct = budget && budget.max_amount > 0 ? (budget.spent / budget.max_amount) * 100 : null
+                    const bChip = bActualPct !== null ? (
+                      bActualPct >= 100
+                        ? { text: 'text-red-400',    bg: 'bg-red-500/15 border-red-500/25' }
+                        : bActualPct >= 80
+                        ? { text: 'text-orange-400', bg: 'bg-orange-500/15 border-orange-500/25' }
+                        : bActualPct >= 60
+                        ? { text: 'text-amber-400',  bg: 'bg-amber-500/15 border-amber-500/25' }
+                        : { text: 'text-emerald-400', bg: 'bg-emerald-500/15 border-emerald-500/25' }
+                    ) : null
                     return (
                       <div key={cat.name}>
                         <div className="flex items-center gap-2 mb-1.5">
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: catColor(i) }} />
                           <span className="text-xs sm:text-sm text-slate-300 flex-1 truncate">{cat.name}</span>
-                          <span className="text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
-                            {fmtMoney(cat.total, currency, privacy)}
-                          </span>
+                          {budget && bActualPct !== null && !privacy && bChip ? (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border tabular-nums ${bChip.bg} ${bChip.text}`}>
+                              {fmtMoney(budget.spent, currency)}/{fmtMoney(budget.max_amount, currency)}
+                              {' · '}
+                              {bActualPct > 100
+                                ? <><span className="text-[11px]">+</span>{(bActualPct - 100).toFixed(0)}%</>
+                                : `${bActualPct.toFixed(0)}%`
+                              }
+                            </span>
+                          ) : (
+                            <span className="text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
+                              {fmtMoney(cat.total, currency, privacy)}
+                            </span>
+                          )}
                           <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${sem.badge}`}>
                             {pct.toFixed(0)}%
                           </span>
                         </div>
-                        <div className="relative">
-                          <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-700"
-                              style={{ width: `${Math.min(pct, 100)}%`, background: sem.bar }} />
-                          </div>
-                          {donutMode === 'expense' && (
-                            <div className="absolute top-[-3px] w-px h-[15px] bg-slate-500/60 rounded-full pointer-events-none"
-                              style={{ left: '30%' }} title="Umbral recomendado: 30% del ingreso" />
-                          )}
+                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-700"
+                            style={{ width: `${Math.min(pct, 100)}%`, background: sem.bar }} />
                         </div>
-                        {budget && bPct !== null && !privacy && (
-                          <div className="mt-1.5">
-                            <div className="flex items-center justify-between mb-0.5">
-                              <span className="text-[9px] text-slate-600 uppercase tracking-widest">Presupuesto</span>
-                              <span className="text-[9px] tabular-nums" style={{ color: bColor ?? '#10b981' }}>
-                                {fmtMoney(budget.spent, currency)} / {fmtMoney(budget.max_amount, currency)} · {bPct.toFixed(0)}%
-                              </span>
-                            </div>
-                            <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                              <div className="h-full rounded-full transition-all duration-700"
-                                style={{ width: `${bPct}%`, backgroundColor: bColor ?? '#10b981' }} />
-                            </div>
-                          </div>
-                        )}
                       </div>
                     )
                   })}
