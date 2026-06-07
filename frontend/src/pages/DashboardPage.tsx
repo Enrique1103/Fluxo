@@ -970,7 +970,6 @@ export default function DashboardPage() {
   }, [patrimonioData])
 
 
-  const todayDate = new Date()
 
   // Initialize currency from user preference
   useEffect(() => {
