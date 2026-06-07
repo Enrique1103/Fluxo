@@ -955,11 +955,12 @@ export default function DashboardPage() {
 
   useEffect(() => { if (me?.currency_default) setCurrency(me.currency_default) }, [me?.currency_default])
 
-  const { data: patrimonioData = [], isLoading: patrimonioLoading } = useQuery({
+  const { data: patrimonioData = [], isLoading: patrimonioLoading, isError: patrimonioError } = useQuery({
     queryKey: ['patrimonio', monthsBack, monthsAhead, currency],
     queryFn:  () => fetchPatrimonio(monthsBack, monthsAhead, currency),
     enabled:  !!me,
     placeholderData: keepPreviousData,
+    retry: 1,
   })
 
   // Auto-scroll patrimonio chart to current month on data load
@@ -1466,12 +1467,16 @@ export default function DashboardPage() {
             {/* Patrimonio bar chart */}
             {patrimonioLoading ? (
               <div className="h-48 bg-slate-800/50 animate-pulse rounded-xl mb-5" />
+            ) : patrimonioError ? (
+              <div className="h-36 flex items-center justify-center mb-5">
+                <p className="text-xs text-rose-400">Error al cargar patrimonio</p>
+              </div>
             ) : (() => {
               const firstMonth = summary?.first_tx_month ?? ''
               const bars = patrimonioData.filter(p => p.value !== null && (!firstMonth || p.month >= firstMonth))
               if (bars.length === 0) return (
                 <div className="h-36 flex items-center justify-center mb-5">
-                  <p className="text-xs text-slate-500">Sin datos de patrimonio disponibles</p>
+                  <p className="text-xs text-slate-500">Sin datos de patrimonio ({patrimonioData.length} meses, todos nulos)</p>
                 </div>
               )
 
