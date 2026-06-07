@@ -298,7 +298,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
       setMetodoPago('efectivo')
       setCommission('')
       setEnCuotas(false); setNCuotas('2')
-      setIsShared(false); setHouseholdId('')
+      setSelectedHouseholdIds([])
     }
   }, [open])
 
@@ -425,7 +425,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               <button
                 key={type}
                 disabled={isEditing}
-                onClick={() => { if (!isEditing) { setTxType(type); if (type !== 'expense') { setIsShared(false); setHouseholdId('') } } }}
+                onClick={() => { if (!isEditing) { setTxType(type); if (type !== 'expense') { setSelectedHouseholdIds([]) } } }}
                 className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all ${
                   isActive
                     ? activeStyles[type]

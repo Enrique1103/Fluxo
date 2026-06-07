@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, Loader2, X } from 'lucide-react'
-import { updateHousehold, deleteHousehold, type Household, type SplitType } from '../../api/households'
+import { updateHousehold, deleteHousehold, type Household } from '../../api/households'
 import { labelClass, inputClass, selectClass, parseErr } from './household.utils'
 
 interface Props {
@@ -13,12 +13,11 @@ export default function EditModal({ household, onClose }: Props) {
   const qc = useQueryClient()
   const [name, setName] = useState(household.name)
   const [currency, setCurrency] = useState(household.base_currency)
-  const [splitType, setSplitType] = useState<SplitType>(household.split_type)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const updateMutation = useMutation({
-    mutationFn: () => updateHousehold(household.id, { name: name.trim(), base_currency: currency, split_type: splitType }),
+    mutationFn: () => updateHousehold(household.id, { name: name.trim(), base_currency: currency }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['households'] }); qc.invalidateQueries({ queryKey: ['household-analytics'] }); onClose() },
     onError:   (err) => setError(parseErr(err, 'No se pudo actualizar el hogar')),
   })
@@ -53,15 +52,9 @@ export default function EditModal({ household, onClose }: Props) {
             </div>
           </div>
           <div>
-            <label className={labelClass + ' mb-2'}>División de gastos</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['equal', 'proportional'] as SplitType[]).map(t => (
-                <button key={t} onClick={() => setSplitType(t)}
-                  className={`py-2 rounded-xl text-xs font-semibold border transition-all ${splitType === t ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'}`}>
-                  {t === 'equal' ? 'Partes iguales' : 'Proporcional'}
-                </button>
-              ))}
-            </div>
+            <p className="text-[11px] text-slate-500 italic">
+              La división de gastos y el nivel de análisis no se pueden modificar después de crear el hogar.
+            </p>
           </div>
           {error && <p className="text-rose-400 text-xs">{error}</p>}
           <button onClick={() => updateMutation.mutate()}
