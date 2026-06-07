@@ -1,10 +1,9 @@
-import { TrendingUp, TrendingDown, Tag, Calendar } from 'lucide-react'
+import { TrendingUp, TrendingDown, Calendar } from 'lucide-react'
 import { fmtNum } from './household.utils'
 
 interface Props {
   totalShared: number
   dailyAverage: number
-  topCategory: { name: string; total: number } | null
   prevChangePct: number | null
   currency: string
   privacy: boolean
@@ -15,13 +14,13 @@ function fmt(n: number, privacy: boolean) {
 }
 
 export default function HouseholdKPICards({
-  totalShared, dailyAverage, topCategory, prevChangePct, currency, privacy,
+  totalShared, dailyAverage, prevChangePct, currency, privacy,
 }: Props) {
   const isUp   = prevChangePct !== null && prevChangePct > 0
   const isDown = prevChangePct !== null && prevChangePct < 0
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
 
       {/* Total gastos */}
       <div className="rounded-2xl border p-4 bg-slate-900 border-slate-800">
@@ -37,21 +36,6 @@ export default function HouseholdKPICards({
         </p>
         <p className="text-xl font-bold tabular-nums text-slate-100">{fmt(dailyAverage, privacy)}</p>
         <p className="text-xs text-slate-500 mt-0.5">{currency}/día</p>
-      </div>
-
-      {/* Mayor categoría */}
-      <div className="rounded-2xl border p-4 bg-slate-900 border-slate-800">
-        <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-1">
-          <Tag className="w-3 h-3" />Mayor categoría
-        </p>
-        {topCategory ? (
-          <>
-            <p className="text-sm font-bold text-slate-200 truncate">{topCategory.name}</p>
-            <p className="text-xs tabular-nums text-slate-400 mt-0.5">{fmt(topCategory.total, privacy)} {currency}</p>
-          </>
-        ) : (
-          <p className="text-sm text-slate-500">—</p>
-        )}
       </div>
 
       {/* vs mes anterior */}

@@ -15,8 +15,8 @@ import {
 } from '../api/households'
 import CategoryDonut from '../components/household/CategoryDonut'
 import HouseholdKPICards from '../components/household/HouseholdKPICards'
-import HouseholdHeatmap from '../components/household/HouseholdHeatmap'
 import HouseholdTopConcepts from '../components/household/HouseholdTopConcepts'
+import SpiderChart from '../components/household/SpiderChart'
 import CreateModal from '../components/household/CreateModal'
 import JoinModal from '../components/household/JoinModal'
 import EditModal from '../components/household/EditModal'
@@ -540,11 +540,6 @@ export default function HouseholdPage() {
                     <HouseholdKPICards
                       totalShared={Number(analytics.total_shared)}
                       dailyAverage={Number(analytics.daily_average)}
-                      topCategory={
-                        analytics.expense_by_category[0]
-                          ? { name: analytics.expense_by_category[0].category_name, total: Number(analytics.expense_by_category[0].total) }
-                          : null
-                      }
                       prevChangePct={analytics.prev_month_change_pct !== null ? Number(analytics.prev_month_change_pct) : null}
                       currency={analytics.base_currency}
                       privacy={privacy}
@@ -564,61 +559,73 @@ export default function HouseholdPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="p-5 flex items-start gap-5">
-                          <div className="shrink-0">
-                            <CategoryDonut
-                              categories={analytics.expense_by_category.map(c => ({ name: c.category_name, total: Number(c.total) }))}
-                              total={Number(analytics.total_shared)}
-                              currency={analytics.base_currency}
-                            />
+                        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
+                          {/* Left half: donut + category bars */}
+                          <div className="space-y-4">
+                            <div className="flex justify-center">
+                              <CategoryDonut
+                                categories={analytics.expense_by_category.map(c => ({ name: c.category_name, total: Number(c.total) }))}
+                                total={Number(analytics.total_shared)}
+                                currency={analytics.base_currency}
+                              />
+                            </div>
+                            <div className="space-y-3">
+                              {analytics.expense_by_category.map((cat, i) => {
+                                const pct = Number(analytics.total_shared) > 0
+                                  ? Number(cat.total) / Number(analytics.total_shared) : 0
+                                const color = DONUT_COLORS[i % DONUT_COLORS.length]
+                                return (
+                                  <div key={cat.category_name}>
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                                      <span className={`text-xs flex-1 truncate text-slate-300`}>{cat.category_name}</span>
+                                      <span className="text-[10px] text-slate-500 tabular-nums shrink-0">{(pct * 100).toFixed(0)}%</span>
+                                      <span className={`text-xs font-semibold tabular-nums shrink-0 text-slate-200`}>
+                                        {fmt(Number(cat.total))}
+                                      </span>
+                                    </div>
+                                    <div className={`h-1.5 rounded-full overflow-hidden bg-slate-800`}>
+                                      <div
+                                        className="h-full rounded-full transition-all duration-700"
+                                        style={{ width: `${Math.max(pct * 100, 2)}%`, backgroundColor: color }}
+                                      />
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
-                          <div className="flex-1 space-y-3 pt-1 min-w-0">
-                            {analytics.expense_by_category.map((cat, i) => {
-                              const pct = Number(analytics.total_shared) > 0
-                                ? Number(cat.total) / Number(analytics.total_shared) : 0
-                              const color = DONUT_COLORS[i % DONUT_COLORS.length]
-                              return (
-                                <div key={cat.category_name}>
-                                  <div className="flex items-center gap-2 mb-1.5">
-                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                                    <span className={`text-xs flex-1 truncate text-slate-300`}>{cat.category_name}</span>
-                                    <span className="text-[10px] text-slate-500 tabular-nums shrink-0">{(pct * 100).toFixed(0)}%</span>
-                                    <span className={`text-xs font-semibold tabular-nums shrink-0 text-slate-200`}>
-                                      {fmt(Number(cat.total))}
-                                    </span>
-                                  </div>
-                                  <div className={`h-1.5 rounded-full overflow-hidden bg-slate-800`}>
-                                    <div
-                                      className="h-full rounded-full transition-all duration-700"
-                                      style={{ width: `${Math.max(pct * 100, 2)}%`, backgroundColor: color }}
-                                    />
-                                  </div>
-                                </div>
-                              )
-                            })}
+                          {/* Right half: spider/radar chart by concept */}
+                          <div className="flex flex-col gap-3">
+                            <p className={sectionTitle}>Mapa de conceptos</p>
+                            {analytics.top_concepts.length >= 3 ? (
+                              <div className="w-full aspect-square max-w-[240px] mx-auto">
+                                <SpiderChart
+                                  data={analytics.top_concepts.slice(0, 12).map(c => ({
+                                    label: c.concept_name,
+                                    value: c.total,
+                                  }))}
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center h-32 text-xs text-slate-500 text-center">
+                                Al menos 3 conceptos para mostrar el gráfico
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
                     )}
 
                     {/* ══════════════════════════════════════════════════ */}
-                    {/* 1b. HEATMAP + TOP CONCEPTS (F01)                  */}
+                    {/* 1b. TOP CONCEPTS (F01)                             */}
                     {/* ══════════════════════════════════════════════════ */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                      <HouseholdHeatmap
-                        expensesByDay={analytics.expenses_by_day}
-                        year={year}
-                        month={month}
-                        currency={analytics.base_currency}
-                        privacy={privacy}
-                      />
-                      <HouseholdTopConcepts
-                        concepts={analytics.top_concepts}
-                        totalShared={Number(analytics.total_shared)}
-                        currency={analytics.base_currency}
-                        privacy={privacy}
-                      />
-                    </div>
+                    <HouseholdTopConcepts
+                      concepts={analytics.top_concepts}
+                      totalShared={Number(analytics.total_shared)}
+                      currency={analytics.base_currency}
+                      privacy={privacy}
+                    />
 
                     {/* ══════════════════════════════════════════════════ */}
                     {/* 1c. INGRESOS DEL HOGAR (F03 — solo FULL)          */}
