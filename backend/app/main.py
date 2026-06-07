@@ -21,6 +21,7 @@ from app.api.routers import (
 )
 from app.api.routers import instalment_plan_router
 from app.api.routers import household_router
+from app.api.routers import reviews_router
 from app.exceptions.user_exceptions import (
     EmailAlreadyExists,
     UserNotFound,
@@ -75,6 +76,12 @@ from app.exceptions.exchange_rate_exceptions import (
     ExchangeRateAlreadyExists,
     ExchangeRateMissing,
     UnauthorizedExchangeRateAccess,
+)
+from app.exceptions.review_exceptions import (
+    ReviewNotFound,
+    UnauthorizedReviewAccess,
+    ReviewAlreadyResolved,
+    TransactionNotInHousehold,
 )
 
 app = FastAPI(title="Fluxo API", version="2.0.0")
@@ -319,6 +326,26 @@ async def handle_invalid_scope(r: Request, exc: InvalidScopeOperation):
     return _json(_422, str(exc))
 
 
+@app.exception_handler(ReviewNotFound)
+async def handle_review_not_found(r: Request, exc: ReviewNotFound):
+    return _json(_404, str(exc))
+
+
+@app.exception_handler(UnauthorizedReviewAccess)
+async def handle_unauthorized_review(r: Request, exc: UnauthorizedReviewAccess):
+    return _json(_403, str(exc))
+
+
+@app.exception_handler(ReviewAlreadyResolved)
+async def handle_review_resolved(r: Request, exc: ReviewAlreadyResolved):
+    return _json(_409, str(exc))
+
+
+@app.exception_handler(TransactionNotInHousehold)
+async def handle_tx_not_in_household(r: Request, exc: TransactionNotInHousehold):
+    return _json(_422, str(exc))
+
+
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
@@ -340,3 +367,4 @@ app.include_router(exchange_rates_router.router, prefix=API_PREFIX)
 app.include_router(importacion_router.router, prefix=API_PREFIX)
 app.include_router(instalment_plan_router.router, prefix=API_PREFIX)
 app.include_router(household_router.router, prefix=API_PREFIX)
+app.include_router(reviews_router.router, prefix=API_PREFIX)

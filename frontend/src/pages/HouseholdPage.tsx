@@ -5,7 +5,7 @@ import {
   Activity, BarChart2, Upload, Home, Users, Plus, Copy, Check,
   Loader2, X, UserCheck, UserX, ArrowRight,
   AlertTriangle, Settings, Crown, Wallet, TrendingDown,
-  Eye, EyeOff, ChevronLeft, ChevronRight, Search, ChevronDown, DollarSign,
+  Eye, EyeOff, ChevronLeft, ChevronRight, Search, ChevronDown, DollarSign, Flag,
 } from 'lucide-react'
 import { useHouseholdEvents } from '../hooks/useHouseholdEvents'
 import { useAuthStore } from '../store/authStore'
@@ -20,6 +20,9 @@ import HouseholdTopConcepts from '../components/household/HouseholdTopConcepts'
 import CreateModal from '../components/household/CreateModal'
 import JoinModal from '../components/household/JoinModal'
 import EditModal from '../components/household/EditModal'
+import FlagModal from '../components/household/FlagModal'
+import ReviewsPanel from '../components/household/ReviewsPanel'
+import type { SharedExpense } from '../api/households'
 import SettingsDrawer from '../components/SettingsDrawer'
 import MonthYearPicker from '../components/MonthYearPicker'
 import ExportButton from '../components/ExportButton'
@@ -59,8 +62,9 @@ export default function HouseholdPage() {
   const [openDropdown,     setOpenDropdown]     = useState<'miembro' | 'categoria' | 'fecha' | 'moneda' | null>(null)
   const closeDropdown = () => setTimeout(() => setOpenDropdown(null), 150)
 
-  const [year,  setYear]  = useState(() => new Date().getFullYear())
-  const [month, setMonth] = useState(() => new Date().getMonth() + 1)
+  const [year,   setYear]   = useState(() => new Date().getFullYear())
+  const [month,  setMonth]  = useState(() => new Date().getMonth() + 1)
+  const [flagTx, setFlagTx] = useState<SharedExpense | null>(null)
 
   useHouseholdEvents()
 
@@ -979,13 +983,14 @@ export default function HouseholdPage() {
                                     <th className="text-left pb-2 pt-1 hidden sm:table-cell">Miembro</th>
                                     <th className="text-left pb-2 pt-1 hidden md:table-cell">Cuenta</th>
                                     <th className="text-right pb-2 pt-1 pr-4">Monto</th>
+                                    <th className="w-8 pb-2 pt-1 pr-3" />
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
                                   {displayed.map(e => {
                                     const pal = avatarPalette(e.paid_by_user_name)
                                     return (
-                                      <tr key={e.transaction_id} className="hover:bg-slate-800/30 transition-colors">
+                                      <tr key={e.transaction_id} className="group hover:bg-slate-800/30 transition-colors">
                                         <td className="py-2 pl-4 text-slate-500 whitespace-nowrap">{e.date}</td>
                                         <td className="py-2">
                                           <p className="text-slate-300 font-medium leading-tight">{e.category_name}</p>
@@ -1001,8 +1006,17 @@ export default function HouseholdPage() {
                                           </div>
                                         </td>
                                         <td className="py-2 text-slate-500 hidden md:table-cell">{e.account_name}</td>
-                                        <td className="py-2 pr-4 text-right font-semibold tabular-nums text-rose-400">
+                                        <td className="py-2 pr-2 text-right font-semibold tabular-nums text-rose-400">
                                           -{fmt(Number(e.amount))}
+                                        </td>
+                                        <td className="py-2 pr-3 text-right">
+                                          <button
+                                            onClick={() => setFlagTx(e)}
+                                            title="Marcar transacción"
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg text-slate-600 hover:text-amber-400 hover:bg-amber-500/10"
+                                          >
+                                            <Flag className="w-3 h-3" />
+                                          </button>
                                         </td>
                                       </tr>
                                     )
@@ -1014,6 +1028,15 @@ export default function HouseholdPage() {
                         </div>
                       )
                     })()}
+
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* 5. REVIEWS DE GASTOS                              */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    <ReviewsPanel
+                      householdId={household.id}
+                      currentUserId={currentUserId ?? ''}
+                      members={activeMembers}
+                    />
                   </>
                 )}
               </>
@@ -1027,6 +1050,20 @@ export default function HouseholdPage() {
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} />}
       {showJoin   && <JoinModal   onClose={() => setShowJoin(false)}   />}
       {showEdit   && household && <EditModal household={household} onClose={() => setShowEdit(false)} />}
+      {flagTx     && household && (
+        <FlagModal
+          householdId={household.id}
+          transaction={{
+            id:            flagTx.transaction_id,
+            concept_name:  flagTx.concept_name,
+            category_name: flagTx.category_name,
+            amount:        flagTx.amount,
+            currency:      flagTx.currency,
+            date:          flagTx.date,
+          }}
+          onClose={() => setFlagTx(null)}
+        />
+      )}
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   )

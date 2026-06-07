@@ -11,6 +11,7 @@ from .exchange_rate_models import ExchangeRate
 from .importacion import Importacion, ReglaCategorias
 from .instalment_plan_models import InstalmentPlan
 from .household_models import Household, HouseholdMember, HouseholdInvite, SplitType, MemberRole, MemberStatus, InviteStatus
+from .review_models import TransactionReview, ReviewType, ReviewStatus
 
 __all__ = [
     "Base",
@@ -36,4 +37,7 @@ __all__ = [
     "MemberRole",
     "MemberStatus",
     "InviteStatus",
+    "TransactionReview",
+    "ReviewType",
+    "ReviewStatus",
 ]
