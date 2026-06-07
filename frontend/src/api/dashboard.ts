@@ -72,8 +72,10 @@ export const fetchIncomeVsExpenses = async (months = 24, months_ahead = 24, curr
 }
 
 /** GET /api/v1/summary */
-export const fetchSummary = async (): Promise<Summary> => {
-  const { data } = await client.get<Summary>('/v1/summary')
+export const fetchSummary = async (currency?: string): Promise<Summary> => {
+  const { data } = await client.get<Summary>('/v1/summary', {
+    params: currency ? { currency } : {},
+  })
   return data
 }
 

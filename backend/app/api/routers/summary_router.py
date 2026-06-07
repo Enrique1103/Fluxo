@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from typing import Annotated
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependeces import get_current_user
@@ -12,7 +13,8 @@ router = APIRouter(prefix="/summary", tags=["Summary"])
 
 @router.get("", response_model=SummaryResponse)
 def get_summary(
+    currency: Annotated[str | None, Query(max_length=3)] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return summary_service.get_summary(db, current_user)
+    return summary_service.get_summary(db, current_user, display_currency=currency)

@@ -8,21 +8,35 @@ from app.models.accounts_models import Account, AccountType
 from app.models.transactions_models import Transaction, TransactionType, TransferRole
 from app.models.users_models import User
 from app.schemas.summary_schema import SummaryResponse, AccountSummary, CategoryBreakdown
+from app.services import exchange_rate_service
 
 
-def get_summary(db: Session, user: User) -> SummaryResponse:
+def get_summary(db: Session, user: User, display_currency: str | None = None) -> SummaryResponse:
     accounts = account_crud.get_all_by_user(db, user.id)
+    target_currency = display_currency or str(user.currency_default)
+    today = date.today()
 
-    # --- Net worth ---
-    total_assets = sum(
-        (a.balance for a in accounts if a.type != AccountType.CREDIT),
-        Decimal("0.00"),
-    )
-    total_debt = sum(
-        (a.balance for a in accounts if a.type == AccountType.CREDIT),
-        Decimal("0.00"),
-    )
-    net_worth = total_assets + total_debt  # debt is negative, so addition is correct
+    # --- Net worth (converted to target_currency) ---
+    total_assets = Decimal("0.00")
+    total_debt   = Decimal("0.00")
+
+    for a in accounts:
+        acc_cur = str(a.currency)
+        balance = Decimal(str(a.balance))
+        if acc_cur != target_currency:
+            rate = exchange_rate_service.get_rate_for_month(
+                db, user.id, acc_cur, target_currency, today.year, today.month
+            )
+            if rate is not None:
+                balance = balance * rate
+            else:
+                balance = Decimal("0.00")  # skip accounts without rate
+        if a.type != AccountType.CREDIT:
+            total_assets += balance
+        else:
+            total_debt += balance
+
+    net_worth = total_assets + total_debt
 
     account_summaries = [
         AccountSummary(
@@ -38,7 +52,6 @@ def get_summary(db: Session, user: User) -> SummaryResponse:
 
     # --- Current month range (full month, including future-dated transactions) ---
     from calendar import monthrange as _monthrange
-    today = date.today()
     month_start = today.replace(day=1)
     month_end = today.replace(day=_monthrange(today.year, today.month)[1])
 

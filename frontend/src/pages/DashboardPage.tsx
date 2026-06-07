@@ -896,8 +896,8 @@ export default function DashboardPage() {
   const patChartRef = useRef<HTMLDivElement>(null)
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
-    queryKey: ['summary'],
-    queryFn:  fetchSummary,
+    queryKey: ['summary', currency],
+    queryFn:  () => fetchSummary(currency),
   })
 
   // How many months back to the first transaction
