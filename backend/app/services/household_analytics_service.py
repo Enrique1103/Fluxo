@@ -6,13 +6,13 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.crud import household_crud, exchange_rate_crud
 from app.exceptions.household_exceptions import HouseholdNotFound, UnauthorizedHouseholdAccess
-from app.models.household_models import MemberStatus, SplitType
+from app.models.household_models import MemberStatus, SplitType, AnalysisLevel
 from app.models.transactions_models import Transaction, TransactionType
 from app.models.users_models import User
 from app.schemas.household_schema import (
     HouseholdAnalyticsResponse, MemberContribution,
     SettlementItem, SharedExpense, HouseholdAlert, CategoryBreakdown,
-    ConceptBreakdown,
+    ConceptBreakdown, MemberIncome,
 )
 
 
@@ -326,6 +326,24 @@ def get_analytics(
             (total_shared - prev_month_total) / prev_month_total * 100
         ).quantize(Decimal("0.01"))
 
+    # ── F03: datos adicionales según analysis_level ──────────────────────────
+    member_incomes: list[MemberIncome] | None = None
+    net_savings: Decimal | None = None
+    total_group_income_out: Decimal | None = None
+
+    if household.analysis_level == AnalysisLevel.FULL:
+        member_incomes = [
+            MemberIncome(
+                user_id=m.user_id,
+                user_name=_get_user_name(db, m.user_id),
+                amount=incomes.get(m.user_id, Decimal("0.00")).quantize(Decimal("0.01")),
+                currency=base_currency,
+            )
+            for m in active_members
+        ]
+        total_group_income_out = total_group_income.quantize(Decimal("0.01"))
+        net_savings = (total_group_income - total_shared).quantize(Decimal("0.01"))
+
     # ── Pending member alerts ────────────────────────────────────────────────
     pending = household_crud.get_pending_members(db, household_id)
     for p in pending:
@@ -351,4 +369,8 @@ def get_analytics(
         expenses_by_day=expenses_by_day,
         prev_month_total=prev_month_total,
         prev_month_change_pct=prev_month_change_pct,
+        analysis_level=household.analysis_level,
+        member_incomes=member_incomes,
+        net_savings=net_savings,
+        total_group_income=total_group_income_out,
     )

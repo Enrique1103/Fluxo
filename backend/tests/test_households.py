@@ -144,3 +144,95 @@ class TestHouseholdAnalytics:
         r = c.get(f"{HH}/{hh_id}/analytics",
                   params={"year": TODAY.year, "month": TODAY.month}, headers=h2)
         assert r.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# F03 — Tipos de hogar (analysis_level)
+# ---------------------------------------------------------------------------
+
+class TestCreateHouseholdF03:
+    def test_create_with_defaults_returns_expenses_only(self, authed):
+        c, h = authed
+        r = c.post(HH, json={"name": "Hogar Default", "base_currency": "UYU"}, headers=h)
+        assert r.status_code == 201
+        body = r.json()
+        assert body["split_type"] == "equal"
+        assert body["analysis_level"] == "expenses_only"
+
+    def test_create_with_proportional_split(self, authed):
+        c, h = authed
+        r = c.post(HH, json={"name": "H Prop", "base_currency": "UYU", "split_type": "proportional"}, headers=h)
+        assert r.status_code == 201
+        assert r.json()["split_type"] == "proportional"
+
+    def test_create_with_full_analysis(self, authed):
+        c, h = authed
+        r = c.post(HH, json={"name": "H Full", "base_currency": "UYU", "analysis_level": "full"}, headers=h)
+        assert r.status_code == 201
+        assert r.json()["analysis_level"] == "full"
+
+    def test_create_with_expenses_and_goals(self, authed):
+        c, h = authed
+        r = c.post(HH, json={"name": "H Goals", "base_currency": "UYU", "analysis_level": "expenses_and_goals"}, headers=h)
+        assert r.status_code == 201
+        assert r.json()["analysis_level"] == "expenses_and_goals"
+
+    def test_create_invalid_analysis_level_422(self, authed):
+        c, h = authed
+        r = c.post(HH, json={"name": "X", "base_currency": "UYU", "analysis_level": "invalido"}, headers=h)
+        assert r.status_code == 422
+
+    def test_create_invalid_split_type_422(self, authed):
+        c, h = authed
+        r = c.post(HH, json={"name": "X", "base_currency": "UYU", "split_type": "custom"}, headers=h)
+        assert r.status_code == 422
+
+
+class TestUpdateHouseholdF03:
+    def test_update_name_ok(self, household):
+        c, h, hh_id = household
+        r = c.patch(f"{HH}/{hh_id}", json={"name": "Nuevo nombre"}, headers=h)
+        assert r.status_code == 200
+        assert r.json()["name"] == "Nuevo nombre"
+
+    def test_cannot_update_split_type(self, household):
+        """split_type ignorado en PATCH — no cambia."""
+        c, h, hh_id = household
+        original = c.get(f"{HH}/{hh_id}", headers=h).json()["split_type"]
+        c.patch(f"{HH}/{hh_id}", json={"split_type": "proportional"}, headers=h)
+        after = c.get(f"{HH}/{hh_id}", headers=h).json()["split_type"]
+        assert after == original
+
+    def test_cannot_update_analysis_level(self, household):
+        """analysis_level ignorado en PATCH — no cambia."""
+        c, h, hh_id = household
+        original = c.get(f"{HH}/{hh_id}", headers=h).json()["analysis_level"]
+        c.patch(f"{HH}/{hh_id}", json={"analysis_level": "full"}, headers=h)
+        after = c.get(f"{HH}/{hh_id}", headers=h).json()["analysis_level"]
+        assert after == original
+
+
+class TestHouseholdAnalyticsF03:
+    def test_expenses_only_excludes_incomes(self, household):
+        """Con analysis_level=expenses_only, member_incomes es null."""
+        c, h, hh_id = household
+        r = c.get(f"{HH}/{hh_id}/analytics",
+                  params={"year": TODAY.year, "month": TODAY.month}, headers=h)
+        assert r.status_code == 200
+        body = r.json()
+        assert body["analysis_level"] == "expenses_only"
+        assert body["member_incomes"] is None
+        assert body["net_savings"] is None
+
+    def test_full_includes_income_data(self, authed):
+        """Con analysis_level=full, member_incomes y net_savings están presentes."""
+        c, h = authed
+        r = c.post(HH, json={"name": "H Full", "base_currency": "UYU", "analysis_level": "full"}, headers=h)
+        hh_id = r.json()["id"]
+        r = c.get(f"{HH}/{hh_id}/analytics",
+                  params={"year": TODAY.year, "month": TODAY.month}, headers=h)
+        assert r.status_code == 200
+        body = r.json()
+        assert body["analysis_level"] == "full"
+        assert body["member_incomes"] is not None
+        assert body["net_savings"] is not None

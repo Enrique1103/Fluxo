@@ -347,6 +347,11 @@ export default function HouseholdPage() {
                       <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-indigo-500/10 border-indigo-500/25 text-indigo-400`}>
                         {household.split_type === 'equal' ? 'Partes iguales' : 'Proporcional'}
                       </span>
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-slate-800/80 border-slate-700 text-slate-400`}>
+                        {household.analysis_level === 'expenses_only'      ? 'Solo gastos' :
+                         household.analysis_level === 'expenses_and_goals' ? 'Gastos + metas' :
+                         'Análisis completo'}
+                      </span>
                     </div>
                   </div>
 
@@ -610,6 +615,53 @@ export default function HouseholdPage() {
                         privacy={privacy}
                       />
                     </div>
+
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* 1c. INGRESOS DEL HOGAR (F03 — solo FULL)          */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {analytics.analysis_level === 'full' && analytics.member_incomes && (
+                      <div className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
+                        <div className={`px-5 py-4 border-b border-slate-800`}>
+                          <div className="flex items-center justify-between">
+                            <p className={sectionTitle}>Ingresos del grupo</p>
+                            {analytics.total_group_income !== null && (
+                              <span className="text-xs font-bold tabular-nums text-emerald-400">
+                                {fmt(Number(analytics.total_group_income))}
+                                <span className="font-normal ml-1 text-slate-500">{analytics.base_currency}</span>
+                              </span>
+                            )}
+                          </div>
+                          {analytics.net_savings !== null && (
+                            <p className={`text-xs mt-1 ${Number(analytics.net_savings) >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
+                              Ahorro neto: {Number(analytics.net_savings) >= 0 ? '+' : ''}{fmt(Number(analytics.net_savings))} {analytics.base_currency}
+                            </p>
+                          )}
+                        </div>
+                        <div className="p-4 space-y-3">
+                          {analytics.member_incomes.map(mi => {
+                            const totalIncome = Number(analytics.total_group_income) || 1
+                            const pct = Number(mi.amount) / totalIncome
+                            const pal = avatarPalette(mi.user_name)
+                            return (
+                              <div key={mi.user_id}>
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${pal.bg} ${pal.text}`}>
+                                    {mi.user_name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="text-xs flex-1 truncate text-slate-300">{mi.user_name}</span>
+                                  <span className="text-[10px] text-slate-500 tabular-nums shrink-0">{(pct * 100).toFixed(0)}%</span>
+                                  <span className="text-xs font-semibold tabular-nums shrink-0 text-emerald-400">{fmt(Number(mi.amount))}</span>
+                                </div>
+                                <div className="h-1.5 rounded-full overflow-hidden bg-slate-800">
+                                  <div className="h-full rounded-full bg-emerald-500 transition-all duration-700"
+                                    style={{ width: `${Math.max(pct * 100, 2)}%` }} />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     {/* ══════════════════════════════════════════════════ */}
                     {/* 2. ANÁLISIS POR MIEMBRO                           */}

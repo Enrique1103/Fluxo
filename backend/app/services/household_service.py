@@ -66,6 +66,7 @@ def create(db: Session, user: User, data: HouseholdCreate) -> HouseholdResponse:
         name=data.name,
         base_currency=data.base_currency,
         split_type=data.split_type,
+        analysis_level=data.analysis_level,
         created_by=user.id,
     )
     # Creator becomes admin immediately

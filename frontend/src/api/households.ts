@@ -3,6 +3,7 @@ import client from './client'
 // --- Types ---
 
 export type SplitType = 'equal' | 'proportional'
+export type AnalysisLevel = 'expenses_only' | 'expenses_and_goals' | 'full'
 export type MemberRole = 'admin' | 'member'
 export type MemberStatus = 'pending' | 'active'
 export type InviteStatus = 'pending' | 'used' | 'expired'
@@ -12,6 +13,7 @@ export interface Household {
   name: string
   base_currency: string
   split_type: SplitType
+  analysis_level: AnalysisLevel
   created_by: string
   created_at: string
 }
@@ -85,6 +87,13 @@ export interface ConceptBreakdown {
   transaction_count: number
 }
 
+export interface MemberIncome {
+  user_id: string
+  user_name: string
+  amount: number
+  currency: string
+}
+
 export interface HouseholdAnalytics {
   household_id: string
   period: string
@@ -101,6 +110,10 @@ export interface HouseholdAnalytics {
   expenses_by_day: Record<string, number>
   prev_month_total: number
   prev_month_change_pct: number | null
+  analysis_level: AnalysisLevel
+  member_incomes: MemberIncome[] | null
+  net_savings: number | null
+  total_group_income: number | null
 }
 
 // --- API calls ---
@@ -114,6 +127,7 @@ export const createHousehold = async (payload: {
   name: string
   base_currency?: string
   split_type?: SplitType
+  analysis_level?: AnalysisLevel
 }): Promise<Household> => {
   const { data } = await client.post<Household>('/v1/households', payload)
   return data
@@ -121,7 +135,7 @@ export const createHousehold = async (payload: {
 
 export const updateHousehold = async (
   id: string,
-  payload: { name?: string; base_currency?: string; split_type?: SplitType },
+  payload: { name?: string; base_currency?: string },
 ): Promise<Household> => {
   const { data } = await client.patch<Household>(`/v1/households/${id}`, payload)
   return data

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.household_models import (
     Household, HouseholdMember, HouseholdInvite,
-    SplitType, MemberRole, MemberStatus, InviteStatus,
+    SplitType, AnalysisLevel, MemberRole, MemberStatus, InviteStatus,
 )
 
 
@@ -42,11 +42,13 @@ def create(
     base_currency: str,
     split_type: SplitType,
     created_by: uuid.UUID,
+    analysis_level: AnalysisLevel = AnalysisLevel.EXPENSES_ONLY,
 ) -> Household:
     h = Household(
         name=name,
         base_currency=base_currency.upper(),
         split_type=split_type,
+        analysis_level=analysis_level,
         created_by=created_by,
     )
     db.add(h)

@@ -13,6 +13,12 @@ class SplitType(str, Enum):
     PROPORTIONAL = "proportional"
 
 
+class AnalysisLevel(str, Enum):
+    EXPENSES_ONLY       = "expenses_only"
+    EXPENSES_AND_GOALS  = "expenses_and_goals"
+    FULL                = "full"
+
+
 class MemberRole(str, Enum):
     ADMIN  = "admin"
     MEMBER = "member"
@@ -39,6 +45,9 @@ class Household(Base):
     base_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UYU")
     split_type: Mapped[SplitType] = mapped_column(
         SQLEnum(SplitType), nullable=False, default=SplitType.EQUAL
+    )
+    analysis_level: Mapped[AnalysisLevel] = mapped_column(
+        SQLEnum(AnalysisLevel), nullable=False, default=AnalysisLevel.EXPENSES_ONLY
     )
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False

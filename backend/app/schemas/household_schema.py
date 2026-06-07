@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel, field_validator
-from app.models.household_models import SplitType, MemberRole, MemberStatus, InviteStatus
+from app.models.household_models import SplitType, MemberRole, MemberStatus, InviteStatus, AnalysisLevel
 
 
 class ConceptBreakdown(BaseModel):
@@ -10,6 +10,13 @@ class ConceptBreakdown(BaseModel):
     total: Decimal
     currency: str
     transaction_count: int
+
+
+class MemberIncome(BaseModel):
+    user_id: uuid.UUID
+    user_name: str
+    amount: Decimal
+    currency: str
 
 
 # ---------------------------------------------------------------------------
@@ -20,6 +27,7 @@ class HouseholdCreate(BaseModel):
     name: str
     base_currency: str = "UYU"
     split_type: SplitType = SplitType.EQUAL
+    analysis_level: AnalysisLevel = AnalysisLevel.EXPENSES_ONLY
 
     @field_validator("base_currency")
     @classmethod
@@ -33,7 +41,7 @@ class HouseholdCreate(BaseModel):
 class HouseholdUpdate(BaseModel):
     name: str | None = None
     base_currency: str | None = None
-    split_type: SplitType | None = None
+    # split_type y analysis_level no se editan después de crear (P03 del plan)
 
     @field_validator("base_currency")
     @classmethod
@@ -50,6 +58,7 @@ class HouseholdResponse(BaseModel):
     name: str
     base_currency: str
     split_type: SplitType
+    analysis_level: AnalysisLevel
     created_by: uuid.UUID
     created_at: datetime
 
@@ -149,9 +158,14 @@ class HouseholdAnalyticsResponse(BaseModel):
     expense_by_category: list[CategoryBreakdown]
     total_shared: Decimal
     base_currency: str
-    # F01: campos nuevos para el dashboard mejorado
+    # F01: campos para el dashboard mejorado
     daily_average: Decimal
     top_concepts: list[ConceptBreakdown]
     expenses_by_day: dict[int, Decimal]
     prev_month_total: Decimal
     prev_month_change_pct: Decimal | None
+    # F03: nivel de análisis y datos condicionales
+    analysis_level: AnalysisLevel
+    member_incomes: list[MemberIncome] | None   # Solo cuando analysis_level=FULL
+    net_savings: Decimal | None                 # Solo cuando analysis_level=FULL
+    total_group_income: Decimal | None          # Solo cuando analysis_level=FULL
