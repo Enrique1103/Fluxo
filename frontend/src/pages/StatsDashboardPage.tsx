@@ -1158,23 +1158,24 @@ export default function StatsDashboardPage() {
                     return (
                       <div key={cat.name}>
                         <div className="flex items-center gap-2 mb-1.5">
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: catColor(i) }} />
-                          <span className="text-xs sm:text-sm text-slate-300 flex-1 truncate">{cat.name}</span>
-                          {budget && bActualPct !== null && !privacy && bChip ? (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border tabular-nums ${bChip.bg} ${bChip.text}`}>
-                              {fmtMoney(budget.spent, currency)}/{fmtMoney(budget.max_amount, currency)}
-                              {' · '}
-                              {bActualPct > 100
-                                ? <><span className="text-[11px]">+</span>{(bActualPct - 100).toFixed(0)}%</>
-                                : `${bActualPct.toFixed(0)}%`
-                              }
-                            </span>
-                          ) : (
-                            <span className="text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
-                              {fmtMoney(cat.total, currency, privacy)}
-                            </span>
-                          )}
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${sem.badge}`}>
+                          <span className="w-2 h-2 rounded-full shrink-0 self-start mt-1.5" style={{ background: catColor(i) }} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs sm:text-sm text-slate-300 truncate block">{cat.name}</span>
+                            {budget && bActualPct !== null && !privacy && bChip && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border tabular-nums mt-0.5 inline-block ${bChip.bg} ${bChip.text}`}>
+                                {fmtMoney(budget.spent, currency)}/{fmtMoney(budget.max_amount, currency)}
+                                {' · '}
+                                {bActualPct > 100
+                                  ? <><span className="text-[11px]">+</span>{(bActualPct - 100).toFixed(0)}%</>
+                                  : `${bActualPct.toFixed(0)}%`
+                                }
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs sm:text-sm font-semibold text-slate-300 tabular-nums shrink-0">
+                            {fmtMoney(cat.total, currency, privacy)}
+                          </span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold shrink-0 ${sem.badge}`}>
                             {pct.toFixed(0)}%
                           </span>
                         </div>
