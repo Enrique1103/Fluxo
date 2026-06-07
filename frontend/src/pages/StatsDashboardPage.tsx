@@ -1041,7 +1041,7 @@ export default function StatsDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-6 mb-4 sm:mb-6">
 
         {/* Estado de Cuentas — 1/4 */}
-        <div className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-5 backdrop-blur-sm flex flex-col gap-4 h-[360px]">
+        <div className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-5 backdrop-blur-sm flex flex-col gap-4 h-[500px]">
           <div className="shrink-0">
             <h2 className="text-sm font-semibold text-slate-200">Estado de Cuentas</h2>
             <p className="text-sm text-slate-500 mt-0.5">Cierre · {MONTH_NAMES[month - 1]} {year}</p>
@@ -1090,7 +1090,7 @@ export default function StatsDashboardPage() {
         </div>
 
         {/* Donut + Categories — 2/4 */}
-        <div id="fluxo-export-distribution" className="lg:col-span-2 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col h-[360px]">
+        <div id="fluxo-export-distribution" className="lg:col-span-2 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col h-[500px]">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl mb-1.5">
@@ -1199,7 +1199,7 @@ export default function StatsDashboardPage() {
         </div>
 
         {/* Heatmap — 1/3, compacto */}
-        <div id="fluxo-export-heatmap" className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm flex flex-col h-[360px]">
+        <div id="fluxo-export-heatmap" className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm flex flex-col h-[500px]">
           <div className="mb-3">
             <h2 className="text-sm font-semibold text-slate-200">Mapa de Gastos</h2>
             <p className="text-sm text-slate-500 mt-0.5">Intensidad diaria</p>
