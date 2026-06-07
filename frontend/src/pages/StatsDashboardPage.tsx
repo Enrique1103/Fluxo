@@ -22,7 +22,6 @@ import {
 } from '../api/dashboard'
 import SettingsDrawer from '../components/SettingsDrawer'
 import TransactionModal from '../components/TransactionModal'
-import ConfirmDialog from '../components/ConfirmDialog'
 import DeleteTransactionModal from '../components/DeleteTransactionModal'
 import FAB from '../components/FAB'
 import VoiceExpenseModal from '../components/VoiceExpenseModal'

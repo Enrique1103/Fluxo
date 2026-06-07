@@ -125,6 +125,8 @@ export interface MonthlyTx {
   household_ids: string[]
 }
 
+
+
 export interface MonthlyBreakdown {
   income: number
   expenses: number

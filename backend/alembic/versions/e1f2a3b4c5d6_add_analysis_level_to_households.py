@@ -1,6 +1,6 @@
-"""Add analysis_level to households
+"""Add analysis_level to households (F03)
 
-Revision ID: c1d2e3f4a5b6
+Revision ID: e1f2a3b4c5d6
 Revises: b9c0d1e2f3a4
 Create Date: 2026-06-06
 
@@ -10,14 +10,13 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'c1d2e3f4a5b6'
+revision: str = 'e1f2a3b4c5d6'
 down_revision: Union[str, None] = 'b9c0d1e2f3a4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Crear el tipo enum en PostgreSQL (idempotente)
     op.execute("""
         DO $$
         BEGIN
