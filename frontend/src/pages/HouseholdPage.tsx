@@ -614,26 +614,28 @@ export default function HouseholdPage() {
                               />
                             </div>
                           ) : (
-                            <div className="flex flex-col items-center gap-4">
-                              <div className="w-full max-w-[200px] mx-auto opacity-20 pointer-events-none select-none">
-                                <SpiderChart
-                                  data={[
-                                    { label: 'Comida', value: 80 },
-                                    { label: 'Transporte', value: 55 },
-                                    { label: 'Entretenimiento', value: 40 },
-                                    { label: 'Salud', value: 65 },
-                                    { label: 'Ropa', value: 30 },
-                                  ]}
-                                  color="#64748b"
-                                />
+                            <div className="flex flex-col gap-4">
+                              <div className="flex items-center gap-4">
+                                <div className="w-[160px] shrink-0 opacity-50 pointer-events-none select-none">
+                                  <SpiderChart
+                                    data={[
+                                      { label: 'Comida', value: 80 },
+                                      { label: 'Transporte', value: 55 },
+                                      { label: 'Ocio', value: 40 },
+                                      { label: 'Salud', value: 65 },
+                                      { label: 'Ropa', value: 30 },
+                                    ]}
+                                    color="#818cf8"
+                                  />
+                                </div>
+                                <p className="flex-1 text-xs text-slate-400 leading-relaxed">
+                                  Registrá al menos 3 conceptos distintos para ver tu análisis de gastos aquí
+                                </p>
                               </div>
-                              <p className="text-xs text-slate-500 text-center leading-relaxed">
-                                Registrá al menos 3 conceptos distintos<br />para ver tu análisis aquí
-                              </p>
                               {analytics.top_concepts.length > 0 && (
-                                <div className="flex flex-wrap gap-2 justify-center">
+                                <div className="flex flex-wrap gap-2">
                                   {analytics.top_concepts.map((c, i) => (
-                                    <span key={i} className="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full">
+                                    <span key={i} className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1 rounded-full">
                                       {c.concept_name}
                                     </span>
                                   ))}
