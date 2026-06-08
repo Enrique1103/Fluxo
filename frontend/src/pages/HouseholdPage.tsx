@@ -345,32 +345,43 @@ export default function HouseholdPage() {
             {/* ══════════════════════════════════════════════════════════ */}
             {/* HOUSEHOLD HERO CARD                                        */}
             {/* ══════════════════════════════════════════════════════════ */}
-            <div className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
+            <div className="relative bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl backdrop-blur-sm overflow-hidden">
 
-              {/* Gradient header strip */}
-              <div className={`relative px-5 py-4 border-b bg-gradient-to-r from-indigo-500/10 to-purple-500/8 border-slate-800`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className={`text-lg font-bold tracking-tight text-white`}>
-                      {household.name}
-                    </h2>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-slate-800/80 border-slate-700 text-slate-300`}>
-                        {household.base_currency}
-                      </span>
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-indigo-500/10 border-indigo-500/25 text-indigo-400`}>
-                        {household.split_type === 'equal' ? 'Partes iguales' : 'Proporcional'}
-                      </span>
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-slate-800/80 border-slate-700 text-slate-400`}>
-                        {household.analysis_level === 'expenses_only'      ? 'Solo gastos' :
-                         household.analysis_level === 'expenses_and_goals' ? 'Gastos + metas' :
-                         'Análisis completo'}
-                      </span>
+              {/* Decorative blobs */}
+              <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-8 -left-4 w-32 h-32 rounded-full bg-violet-500/8 blur-3xl pointer-events-none" />
+
+              <div className="relative px-5 pt-5 pb-4">
+
+                {/* Top row */}
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Icon badge */}
+                    <div className="w-11 h-11 bg-gradient-to-br from-indigo-400 to-violet-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/25">
+                      <Home className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="text-xl font-bold text-white tracking-tight truncate">
+                        {household.name}
+                      </h2>
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold border bg-slate-800/80 border-slate-700/60 text-slate-400 tracking-wide">
+                          {household.base_currency}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold border bg-indigo-500/10 border-indigo-500/25 text-indigo-400">
+                          {household.split_type === 'equal' ? 'Partes iguales' : 'Proporcional'}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold border bg-violet-500/10 border-violet-500/25 text-violet-400">
+                          {household.analysis_level === 'expenses_only'      ? 'Solo gastos' :
+                           household.analysis_level === 'expenses_and_goals' ? 'Gastos + metas' :
+                           'Análisis completo'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {isAdmin && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => inviteMutation.mutate()}
                         disabled={inviteMutation.isPending}
@@ -379,34 +390,65 @@ export default function HouseholdPage() {
                         Invitar
                       </button>
                       <button onClick={() => setShowEdit(true)}
-                        className={`p-1.5 rounded-xl transition-colors text-slate-400 hover:text-white hover:bg-slate-800`}>
+                        className="p-1.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent hover:border-slate-700/50 transition-all">
                         <Settings className="w-4 h-4" />
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Stats row */}
-                <div className="flex items-center gap-4 mt-3">
-                  <div className="flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-slate-400" />
-                    <span className={`text-xs text-slate-400`}>
-                      {activeMembers.length} {activeMembers.length === 1 ? 'miembro' : 'miembros'}
-                    </span>
-                  </div>
-                  {analytics && Number(analytics.total_shared) > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <Wallet className="w-3.5 h-3.5 text-slate-400" />
-                      <span className={`text-xs text-slate-400`}>
-                        {fmt(Number(analytics.total_shared))} {analytics.base_currency} compartido
+                {/* Divider */}
+                <div className="h-px bg-slate-800/60 mb-4" />
+
+                {/* Stats row + member avatars */}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/50 border border-slate-700/40 rounded-lg">
+                      <Users className="w-3 h-3 text-slate-500" />
+                      <span className="text-xs text-slate-400 font-medium">
+                        {activeMembers.length} {activeMembers.length === 1 ? 'miembro' : 'miembros'}
                       </span>
                     </div>
-                  )}
-                  {analytics && analytics.settlement.length === 0 && analytics.members.length > 0 && (
-                    <span className="text-xs font-semibold text-emerald-500">● Saldado</span>
-                  )}
-                  {analytics && analytics.settlement.length > 0 && (
-                    <span className="text-xs font-semibold text-rose-400">● Deuda pendiente</span>
+                    {analytics && Number(analytics.total_shared) > 0 && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/50 border border-slate-700/40 rounded-lg">
+                        <Wallet className="w-3 h-3 text-slate-500" />
+                        <span className="text-xs text-slate-400 font-medium">
+                          {fmt(Number(analytics.total_shared))} {analytics.base_currency}
+                        </span>
+                      </div>
+                    )}
+                    {analytics && analytics.settlement.length === 0 && analytics.members.length > 0 && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                        <span className="text-xs text-emerald-400 font-semibold">Saldado</span>
+                      </div>
+                    )}
+                    {analytics && analytics.settlement.length > 0 && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
+                        <span className="text-xs text-rose-400 font-semibold">Deuda pendiente</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Member avatar stack */}
+                  {activeMembers.length > 0 && (
+                    <div className="flex -space-x-2 shrink-0">
+                      {activeMembers.slice(0, 5).map(m => {
+                        const pal = avatarPalette(m.user_name)
+                        return (
+                          <div key={m.user_id} title={m.user_name}
+                            className={`w-7 h-7 rounded-full border-2 border-slate-900/80 flex items-center justify-center text-xs font-bold ${pal.bg} ${pal.text}`}>
+                            {m.user_name.charAt(0).toUpperCase()}
+                          </div>
+                        )
+                      })}
+                      {activeMembers.length > 5 && (
+                        <div className="w-7 h-7 rounded-full border-2 border-slate-900/80 bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                          +{activeMembers.length - 5}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
