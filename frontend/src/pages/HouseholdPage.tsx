@@ -273,35 +273,43 @@ export default function HouseholdPage() {
         </div>
       </header>
 
-      {/* ── Action buttons ────────────────────────────────────────────────── */}
-      {households.length > 0 && (
-        <div className="flex gap-2 mb-4 justify-end">
-          <button onClick={() => setShowJoin(true)}
-            className="px-4 py-2 rounded-xl text-sm font-semibold border transition-all bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700">
-            Unirse
-          </button>
-          <button onClick={() => setShowCreate(true)}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-xl text-sm font-semibold hover:bg-indigo-500/30 transition-all">
-            <Plus className="w-4 h-4" /> Crear
-          </button>
-        </div>
-      )}
-
       <div className="space-y-3 sm:space-y-5">
 
-        {/* ── Tabs múltiples hogares ────────────────────────────────────── */}
-        {households.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-            {households.map(h => (
-              <button key={h.id} onClick={() => setSelectedId(h.id)}
-                className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
-                  (selectedId ?? households[0]?.id) === h.id
-                    ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-                }`}>
-                {h.name}
+        {/* ── Selector de hogar + acciones ─────────────────────────────── */}
+        {households.length > 0 && (
+          <div className="flex items-center gap-3 bg-slate-900/40 border border-slate-800/50 rounded-2xl px-3 py-2 backdrop-blur-sm">
+            {/* Tabs — izquierda */}
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto [scrollbar-width:none]">
+              {households.map(h => {
+                const isActive = (selectedId ?? households[0]?.id) === h.id
+                return (
+                  <button key={h.id} onClick={() => setSelectedId(h.id)}
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
+                      isActive
+                        ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'
+                        : 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    }`}>
+                    <Home className="w-3.5 h-3.5 shrink-0" />
+                    {h.name}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Divider */}
+            <div className="w-px h-5 bg-slate-700/60 shrink-0" />
+
+            {/* Botones — derecha */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button onClick={() => setShowJoin(true)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-slate-200">
+                Unirse
               </button>
-            ))}
+              <button onClick={() => setShowCreate(true)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-xl text-xs font-semibold hover:bg-indigo-500/30 transition-all">
+                <Plus className="w-3.5 h-3.5" /> Crear
+              </button>
+            </div>
           </div>
         )}
 
