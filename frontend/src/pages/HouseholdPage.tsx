@@ -556,11 +556,6 @@ export default function HouseholdPage() {
                       <div id="fluxo-export-household-donut" className="lg:col-span-3 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col h-[500px]">
                         <div className="flex items-center justify-between mb-4">
                           <div>
-                            <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl mb-1.5">
-                              <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/30">
-                                Gastos
-                              </span>
-                            </div>
                             <p className="text-xs text-slate-500">
                               Por {donutGroupBy === 'category' ? 'categoría' : 'concepto'} · {MONTH_NAMES[month - 1]} {year}
                             </p>
