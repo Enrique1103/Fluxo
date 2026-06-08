@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Activity, BarChart2, Upload, Home, Users, Plus, Copy, Check,
   Loader2, X, UserCheck, UserX, ArrowRight,
-  AlertTriangle, Settings, Crown, Wallet, TrendingDown,
+  AlertTriangle, Settings, Crown, Wallet, TrendingDown, TrendingUp,
   Eye, EyeOff, ChevronLeft, ChevronRight, Search, ChevronDown, DollarSign, Flag,
 } from 'lucide-react'
 import { useHouseholdEvents } from '../hooks/useHouseholdEvents'
@@ -13,6 +13,7 @@ import {
   fetchHouseholds, generateInvite, fetchMembers, approveMember, removeMember,
   fetchHouseholdAnalytics,
 } from '../api/households'
+import { fetchFinGoals, type FinGoal } from '../api/dashboard'
 import HouseholdKPICards from '../components/household/HouseholdKPICards'
 import DonutChart, { catColor } from '../components/DonutChart'
 import ExpenseHeatmap from '../components/ExpenseHeatmap'
@@ -90,6 +91,13 @@ export default function HouseholdPage() {
     retry:    false,
   })
 
+  const showGoals = household?.analysis_level === 'expenses_and_goals' || household?.analysis_level === 'full'
+  const { data: finGoals = [], isLoading: goalsLoading } = useQuery({
+    queryKey: ['fin-goals'],
+    queryFn:  fetchFinGoals,
+    enabled:  showGoals,
+  })
+
   const inviteMutation = useMutation({
     mutationFn: () => generateInvite(household!.id),
     onSuccess:  (inv) => { setInviteCode(inv.code); setShowInvite(true) },
@@ -149,6 +157,12 @@ export default function HouseholdPage() {
 
   const sectionTitle = 'text-xs font-semibold uppercase tracking-widest text-slate-500'
   const fmt = (n: number | string) => privacy ? '••••' : fmtNum(typeof n === 'string' ? Number(n) : n)
+
+  const GOAL_COLORS = ['bg-indigo-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-sky-500']
+  const fmtGoalAmount = (goal: FinGoal, n: number) =>
+    privacy ? '••••' : new Intl.NumberFormat('es-UY', {
+      style: 'currency', currency: goal.currency, maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol',
+    }).format(n)
 
   const now = new Date()
   const isMaxMonth = year === now.getFullYear() && month === now.getMonth() + 1
@@ -659,6 +673,83 @@ export default function HouseholdPage() {
                       </div>
 
                     </div>
+
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* N2. METAS FINANCIERAS (nivel expenses_and_goals+)  */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {showGoals && (
+                      <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                        <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2.5">
+                          <div className="w-7 h-7 bg-indigo-500/10 rounded-lg flex items-center justify-center">
+                            <TrendingUp className="w-3.5 h-3.5 text-indigo-400" />
+                          </div>
+                          <div>
+                            <p className={sectionTitle}>Mis metas financieras</p>
+                            <p className="text-xs text-slate-500 mt-0.5">Tus objetivos personales</p>
+                          </div>
+                        </div>
+
+                        {goalsLoading ? (
+                          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {[1, 2, 3].map(i => (
+                              <div key={i} className="h-24 bg-slate-800/50 animate-pulse rounded-xl" />
+                            ))}
+                          </div>
+                        ) : finGoals.length === 0 ? (
+                          <div className="py-10 text-center">
+                            <div className="inline-flex items-center justify-center w-10 h-10 bg-indigo-500/10 rounded-2xl mb-3">
+                              <TrendingUp className="w-5 h-5 text-indigo-400/50" />
+                            </div>
+                            <p className="text-slate-500 text-sm">Sin metas configuradas</p>
+                            <p className="text-slate-600 text-xs mt-1">Creá una meta desde tu dashboard personal.</p>
+                          </div>
+                        ) : (
+                          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {finGoals.map((goal, idx) => {
+                              const current = Number(goal.current_amount ?? 0)
+                              const target  = Number(goal.target_amount)
+                              const pct     = target > 0 ? Math.min((current / target) * 100, 100) : 0
+                              return (
+                                <div key={goal.id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4 flex flex-col gap-2.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-sm font-medium text-slate-200 truncate">{goal.name}</span>
+                                    {goal.is_completed && (
+                                      <span className="shrink-0 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                                        ✓ Lograda
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full transition-all duration-700 ${GOAL_COLORS[idx % GOAL_COLORS.length]}`}
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-slate-400">
+                                      {fmtGoalAmount(goal, current)} / {fmtGoalAmount(goal, target)}
+                                    </span>
+                                    <span className={`text-xs font-bold ${pct >= 100 ? 'text-emerald-400' : 'text-slate-300'}`}>
+                                      {pct.toFixed(0)}%
+                                    </span>
+                                  </div>
+
+                                  {goal.deadline && (
+                                    <p className="text-[10px] text-slate-500">
+                                      Límite: {new Date(goal.deadline + 'T00:00:00').toLocaleDateString('es-UY', {
+                                        day: '2-digit', month: 'short', year: 'numeric',
+                                      })}
+                                    </p>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* ══════════════════════════════════════════════════ */}
                     {/* 1c. INGRESOS DEL HOGAR (F03 — solo FULL)          */}
