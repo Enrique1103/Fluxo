@@ -108,7 +108,7 @@ function ReviewThread({
   const authorName = author?.user_name ?? 'Miembro'
   const pal        = avatarPalette(authorName)
   const isAuthor   = review.flagged_by_user_id === currentUserId
-  const canDelete  = isAuthor && review.status === 'pendiente'
+  const canDelete  = isAuthor
   const canRespond = isAdmin && !['resuelta', 'descartada'].includes(review.status)
 
   const deleteMutation = useMutation({
