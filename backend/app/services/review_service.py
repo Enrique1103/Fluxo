@@ -127,8 +127,6 @@ def delete(
         raise ReviewNotFound("Review no encontrada")
     if review.flagged_by_user_id != current_user.id:
         raise UnauthorizedReviewAccess("Solo el autor puede eliminar su propia review")
-    if review.status != ReviewStatus.PENDING:
-        raise ReviewAlreadyResolved("Solo se puede eliminar una review pendiente")
 
     try:
         review_crud.delete(db, review)
