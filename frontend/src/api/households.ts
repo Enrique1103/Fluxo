@@ -94,6 +94,20 @@ export interface MemberIncome {
   currency: string
 }
 
+export interface MemberTransaction {
+  transaction_id: string
+  date: string
+  type: 'income' | 'expense'
+  concept_name: string
+  category_name: string
+  amount: number
+  currency: string
+  user_id: string
+  user_name: string
+  account_name: string
+  description?: string | null
+}
+
 export interface HouseholdAnalytics {
   household_id: string
   period: string
@@ -114,6 +128,7 @@ export interface HouseholdAnalytics {
   member_incomes: MemberIncome[] | null
   net_savings: number | null
   total_group_income: number | null
+  member_transactions: MemberTransaction[] | null
 }
 
 // --- API calls ---

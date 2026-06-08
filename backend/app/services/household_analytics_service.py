@@ -12,7 +12,7 @@ from app.models.users_models import User
 from app.schemas.household_schema import (
     HouseholdAnalyticsResponse, MemberContribution,
     SettlementItem, SharedExpense, HouseholdAlert, CategoryBreakdown,
-    ConceptBreakdown, MemberIncome,
+    ConceptBreakdown, MemberIncome, MemberTransaction,
 )
 
 
@@ -333,6 +333,7 @@ def get_analytics(
     member_incomes: list[MemberIncome] | None = None
     net_savings: Decimal | None = None
     total_group_income_out: Decimal | None = None
+    member_transactions_list: list[MemberTransaction] | None = None
 
     effective_level = household.analysis_level or AnalysisLevel.EXPENSES_ONLY
     if effective_level == AnalysisLevel.FULL:
@@ -347,6 +348,36 @@ def get_analytics(
         ]
         total_group_income_out = total_group_income.quantize(Decimal("0.01"))
         net_savings = (total_group_income - total_shared).quantize(Decimal("0.01"))
+
+        # Todos los movimientos individuales de los miembros en el período
+        all_member_txs = (
+            db.query(Transaction)
+            .options(joinedload(Transaction.account))
+            .filter(
+                Transaction.user_id.in_(member_ids),
+                Transaction.is_deleted == False,
+                Transaction.date >= date_from,
+                Transaction.date <= date_to,
+            )
+            .order_by(Transaction.date.desc())
+            .all()
+        )
+        member_transactions_list = [
+            MemberTransaction(
+                transaction_id=tx.id,
+                date=str(tx.date),
+                type=tx.type.value,
+                concept_name=tx.concept.name if tx.concept else "",
+                category_name=tx.category.name if tx.category else "",
+                amount=tx.amount,
+                currency=tx.account.currency if tx.account else base_currency,
+                user_id=tx.user_id,
+                user_name=_get_user_name(db, tx.user_id),
+                account_name=tx.account.name if tx.account else "",
+                description=tx.description,
+            )
+            for tx in all_member_txs
+        ]
 
     # ── Pending member alerts ────────────────────────────────────────────────
     pending = household_crud.get_pending_members(db, household_id)
@@ -377,4 +408,5 @@ def get_analytics(
         member_incomes=member_incomes,
         net_savings=net_savings,
         total_group_income=total_group_income_out,
+        member_transactions=member_transactions_list,
     )

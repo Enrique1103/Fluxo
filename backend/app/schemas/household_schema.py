@@ -19,6 +19,20 @@ class MemberIncome(BaseModel):
     currency: str
 
 
+class MemberTransaction(BaseModel):
+    transaction_id: uuid.UUID
+    date: str
+    type: str                  # "income" | "expense"
+    concept_name: str
+    category_name: str
+    amount: Decimal
+    currency: str
+    user_id: uuid.UUID
+    user_name: str
+    account_name: str
+    description: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Household
 # ---------------------------------------------------------------------------
@@ -166,6 +180,7 @@ class HouseholdAnalyticsResponse(BaseModel):
     prev_month_change_pct: Decimal | None
     # F03: nivel de análisis y datos condicionales
     analysis_level: AnalysisLevel
-    member_incomes: list[MemberIncome] | None   # Solo cuando analysis_level=FULL
-    net_savings: Decimal | None                 # Solo cuando analysis_level=FULL
-    total_group_income: Decimal | None          # Solo cuando analysis_level=FULL
+    member_incomes: list[MemberIncome] | None                  # Solo cuando analysis_level=FULL
+    net_savings: Decimal | None                               # Solo cuando analysis_level=FULL
+    total_group_income: Decimal | None                        # Solo cuando analysis_level=FULL
+    member_transactions: list[MemberTransaction] | None = None  # Solo cuando analysis_level=FULL

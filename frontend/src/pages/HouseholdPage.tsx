@@ -68,9 +68,11 @@ export default function HouseholdPage() {
   const [month,  setMonth]  = useState(() => new Date().getMonth() + 1)
   const [flagTx, setFlagTx] = useState<SharedExpense | null>(null)
 
-  const [donutGroupBy,    setDonutGroupBy]    = useState<'category' | 'concept'>('category')
-  const [donutSelected,   setDonutSelected]   = useState<string | null>(null)
+  const [donutGroupBy,      setDonutGroupBy]      = useState<'category' | 'concept'>('category')
+  const [donutSelected,     setDonutSelected]     = useState<string | null>(null)
   const [personalDonutMode, setPersonalDonutMode] = useState<'expense' | 'income'>('expense')
+  const [personalGroupBy,   setPersonalGroupBy]   = useState<'category' | 'concept'>('category')
+  const [memberTxFilter,    setMemberTxFilter]    = useState<'all' | 'income' | 'expense'>('all')
 
   useHouseholdEvents()
 
@@ -730,8 +732,7 @@ export default function HouseholdPage() {
                       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-6">
                         {/* Personal donut con toggle Gastos/Ingresos */}
                         <div className="lg:col-span-3 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col h-[500px]">
-                          <div className="flex items-center justify-between mb-4">
-                            <p className="text-xs text-slate-500">{personalDonutMode === 'expense' ? 'Distribución de gastos' : 'Distribución de ingresos'} · {MONTH_NAMES[month - 1]} {year}</p>
+                          <div className="flex items-center gap-2 mb-4 flex-wrap">
                             <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl">
                               <button onClick={() => setPersonalDonutMode('expense')}
                                 className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${personalDonutMode === 'expense' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'text-slate-500 hover:text-slate-300'}`}>
@@ -742,11 +743,22 @@ export default function HouseholdPage() {
                                 Ingresos
                               </button>
                             </div>
+                            <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl">
+                              <button onClick={() => setPersonalGroupBy('category')}
+                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${personalGroupBy === 'category' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-500 hover:text-slate-300'}`}>
+                                Categorías
+                              </button>
+                              <button onClick={() => setPersonalGroupBy('concept')}
+                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${personalGroupBy === 'concept' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-500 hover:text-slate-300'}`}>
+                                Conceptos
+                              </button>
+                            </div>
+                            <p className="text-xs text-slate-500 ml-auto">{personalDonutMode === 'expense' ? 'Distribución de gastos' : 'Distribución de ingresos'} · {MONTH_NAMES[month - 1]} {year}</p>
                           </div>
                           {(() => {
                             const items = personalDonutMode === 'expense'
-                              ? (breakdown?.categories ?? [])
-                              : (breakdown?.income_categories ?? [])
+                              ? (personalGroupBy === 'category' ? (breakdown?.categories ?? []) : (breakdown?.concepts ?? []))
+                              : (personalGroupBy === 'category' ? (breakdown?.income_categories ?? []) : (breakdown?.income_concepts ?? []))
                             const total = items.reduce((s, c) => s + c.total, 0)
                             if (items.length === 0) return (
                               <div className="flex-1 flex items-center justify-center">
@@ -975,48 +987,85 @@ export default function HouseholdPage() {
                     )}
 
                     {/* ══════════════════════════════════════════════════ */}
-                    {/* 1c. INGRESOS DEL HOGAR (F03 — solo FULL)          */}
+                    {/* 1c. MOVIMIENTOS DE MIEMBROS (F03 — solo FULL)     */}
                     {/* ══════════════════════════════════════════════════ */}
-                    {analytics.analysis_level === 'full' && analytics.member_incomes && (
-                      <div className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
-                        <div className={`px-5 py-4 border-b border-slate-800`}>
-                          <div className="flex items-center justify-between">
-                            <p className={sectionTitle}>Ingresos del grupo</p>
-                            {analytics.total_group_income !== null && (
-                              <span className="text-xs font-bold tabular-nums text-emerald-400">
-                                {fmt(Number(analytics.total_group_income))}
-                                <span className="font-normal ml-1 text-slate-500">{analytics.base_currency}</span>
-                              </span>
-                            )}
+                    {analytics.analysis_level === 'full' && analytics.member_transactions && analytics.member_transactions.length > 0 && (
+                      <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                        <div className="px-5 py-4 border-b border-slate-800">
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div>
+                              <p className={sectionTitle}>Movimientos de miembros</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{MONTH_NAMES[month - 1]} {year}</p>
+                            </div>
+                            <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl">
+                              <button onClick={() => setMemberTxFilter('all')}
+                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${memberTxFilter === 'all' ? 'bg-slate-600/60 text-slate-200 border border-slate-500/30' : 'text-slate-500 hover:text-slate-300'}`}>
+                                Todos
+                              </button>
+                              <button onClick={() => setMemberTxFilter('income')}
+                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${memberTxFilter === 'income' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-500 hover:text-slate-300'}`}>
+                                Ingresos
+                              </button>
+                              <button onClick={() => setMemberTxFilter('expense')}
+                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${memberTxFilter === 'expense' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'text-slate-500 hover:text-slate-300'}`}>
+                                Gastos
+                              </button>
+                            </div>
                           </div>
-                          {analytics.net_savings !== null && (
-                            <p className={`text-xs mt-1 ${Number(analytics.net_savings) >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
-                              Ahorro neto: {Number(analytics.net_savings) >= 0 ? '+' : ''}{fmt(Number(analytics.net_savings))} {analytics.base_currency}
-                            </p>
-                          )}
                         </div>
-                        <div className="p-4 space-y-3">
-                          {analytics.member_incomes.map(mi => {
-                            const totalIncome = Number(analytics.total_group_income) || 1
-                            const pct = Number(mi.amount) / totalIncome
-                            const pal = avatarPalette(mi.user_name)
-                            return (
-                              <div key={mi.user_id}>
-                                <div className="flex items-center gap-2 mb-1.5">
-                                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${pal.bg} ${pal.text}`}>
-                                    {mi.user_name.charAt(0).toUpperCase()}
-                                  </div>
-                                  <span className="text-xs flex-1 truncate text-slate-300">{mi.user_name}</span>
-                                  <span className="text-[10px] text-slate-500 tabular-nums shrink-0">{(pct * 100).toFixed(0)}%</span>
-                                  <span className="text-xs font-semibold tabular-nums shrink-0 text-emerald-400">{fmt(Number(mi.amount))}</span>
-                                </div>
-                                <div className="h-1.5 rounded-full overflow-hidden bg-slate-800">
-                                  <div className="h-full rounded-full bg-emerald-500 transition-all duration-700"
-                                    style={{ width: `${Math.max(pct * 100, 2)}%` }} />
-                                </div>
-                              </div>
+                        <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 340 }}>
+                          {(() => {
+                            const displayed = analytics.member_transactions!.filter(tx =>
+                              memberTxFilter === 'all' || tx.type === memberTxFilter,
                             )
-                          })}
+                            if (displayed.length === 0) return (
+                              <p className="text-sm text-center py-6 text-slate-500">Sin movimientos</p>
+                            )
+                            return (
+                              <table className="w-full text-xs">
+                                <thead className="sticky top-0 bg-slate-900 z-10">
+                                  <tr className="text-slate-600 uppercase text-[11px]">
+                                    <th className="text-left pb-2 pt-1 pl-4">Fecha</th>
+                                    <th className="text-left pb-2 pt-1">Tipo</th>
+                                    <th className="text-left pb-2 pt-1">Categoría · Concepto</th>
+                                    <th className="text-left pb-2 pt-1 hidden sm:table-cell">Miembro</th>
+                                    <th className="text-right pb-2 pt-1 pr-4">Monto</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                  {displayed.map(tx => {
+                                    const pal = avatarPalette(tx.user_name)
+                                    const isIncome = tx.type === 'income'
+                                    return (
+                                      <tr key={tx.transaction_id} className="hover:bg-slate-800/30 transition-colors">
+                                        <td className="py-2 pl-4 text-slate-500 whitespace-nowrap">{tx.date}</td>
+                                        <td className="py-2">
+                                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isIncome ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                                            {isIncome ? 'Ingreso' : 'Gasto'}
+                                          </span>
+                                        </td>
+                                        <td className="py-2">
+                                          <p className="text-slate-300 font-medium leading-tight">{tx.category_name}</p>
+                                          <p className="text-slate-600 leading-tight">{tx.concept_name}</p>
+                                        </td>
+                                        <td className="py-2 hidden sm:table-cell">
+                                          <div className="flex items-center gap-1.5">
+                                            <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${pal.bg} ${pal.text}`}>
+                                              {tx.user_name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="text-slate-500 truncate">{tx.user_name}</span>
+                                          </div>
+                                        </td>
+                                        <td className={`py-2 pr-4 text-right font-semibold tabular-nums ${isIncome ? 'text-cyan-400' : 'text-rose-400'}`}>
+                                          {isIncome ? '+' : '-'}{fmt(Number(tx.amount))}
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            )
+                          })()}
                         </div>
                       </div>
                     )}
