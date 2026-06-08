@@ -134,11 +134,11 @@ export default function HouseholdPage() {
     enabled:  showFull,
   })
 
-  const prevYear  = month === 1 ? year - 1 : year
-  const prevMonth = month === 1 ? 12 : month - 1
+  const prevYear     = month === 1 ? year - 1 : year
+  const prevMonthNum = month === 1 ? 12 : month - 1
   const { data: prevBreakdown } = useQuery({
-    queryKey: ['monthly-breakdown', prevYear, prevMonth, currency],
-    queryFn:  () => fetchMonthlyBreakdown(prevYear, prevMonth, currency),
+    queryKey: ['monthly-breakdown', prevYear, prevMonthNum, currency],
+    queryFn:  () => fetchMonthlyBreakdown(prevYear, prevMonthNum, currency),
     enabled:  showFull,
   })
 
@@ -655,7 +655,7 @@ export default function HouseholdPage() {
                                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${deltaGood ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
                                       {deltaUp ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
                                     </span>
-                                    <span className="text-[10px] text-slate-500">vs {MONTH_NAMES[prevMonth - 1]}</span>
+                                    <span className="text-[10px] text-slate-500">vs {MONTH_NAMES[prevMonthNum - 1]}</span>
                                   </div>
                                 ) : (
                                   <div className="h-5" />
@@ -673,6 +673,53 @@ export default function HouseholdPage() {
                         currency={analytics.base_currency}
                         privacy={privacy}
                       />
+                    )}
+
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* 0b. MONTHLY CHART (solo FULL)                     */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {showFull && (
+                      <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                        <div className="px-5 py-4 border-b border-slate-800">
+                          <p className={sectionTitle}>Ingresos · Gastos · Ahorro</p>
+                          <p className="text-xs text-slate-500 mt-0.5">Evolución mensual personal</p>
+                        </div>
+                        <div className="p-4">
+                          {chartLoading ? (
+                            <div className="h-72 bg-slate-800/50 animate-pulse rounded-xl" />
+                          ) : chartData.length === 0 ? (
+                            <div className="h-40 flex items-center justify-center">
+                              <p className="text-xs text-slate-500">Sin datos de movimientos</p>
+                            </div>
+                          ) : (
+                            <MonthlyChart data={chartData} patrimonio={patrimonioData} privacy={privacy} currency={currency} />
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* 0c. PATRIMONIO NETO TOTAL (solo FULL)             */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {showFull && (
+                      <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                        <div className="px-5 py-4 border-b border-slate-800">
+                          <p className={sectionTitle}>Patrimonio Neto Total</p>
+                          <p className="text-xs text-slate-500 mt-0.5">Activos menos deudas personales</p>
+                        </div>
+                        <div className="p-4">
+                          <PatrimonioChart
+                            data={patrimonioData}
+                            isLoading={patrimonioLoading}
+                            isError={patrimonioError}
+                            firstTxMonth={summary?.first_tx_month}
+                            privacy={privacy}
+                            currency={currency}
+                            netWorth={Number(summary?.net_worth ?? 0)}
+                            netWorthLoading={!summary}
+                          />
+                        </div>
+                      </div>
                     )}
 
                     {/* ══════════════════════════════════════════════════ */}
