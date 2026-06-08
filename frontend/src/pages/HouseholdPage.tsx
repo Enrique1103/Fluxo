@@ -745,16 +745,14 @@ export default function HouseholdPage() {
                     )}
 
                     {/* ══════════════════════════════════════════════════ */}
-                    {/* 2. ANÁLISIS POR MIEMBRO + REVIEWS (lado a lado)   */}
+                    {/* 2. ANÁLISIS POR MIEMBRO                           */}
                     {/* ══════════════════════════════════════════════════ */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 lg:items-start">
-
                     {analytics.members.length > 0 && (
-                      <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl backdrop-blur-sm overflow-hidden">
-                        <div className="px-5 py-4 border-b border-slate-800/50">
+                      <div className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
+                        <div className={`px-5 py-4 border-b border-slate-800`}>
                           <p className={sectionTitle}>Análisis por miembro</p>
                         </div>
-                        <div className="p-4 grid gap-4 grid-cols-1">
+                        <div className={`p-4 grid gap-4 ${analytics.members.length >= 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
                           {analytics.members.map(m => {
                             const breakdown = getMemberBreakdown(analytics.shared_expenses, m.user_id)
                             const balance   = Number(m.balance)
@@ -762,7 +760,7 @@ export default function HouseholdPage() {
                             const pal       = avatarPalette(m.user_name)
                             return (
                               <div key={m.user_id}
-                                className="rounded-2xl border p-4 flex flex-col gap-3 bg-slate-800/40 border-slate-700/40">
+                                className={`rounded-2xl border p-4 flex flex-col gap-3 bg-slate-800/50 border-slate-700/40`}>
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2.5 min-w-0">
                                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 ${pal.bg} ${pal.text}`}>
@@ -824,15 +822,6 @@ export default function HouseholdPage() {
                         </div>
                       </div>
                     )}
-
-                    {/* Reviews — columna derecha */}
-                    <ReviewsPanel
-                      householdId={household.id}
-                      currentUserId={currentUserId ?? ''}
-                      members={activeMembers}
-                    />
-
-                    </div>{/* end grid miembro+reviews */}
 
                     {/* ══════════════════════════════════════════════════ */}
                     {/* 3. LIQUIDACIÓN                                    */}
@@ -1117,6 +1106,14 @@ export default function HouseholdPage() {
                       )
                     })()}
 
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* 5. REVIEWS DE GASTOS                              */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    <ReviewsPanel
+                      householdId={household.id}
+                      currentUserId={currentUserId ?? ''}
+                      members={activeMembers}
+                    />
                   </>
                 )}
               </>
