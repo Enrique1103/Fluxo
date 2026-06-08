@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Activity, BarChart2, Upload, Home, Users, Plus, Copy, Check,
-  Loader2, X, UserCheck, UserX, ArrowRight,
+  Loader2, X, UserCheck, UserX, ArrowRight, Calendar,
   AlertTriangle, Settings, Crown, Wallet, TrendingDown, TrendingUp,
   Eye, EyeOff, ChevronLeft, ChevronRight, Search, ChevronDown, DollarSign, Flag,
 } from 'lucide-react'
@@ -13,8 +13,8 @@ import {
   fetchHouseholds, generateInvite, fetchMembers, approveMember, removeMember,
   fetchHouseholdAnalytics,
 } from '../api/households'
-import { fetchFinGoals, fetchIncomeVsExpenses, fetchPatrimonio, fetchSummary, type FinGoal } from '../api/dashboard'
-import MonthlyChart from '../components/MonthlyChart'
+import { fetchFinGoals, fetchIncomeVsExpenses, fetchPatrimonio, fetchSummary, fetchMonthlyBreakdown, type FinGoal } from '../api/dashboard'
+import MonthlyChart, { fmtMoney } from '../components/MonthlyChart'
 import PatrimonioChart from '../components/PatrimonioChart'
 import HouseholdKPICards from '../components/household/HouseholdKPICards'
 import DonutChart, { catColor } from '../components/DonutChart'
@@ -70,6 +70,7 @@ export default function HouseholdPage() {
 
   const [donutGroupBy,    setDonutGroupBy]    = useState<'category' | 'concept'>('category')
   const [donutSelected,   setDonutSelected]   = useState<string | null>(null)
+  const [personalDonutMode, setPersonalDonutMode] = useState<'expense' | 'income'>('expense')
 
   useHouseholdEvents()
 
@@ -124,6 +125,20 @@ export default function HouseholdPage() {
   const { data: patrimonioData = [], isLoading: patrimonioLoading, isError: patrimonioError } = useQuery({
     queryKey: ['patrimonio', monthsBack, 0, currency],
     queryFn:  () => fetchPatrimonio(monthsBack, 0, currency),
+    enabled:  showFull,
+  })
+
+  const { data: breakdown, isLoading: breakdownLoading } = useQuery({
+    queryKey: ['monthly-breakdown', year, month, currency],
+    queryFn:  () => fetchMonthlyBreakdown(year, month, currency),
+    enabled:  showFull,
+  })
+
+  const prevYear  = month === 1 ? year - 1 : year
+  const prevMonth = month === 1 ? 12 : month - 1
+  const { data: prevBreakdown } = useQuery({
+    queryKey: ['monthly-breakdown', prevYear, prevMonth, currency],
+    queryFn:  () => fetchMonthlyBreakdown(prevYear, prevMonth, currency),
     enabled:  showFull,
   })
 
@@ -593,19 +608,150 @@ export default function HouseholdPage() {
                 ) : (
                   <>
                     {/* ══════════════════════════════════════════════════ */}
-                    {/* 0. KPI CARDS (F01)                                 */}
+                    {/* 0. KPI CARDS                                       */}
                     {/* ══════════════════════════════════════════════════ */}
-                    <HouseholdKPICards
-                      totalShared={Number(analytics.total_shared)}
-                      dailyAverage={Number(analytics.daily_average)}
-                      prevChangePct={analytics.prev_month_change_pct !== null ? Number(analytics.prev_month_change_pct) : null}
-                      currency={analytics.base_currency}
-                      privacy={privacy}
-                    />
+                    {showFull ? (() => {
+                      const inc  = breakdown?.income   ?? 0
+                      const exp  = breakdown?.expenses ?? 0
+                      const sav  = breakdown?.savings  ?? 0
+                      const rate = inc > 0 ? (sav / inc) * 100 : 0
+                      const daysInMonth   = new Date(year, month, 0).getDate()
+                      const daysElapsed   = year === new Date().getFullYear() && month === new Date().getMonth() + 1
+                        ? new Date().getDate() : daysInMonth
+                      const daily = exp / Math.max(daysElapsed, 1)
+                      type CardDef = { label: string; value: number | null; prev: number | undefined; color: string; icon: React.ElementType; border: string; bg: string; better: boolean; extra?: string }
+                      const cards: CardDef[] = [
+                        { label: 'Ingresos',              value: inc,  prev: prevBreakdown?.income,   color: 'text-cyan-400',    icon: TrendingUp,   border: 'border-cyan-500/25',    bg: 'bg-cyan-500/10',    better: true  },
+                        { label: 'Gastos',                value: exp,  prev: prevBreakdown?.expenses, color: 'text-rose-400',    icon: TrendingDown, border: 'border-rose-500/25',    bg: 'bg-rose-500/10',    better: false },
+                        { label: 'Ahorro',                value: sav,  prev: prevBreakdown?.savings,  color: sav >= 0 ? 'text-emerald-400' : 'text-red-400', icon: sav >= 0 ? TrendingUp : TrendingDown, border: sav >= 0 ? 'border-emerald-500/25' : 'border-red-500/25', bg: sav >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10', better: true },
+                        { label: 'Tasa de Ahorro',        value: null, prev: undefined,               color: rate >= 0 ? 'text-violet-400' : 'text-red-400', icon: TrendingUp, border: 'border-violet-500/25', bg: 'bg-violet-500/10', better: true, extra: privacy ? '**%' : `${rate.toFixed(1)}%` },
+                        { label: 'Gasto Diario Promedio', value: null, prev: undefined,               color: 'text-amber-400',   icon: Calendar,     border: 'border-amber-500/25',   bg: 'bg-amber-500/10',   better: false, extra: privacy ? '••••' : `${fmtMoney(daily, currency, false)}/día` },
+                      ]
+                      return (
+                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                          {cards.map(({ label, value, prev, color, icon: Icon, border, bg, better, extra }) => {
+                            const delta = value != null && prev != null && prev !== 0
+                              ? ((value - prev) / Math.abs(prev)) * 100 : null
+                            const deltaUp   = delta != null && delta > 0
+                            const deltaGood = delta != null && (better ? deltaUp : !deltaUp)
+                            return (
+                              <div key={label} className={`relative bg-slate-900/40 border ${border} rounded-2xl p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-3`}>
+                                <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full ${bg} opacity-40 blur-2xl pointer-events-none`} />
+                                <div className="flex items-center justify-between">
+                                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{label}</p>
+                                  <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center`}>
+                                    <Icon className={`w-4 h-4 ${color}`} />
+                                  </div>
+                                </div>
+                                {breakdownLoading ? (
+                                  <div className="h-9 w-28 bg-slate-800 animate-pulse rounded-lg" />
+                                ) : (
+                                  <p className={`text-3xl font-bold tabular-nums leading-none ${color}`}>
+                                    {extra ?? fmtMoney(value!, currency, privacy)}
+                                  </p>
+                                )}
+                                {!privacy && delta != null && Math.abs(delta) >= 0.5 ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${deltaGood ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                                      {deltaUp ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
+                                    </span>
+                                    <span className="text-[10px] text-slate-500">vs {MONTH_NAMES[prevMonth - 1]}</span>
+                                  </div>
+                                ) : (
+                                  <div className="h-5" />
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })() : (
+                      <HouseholdKPICards
+                        totalShared={Number(analytics.total_shared)}
+                        dailyAverage={Number(analytics.daily_average)}
+                        prevChangePct={analytics.prev_month_change_pct !== null ? Number(analytics.prev_month_change_pct) : null}
+                        currency={analytics.base_currency}
+                        privacy={privacy}
+                      />
+                    )}
 
                     {/* ══════════════════════════════════════════════════ */}
                     {/* 1. DONUT (3/4) + HEATMAP (1/4)                   */}
                     {/* ══════════════════════════════════════════════════ */}
+                    {showFull ? (
+                      /* Nivel 3: datos personales con toggle gasto/ingreso */
+                      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-6">
+                        {/* Personal donut con toggle Gastos/Ingresos */}
+                        <div className="lg:col-span-3 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col h-[500px]">
+                          <div className="flex items-center justify-between mb-4">
+                            <p className="text-xs text-slate-500">{personalDonutMode === 'expense' ? 'Distribución de gastos' : 'Distribución de ingresos'} · {MONTH_NAMES[month - 1]} {year}</p>
+                            <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl">
+                              <button onClick={() => setPersonalDonutMode('expense')}
+                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${personalDonutMode === 'expense' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'text-slate-500 hover:text-slate-300'}`}>
+                                Gastos
+                              </button>
+                              <button onClick={() => setPersonalDonutMode('income')}
+                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${personalDonutMode === 'income' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-500 hover:text-slate-300'}`}>
+                                Ingresos
+                              </button>
+                            </div>
+                          </div>
+                          {(() => {
+                            const items = personalDonutMode === 'expense'
+                              ? (breakdown?.categories ?? [])
+                              : (breakdown?.income_categories ?? [])
+                            const total = items.reduce((s, c) => s + c.total, 0)
+                            if (items.length === 0) return (
+                              <div className="flex-1 flex items-center justify-center">
+                                <p className="text-slate-600 text-sm">Sin datos en {MONTH_NAMES[month - 1]}</p>
+                              </div>
+                            )
+                            return (
+                              <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 items-center sm:items-start flex-1 min-h-0">
+                                <DonutChart
+                                  categories={items}
+                                  income={personalDonutMode === 'income' ? total : breakdown?.income}
+                                  privacy={privacy}
+                                  selectedCategory={null}
+                                  mode={personalDonutMode}
+                                />
+                                <div className="flex-1 min-w-0 min-h-0 overflow-y-auto space-y-2 w-full pb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+                                  {items.map((item, i) => {
+                                    const pct = total > 0 ? (item.total / total) * 100 : 0
+                                    return (
+                                      <div key={item.name}>
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                          <span className="w-2.5 h-2.5 rounded-full shrink-0 self-start mt-1.5" style={{ background: catColor(i) }} />
+                                          <span className="text-sm text-slate-300 flex-1 truncate">{item.name}</span>
+                                          <span className="text-sm font-semibold text-slate-300 tabular-nums shrink-0">{fmt(item.total)}</span>
+                                          <span className="text-sm px-2 py-0.5 rounded-full font-semibold shrink-0 bg-slate-500/15 text-slate-400 border border-slate-500/20">{pct.toFixed(0)}%</span>
+                                        </div>
+                                        <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.max(Math.min(pct, 100), 3)}%`, background: catColor(i) }} />
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                        {/* Personal heatmap */}
+                        <div className="lg:col-span-1 bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm flex flex-col h-[500px]">
+                          <div className="mb-3">
+                            <h2 className="text-sm font-semibold text-slate-200">Mapa de Gastos</h2>
+                            <p className="text-sm text-slate-500 mt-0.5">Intensidad diaria</p>
+                          </div>
+                          <ExpenseHeatmap
+                            year={year}
+                            month={month}
+                            dailyExpenses={breakdown?.daily_expenses ?? []}
+                            privacy={privacy}
+                          />
+                        </div>
+                      </div>
+                    ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-6">
 
                       {/* Donut + Categorías/Conceptos — 3/4 */}
@@ -702,6 +848,7 @@ export default function HouseholdPage() {
                       </div>
 
                     </div>
+                    )}
 
                     {/* ══════════════════════════════════════════════════ */}
                     {/* N2. METAS FINANCIERAS (nivel expenses_and_goals+)  */}
@@ -777,58 +924,6 @@ export default function HouseholdPage() {
                             })}
                           </div>
                         )}
-                      </div>
-                    )}
-
-                    {/* ══════════════════════════════════════════════════ */}
-                    {/* N3a. INGRESOS · GASTOS · AHORRO (solo FULL)       */}
-                    {/* ══════════════════════════════════════════════════ */}
-                    {showFull && (
-                      <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
-                        <div className="px-5 py-4 border-b border-slate-800">
-                          <p className={sectionTitle}>Ingresos · Gastos · Ahorro</p>
-                          <p className="text-xs text-slate-500 mt-0.5">Evolución mensual personal</p>
-                        </div>
-                        <div className="p-4">
-                          {chartLoading ? (
-                            <div className="h-72 bg-slate-800/50 animate-pulse rounded-xl" />
-                          ) : chartData.length === 0 ? (
-                            <div className="h-40 flex items-center justify-center">
-                              <p className="text-xs text-slate-500">Sin datos de movimientos</p>
-                            </div>
-                          ) : (
-                            <MonthlyChart
-                              data={chartData}
-                              patrimonio={patrimonioData}
-                              privacy={privacy}
-                              currency={currency}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ══════════════════════════════════════════════════ */}
-                    {/* N3b. PATRIMONIO NETO TOTAL (solo FULL)            */}
-                    {/* ══════════════════════════════════════════════════ */}
-                    {showFull && (
-                      <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
-                        <div className="px-5 py-4 border-b border-slate-800">
-                          <p className={sectionTitle}>Patrimonio Neto Total</p>
-                          <p className="text-xs text-slate-500 mt-0.5">Activos menos deudas personales</p>
-                        </div>
-                        <div className="p-4">
-                          <PatrimonioChart
-                            data={patrimonioData}
-                            isLoading={patrimonioLoading}
-                            isError={patrimonioError}
-                            firstTxMonth={summary?.first_tx_month}
-                            privacy={privacy}
-                            currency={currency}
-                            netWorth={Number(summary?.net_worth ?? 0)}
-                            netWorthLoading={!summary}
-                          />
-                        </div>
                       </div>
                     )}
 
