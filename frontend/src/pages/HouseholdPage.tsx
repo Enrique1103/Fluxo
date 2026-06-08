@@ -354,7 +354,7 @@ export default function HouseholdPage() {
               <div className="relative px-5 pt-5 pb-4">
 
                 {/* Top row */}
-                <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex items-center gap-3 min-w-0">
                     {/* Icon badge */}
                     <div className="w-11 h-11 bg-gradient-to-br from-indigo-400 to-violet-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/25">
@@ -419,6 +419,44 @@ export default function HouseholdPage() {
                   )}
                 </div>
 
+                {/* Member chips row */}
+                {activeMembers.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {activeMembers.map(m => {
+                      const pal          = m.role === 'admin' ? { bg: 'bg-amber-500/20', text: 'text-amber-400' } : avatarPalette(m.user_name)
+                      const isConfirming = confirmRemoveId === m.user_id
+                      return isConfirming ? (
+                        <div key={m.id} className="flex items-center gap-1 px-1.5 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30">
+                          <span className="text-[10px] text-rose-400 font-semibold ml-1">¿Eliminar?</span>
+                          <button onClick={() => removeMutation.mutate(m.user_id)} disabled={removeMutation.isPending}
+                            className="p-1 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-all">
+                            {removeMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                          </button>
+                          <button onClick={() => setConfirmRemoveId(null)}
+                            className="p-1 rounded-lg text-slate-500 hover:bg-slate-700 transition-colors">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div key={m.id}
+                          className="group flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-800/50 border border-slate-700/40 hover:border-slate-600/60 transition-colors">
+                          <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${pal.bg} ${pal.text}`}>
+                            {m.user_name.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-xs text-slate-300 font-medium">{m.user_name}</span>
+                          {m.role === 'admin' && <Crown className="w-3 h-3 text-amber-400 shrink-0" />}
+                          {isAdmin && m.role !== 'admin' && (
+                            <button onClick={() => setConfirmRemoveId(m.user_id)}
+                              className="ml-0.5 p-0.5 rounded text-slate-700 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all">
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
               </div>
 
               {/* Invite code strip */}
@@ -467,55 +505,6 @@ export default function HouseholdPage() {
                 </div>
               )}
 
-              {/* Lista de miembros — grid compacto */}
-              <div className="px-5 py-4">
-                <p className={sectionTitle + ' mb-3'}>Miembros</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {activeMembers.map(m => {
-                    const pal          = m.role === 'admin' ? { bg: 'bg-amber-500/20', text: 'text-amber-400' } : avatarPalette(m.user_name)
-                    const isConfirming = confirmRemoveId === m.user_id
-                    return (
-                      <div key={m.id} className="relative flex flex-col items-center gap-2 px-3 py-3 rounded-2xl border transition-colors bg-slate-800/40 border-slate-700/40 hover:bg-slate-800/60">
-                        {/* Avatar */}
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${pal.bg} ${pal.text}`}>
-                          {m.user_name.charAt(0).toUpperCase()}
-                        </div>
-                        {/* Name + role */}
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <p className="text-xs font-semibold text-slate-200 truncate max-w-[90px]">{m.user_name}</p>
-                            {m.role === 'admin' && <Crown className="w-3 h-3 text-amber-400 shrink-0" />}
-                          </div>
-                          <p className="text-[10px] text-slate-500 mt-0.5">{m.role === 'admin' ? 'Admin' : 'Miembro'}</p>
-                        </div>
-                        {/* Remove */}
-                        {isAdmin && m.role !== 'admin' && (
-                          isConfirming ? (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-900/92 rounded-2xl backdrop-blur-sm">
-                              <p className="text-[10px] text-rose-400 font-semibold">¿Eliminar?</p>
-                              <div className="flex gap-1.5">
-                                <button onClick={() => removeMutation.mutate(m.user_id)} disabled={removeMutation.isPending}
-                                  className="p-1.5 bg-rose-500/20 border border-rose-500/30 text-rose-400 rounded-lg hover:bg-rose-500/30 transition-all">
-                                  {removeMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                                </button>
-                                <button onClick={() => setConfirmRemoveId(null)}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-700 transition-colors">
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <button onClick={() => setConfirmRemoveId(m.user_id)}
-                              className="absolute top-1.5 right-1.5 p-1 rounded-lg text-slate-700 hover:text-rose-400 hover:bg-rose-500/10 transition-all">
-                              <X className="w-3 h-3" />
-                            </button>
-                          )
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
             </div>
 
             {/* ── Analytics ─────────────────────────────────────────────── */}
