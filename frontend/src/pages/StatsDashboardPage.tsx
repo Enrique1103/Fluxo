@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import ExportButton from '../components/ExportButton'
 import MonthYearPicker from '../components/MonthYearPicker'
+import DonutChart, { catColor } from '../components/DonutChart'
+import ExpenseHeatmap from '../components/ExpenseHeatmap'
 import { exportMonthlyPDF } from '../lib/exportPDF'
 import {
   fetchMonthlyBreakdown,
@@ -50,13 +52,6 @@ function fmtDate(iso: string) {
   return `${d} ${MONTH_SHORT[m]}`
 }
 
-const CAT_COLORS = [
-  '#22d3ee','#f43f5e','#a78bfa','#fb923c','#34d399',
-  '#facc15','#60a5fa','#f472b6','#4ade80','#e879f9',
-]
-
-function catColor(idx: number) { return CAT_COLORS[idx % CAT_COLORS.length] }
-
 const WARN_PCT   = 20
 const DANGER_PCT = 35
 function semColor(pct: number) {
@@ -90,239 +85,6 @@ function PaymentBadge({ method }: { method: PaymentMethod }) {
     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${PAYMENT_METHOD_STYLES[method]}`}>
       {PAYMENT_METHOD_LABELS[method]}
     </span>
-  )
-}
-
-// ─── Donut ────────────────────────────────────────────────────────────────────
-
-function DonutChart({
-  data, privacy, selectedCategory, onCategoryClick, mode = 'expense', size = 210,
-}: {
-  data: MonthlyBreakdown
-  privacy: boolean
-  selectedCategory?: string | null
-  onCategoryClick?: (name: string | null) => void
-  mode?: 'expense' | 'income'
-  size?: number
-}) {
-  const { theme } = useTheme()
-  const isLight = theme === 'light'
-  const [hovered, setHovered] = useState<number | null>(null)
-
-  const { income, categories } = data
-  const total = categories.reduce((s, c) => s + c.total, 0)
-  if (total === 0) return null
-
-  const SIZE = 178, cx = 89, cy = 89, R = 73, r = 45
-  const GAP = 0.022
-  let angle = -Math.PI / 2
-
-  // Enforce minimum visual size (3%) so tiny slices are always visible
-  const MIN_FRAC = 0.03
-  const rawFracs  = categories.map(c => c.total / total)
-  const dispFracs = rawFracs.map(f => Math.max(f, MIN_FRAC))
-  const dispTotal = dispFracs.reduce((a, b) => a + b, 0)
-  const normFracs = dispFracs.map(f => f / dispTotal)
-
-  const slices = categories.map((cat, i) => {
-    const frac   = rawFracs[i]
-    const sweep  = normFracs[i] * Math.PI * 2
-    const gap    = Math.min(GAP, sweep * 0.2)
-    const start  = angle + gap / 2
-    const end    = angle + sweep - gap / 2
-    const mid    = angle + sweep / 2
-    angle       += sweep
-    return { frac, sweep, start, end, mid, color: catColor(i), name: cat.name, total: cat.total }
-  })
-
-  function arcPath(start: number, end: number) {
-    const large = end - start > Math.PI ? 1 : 0
-    const ox = cx + R * Math.cos(start), oy = cy + R * Math.sin(start)
-    const ex = cx + R * Math.cos(end),   ey = cy + R * Math.sin(end)
-    const ix = cx + r * Math.cos(end),   iy = cy + r * Math.sin(end)
-    const bx = cx + r * Math.cos(start), by = cy + r * Math.sin(start)
-    return `M ${ox} ${oy} A ${R} ${R} 0 ${large} 1 ${ex} ${ey} L ${ix} ${iy} A ${r} ${r} 0 ${large} 0 ${bx} ${by} Z`
-  }
-
-  const hasSelection = selectedCategory != null
-  const hovSeg = hovered !== null ? slices[hovered] : null
-  const textColor = isLight ? '#0f172a' : '#e2e8f0'
-  const subColor  = isLight ? '#475569' : '#64748b'
-
-  const fmtAmt = (v: number) =>
-    privacy ? '****' : v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${Math.round(v)}`
-
-  return (
-    <div className="shrink-0" onClick={() => onCategoryClick?.(null)}>
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ width: size, height: size }}>
-        {slices.map((s, i) => {
-          const isSelected = selectedCategory === s.name
-          const dimmed = hovered !== null ? hovered !== i : hasSelection && !isSelected
-          const dx = hovered === i ? Math.cos(s.mid) * 5 : 0
-          const dy = hovered === i ? Math.sin(s.mid) * 5 : 0
-          return (
-            <path
-              key={i}
-              d={arcPath(s.start, s.end)}
-              fill={s.color}
-              fillOpacity={dimmed ? 0.25 : 0.9}
-              stroke="#0f172a"
-              strokeWidth="2"
-              style={{
-                cursor: 'pointer',
-                transform: `translate(${dx}px, ${dy}px)`,
-                transition: 'fill-opacity 0.15s, transform 0.15s',
-              }}
-              onMouseEnter={() => setHovered(i)}
-              onMouseLeave={() => setHovered(null)}
-              onClick={(e) => { e.stopPropagation(); onCategoryClick?.(isSelected ? null : s.name) }}
-            />
-          )
-        })}
-
-        {hovSeg ? (
-          <>
-            <text x={cx} y={cy - 16} textAnchor="middle"
-              style={{ fontSize: '9px', fontWeight: 600, fill: hovSeg.color, letterSpacing: '0.02em' }}>
-              {hovSeg.name.length > 12 ? hovSeg.name.slice(0, 11) + '…' : hovSeg.name}
-            </text>
-            <text x={cx} y={cy + 4} textAnchor="middle" fill={textColor} fontSize="16" fontWeight="700">
-              {fmtAmt(hovSeg.total)}
-            </text>
-            <text x={cx} y={cy + 19} textAnchor="middle" fill={subColor} fontSize="10">
-              {privacy ? '**%' : `${(hovSeg.frac * 100).toFixed(1)}%`}
-            </text>
-          </>
-        ) : (
-          <>
-            <text x={cx} y={cy - 8} textAnchor="middle" fill={textColor} fontSize="15" fontWeight="700">
-              {fmtAmt(total)}
-            </text>
-            <text x={cx} y={cy + 8} textAnchor="middle" fill={subColor} fontSize="9">
-              {mode === 'income' ? 'en ingresos' : 'en gastos'}
-            </text>
-            {mode === 'expense' && income > 0 && (
-              <text x={cx} y={cy + 22} textAnchor="middle" fill={isLight ? '#059669' : '#34d399'} fontSize="9.5" fontWeight="600">
-                {privacy ? '**%' : `${((total / income) * 100).toFixed(0)}% del ing.`}
-              </text>
-            )}
-          </>
-        )}
-      </svg>
-    </div>
-  )
-}
-
-// ─── Heatmap ─────────────────────────────────────────────────────────────────
-
-function ExpenseHeatmap({
-  year, month, dailyExpenses, privacy,
-}: {
-  year: number
-  month: number
-  dailyExpenses: { date: string; total: number }[]
-  privacy: boolean
-}) {
-  const dayMap = useMemo(() => {
-    const m: Record<string, number> = {}
-    for (const d of dailyExpenses) m[d.date] = d.total
-    return m
-  }, [dailyExpenses])
-
-  const maxExp = useMemo(
-    () => Math.max(...dailyExpenses.map(d => d.total), 1),
-    [dailyExpenses]
-  )
-
-  // Build calendar grid
-  const firstDay = new Date(year, month - 1, 1)
-  const lastDay  = new Date(year, month, 0).getDate()
-  // Monday-based: 0=Mon..6=Sun
-  const startDow = (firstDay.getDay() + 6) % 7
-
-  const cells: { day: number | null; date: string | null }[] = []
-  for (let i = 0; i < startDow; i++) cells.push({ day: null, date: null })
-  for (let d = 1; d <= lastDay; d++) {
-    const mm = String(month).padStart(2, '0')
-    const dd = String(d).padStart(2, '0')
-    cells.push({ day: d, date: `${year}-${mm}-${dd}` })
-  }
-
-  const DOW = ['L','M','X','J','V','S','D']
-
-  // Multi-stop heat color: transparent → amber → orange → rose → crimson
-  const heatColor = (intensity: number): string => {
-    if (intensity <= 0) return 'rgba(255,255,255,0.03)'
-    const stops: [number, [number,number,number]][] = [
-      [0.00, [251, 191,  36]],  // amber-400
-      [0.25, [251, 146,  60]],  // orange-400
-      [0.50, [251, 113, 133]],  // rose-400
-      [0.75, [244,  63,  94]],  // rose-500
-      [1.00, [159,  18,  57]],  // rose-900
-    ]
-    const t = Math.max(0, Math.min(1, intensity))
-    let lo = stops[0], hi = stops[stops.length - 1]
-    for (let i = 0; i < stops.length - 1; i++) {
-      if (t >= stops[i][0] && t <= stops[i + 1][0]) { lo = stops[i]; hi = stops[i + 1]; break }
-    }
-    const span = hi[0] - lo[0]
-    const f = span > 0 ? (t - lo[0]) / span : 0
-    const r = Math.round(lo[1][0] + (hi[1][0] - lo[1][0]) * f)
-    const g = Math.round(lo[1][1] + (hi[1][1] - lo[1][1]) * f)
-    const b = Math.round(lo[1][2] + (hi[1][2] - lo[1][2]) * f)
-    return `rgb(${r},${g},${b})`
-  }
-
-  return (
-    <div className="select-none">
-      {/* Day headers */}
-      <div className="grid grid-cols-7 mb-1">
-        {DOW.map(d => (
-          <div key={d} className="text-center text-sm font-bold text-slate-600 py-1">{d}</div>
-        ))}
-      </div>
-
-      {/* Day cells */}
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((cell, i) => {
-          if (!cell.day || !cell.date) {
-            return <div key={i} />
-          }
-          const exp = dayMap[cell.date] ?? 0
-          const intensity = exp > 0 ? 0.1 + (exp / maxExp) * 0.9 : 0
-
-          const today = new Date()
-          const isToday =
-            today.getFullYear() === year &&
-            today.getMonth() + 1 === month &&
-            today.getDate() === cell.day
-
-          return (
-            <div
-              key={cell.date}
-              title={exp > 0 && !privacy ? `${cell.date}: $${exp.toFixed(0)}` : cell.date ?? ''}
-              className="relative aspect-square rounded-md flex flex-col items-center justify-center cursor-default"
-              style={{ background: heatColor(intensity), outline: isToday ? '1.5px solid #34d399' : undefined }}
-            >
-              <span className={`text-xs font-medium ${
-                exp > 0 ? 'text-white' : 'text-slate-600'
-              } ${isToday ? 'text-emerald-400' : ''}`}>
-                {cell.day}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Scale legend */}
-      <div className="flex items-center gap-2 mt-3 justify-end">
-        <span className="text-sm text-slate-600">Menos</span>
-        {[0.1, 0.325, 0.55, 0.775, 1.0].map(v => (
-          <div key={v} className="w-4 h-4 rounded-sm" style={{ background: heatColor(v) }} />
-        ))}
-        <span className="text-sm text-slate-600">Más</span>
-      </div>
-    </div>
   )
 }
 
@@ -1176,7 +938,8 @@ export default function StatsDashboardPage() {
             return (
               <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 items-center sm:items-start flex-1 min-h-0">
                 <DonutChart
-                  data={{ ...breakdown, categories: cats, income: total }}
+                  categories={cats}
+                  income={breakdown.income}
                   privacy={privacy}
                   selectedCategory={selectedCategory}
                   onCategoryClick={setSelectedCategory}

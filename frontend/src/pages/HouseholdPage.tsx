@@ -13,9 +13,9 @@ import {
   fetchHouseholds, generateInvite, fetchMembers, approveMember, removeMember,
   fetchHouseholdAnalytics,
 } from '../api/households'
-import CategoryDonut from '../components/household/CategoryDonut'
 import HouseholdKPICards from '../components/household/HouseholdKPICards'
-import HouseholdHeatmap from '../components/household/HouseholdHeatmap'
+import DonutChart, { catColor } from '../components/DonutChart'
+import ExpenseHeatmap from '../components/ExpenseHeatmap'
 import CreateModal from '../components/household/CreateModal'
 import JoinModal from '../components/household/JoinModal'
 import EditModal from '../components/household/EditModal'
@@ -64,6 +64,9 @@ export default function HouseholdPage() {
   const [year,   setYear]   = useState(() => new Date().getFullYear())
   const [month,  setMonth]  = useState(() => new Date().getMonth() + 1)
   const [flagTx, setFlagTx] = useState<SharedExpense | null>(null)
+
+  const [donutGroupBy,    setDonutGroupBy]    = useState<'category' | 'concept'>('category')
+  const [donutSelected,   setDonutSelected]   = useState<string | null>(null)
 
   useHouseholdEvents()
 
@@ -545,66 +548,104 @@ export default function HouseholdPage() {
                     />
 
                     {/* ══════════════════════════════════════════════════ */}
-                    {/* 1. DONUT (2/3) + HEATMAP (1/3)                   */}
+                    {/* 1. DONUT (3/4) + HEATMAP (1/4)                   */}
                     {/* ══════════════════════════════════════════════════ */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-6">
 
-                      {/* Gastos del grupo — 2/3 */}
-                      {analytics.expense_by_category.length > 0 && (
-                        <div id="fluxo-export-household-donut" className={`col-span-2 rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
-                          <div className={`px-5 py-4 border-b border-slate-800`}>
-                            <div className="flex items-center justify-between">
-                              <p className={sectionTitle}>Gastos del grupo</p>
-                              <span className={`text-xs font-bold tabular-nums text-slate-300`}>
-                                {fmt(Number(analytics.total_shared))}
-                                <span className={`font-normal ml-1 text-slate-500`}>{analytics.base_currency}</span>
+                      {/* Donut + Categorías/Conceptos — 3/4 */}
+                      <div id="fluxo-export-household-donut" className="lg:col-span-3 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col h-[500px]">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl mb-1.5">
+                              <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                                Gastos
                               </span>
                             </div>
+                            <p className="text-xs text-slate-500">
+                              Por {donutGroupBy === 'category' ? 'categoría' : 'concepto'} · {MONTH_NAMES[month - 1]} {year}
+                            </p>
                           </div>
-                          <div className="p-5 flex items-start gap-5">
-                            <div className="shrink-0">
-                              <CategoryDonut
-                                categories={analytics.expense_by_category.map(c => ({ name: c.category_name, total: Number(c.total) }))}
-                                total={Number(analytics.total_shared)}
-                                currency={analytics.base_currency}
-                              />
-                            </div>
-                            <div className="flex-1 space-y-3 pt-1 min-w-0">
-                              {analytics.expense_by_category.map((cat, i) => {
-                                const pct = Number(analytics.total_shared) > 0
-                                  ? Number(cat.total) / Number(analytics.total_shared) : 0
-                                const color = DONUT_COLORS[i % DONUT_COLORS.length]
-                                return (
-                                  <div key={cat.category_name}>
-                                    <div className="flex items-center gap-2 mb-1.5">
-                                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                                      <span className={`text-xs flex-1 truncate text-slate-300`}>{cat.category_name}</span>
-                                      <span className="text-[10px] text-slate-500 tabular-nums shrink-0">{(pct * 100).toFixed(0)}%</span>
-                                      <span className={`text-xs font-semibold tabular-nums shrink-0 text-slate-200`}>
-                                        {fmt(Number(cat.total))}
-                                      </span>
-                                    </div>
-                                    <div className={`h-1.5 rounded-full overflow-hidden bg-slate-800`}>
-                                      <div
-                                        className="h-full rounded-full transition-all duration-700"
-                                        style={{ width: `${Math.max(pct * 100, 2)}%`, backgroundColor: color }}
-                                      />
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
+                          <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl">
+                            <button
+                              onClick={() => { setDonutGroupBy('category'); setDonutSelected(null) }}
+                              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                                donutGroupBy === 'category'
+                                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                                  : 'text-slate-500 hover:text-slate-300'
+                              }`}
+                            >
+                              Categorías
+                            </button>
+                            <button
+                              onClick={() => { setDonutGroupBy('concept'); setDonutSelected(null) }}
+                              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                                donutGroupBy === 'concept'
+                                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                                  : 'text-slate-500 hover:text-slate-300'
+                              }`}
+                            >
+                              Conceptos
+                            </button>
                           </div>
                         </div>
-                      )}
 
-                      {/* Mapa de gastos — 1/3 */}
-                      <div className="col-span-1">
-                        <HouseholdHeatmap
-                          expensesByDay={analytics.expenses_by_day}
+                        {(() => {
+                          const items = donutGroupBy === 'category'
+                            ? analytics.expense_by_category.map(c => ({ name: c.category_name, total: Number(c.total) }))
+                            : analytics.top_concepts.map(c => ({ name: c.concept_name, total: Number(c.total) }))
+                          const total = Number(analytics.total_shared)
+                          if (items.length === 0) return (
+                            <div className="flex-1 flex items-center justify-center">
+                              <p className="text-slate-600 text-sm">Sin gastos en este mes</p>
+                            </div>
+                          )
+                          return (
+                            <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 items-center sm:items-start flex-1 min-h-0">
+                              <DonutChart
+                                categories={items}
+                                privacy={privacy}
+                                selectedCategory={donutSelected}
+                                onCategoryClick={setDonutSelected}
+                                mode="expense"
+                              />
+                              <div className="flex-1 min-w-0 min-h-0 overflow-y-auto space-y-2 w-full pb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+                                {items.map((item, i) => {
+                                  const pct = total > 0 ? (item.total / total) * 100 : 0
+                                  return (
+                                    <div key={item.name}>
+                                      <div className="flex items-center gap-2 mb-1.5">
+                                        <span className="w-2.5 h-2.5 rounded-full shrink-0 self-start mt-1.5" style={{ background: catColor(i) }} />
+                                        <span className="text-sm text-slate-300 flex-1 truncate">{item.name}</span>
+                                        <span className="text-sm font-semibold text-slate-300 tabular-nums shrink-0">
+                                          {fmt(item.total)}
+                                        </span>
+                                        <span className="text-sm px-2 py-0.5 rounded-full font-semibold shrink-0 bg-slate-500/15 text-slate-400 border border-slate-500/20">
+                                          {pct.toFixed(0)}%
+                                        </span>
+                                      </div>
+                                      <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full transition-all duration-700"
+                                          style={{ width: `${Math.max(Math.min(pct, 100), 3)}%`, background: catColor(i) }} />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })()}
+                      </div>
+
+                      {/* Mapa de gastos — 1/4 */}
+                      <div id="fluxo-export-household-heatmap" className="lg:col-span-1 bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm flex flex-col h-[500px]">
+                        <div className="mb-3">
+                          <h2 className="text-sm font-semibold text-slate-200">Mapa de Gastos</h2>
+                          <p className="text-sm text-slate-500 mt-0.5">Intensidad diaria</p>
+                        </div>
+                        <ExpenseHeatmap
                           year={year}
                           month={month}
-                          currency={analytics.base_currency}
+                          dailyExpenses={Object.entries(analytics.expenses_by_day).map(([date, total]) => ({ date, total: Number(total) }))}
                           privacy={privacy}
                         />
                       </div>
