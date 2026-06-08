@@ -13,7 +13,9 @@ import {
   fetchHouseholds, generateInvite, fetchMembers, approveMember, removeMember,
   fetchHouseholdAnalytics,
 } from '../api/households'
-import { fetchFinGoals, type FinGoal } from '../api/dashboard'
+import { fetchFinGoals, fetchIncomeVsExpenses, fetchPatrimonio, fetchSummary, type FinGoal } from '../api/dashboard'
+import MonthlyChart from '../components/MonthlyChart'
+import PatrimonioChart from '../components/PatrimonioChart'
 import HouseholdKPICards from '../components/household/HouseholdKPICards'
 import DonutChart, { catColor } from '../components/DonutChart'
 import ExpenseHeatmap from '../components/ExpenseHeatmap'
@@ -91,11 +93,38 @@ export default function HouseholdPage() {
     retry:    false,
   })
 
-  const showGoals = household?.analysis_level === 'expenses_and_goals' || household?.analysis_level === 'full'
+  const showGoals  = household?.analysis_level === 'expenses_and_goals' || household?.analysis_level === 'full'
+  const showFull   = household?.analysis_level === 'full'
+
   const { data: finGoals = [], isLoading: goalsLoading } = useQuery({
     queryKey: ['fin-goals'],
     queryFn:  fetchFinGoals,
     enabled:  showGoals,
+  })
+
+  const { data: summary } = useQuery({
+    queryKey: ['summary', currency],
+    queryFn:  () => fetchSummary(currency),
+    enabled:  showFull,
+  })
+
+  const monthsBack = (() => {
+    if (!summary?.first_tx_month) return 24
+    const [y, m] = summary.first_tx_month.split('-').map(Number)
+    const today = new Date()
+    return Math.max((today.getFullYear() - y) * 12 + (today.getMonth() + 1 - m) + 1, 2)
+  })()
+
+  const { data: chartData = [], isLoading: chartLoading } = useQuery({
+    queryKey: ['income-vs-expenses', monthsBack, 0, currency],
+    queryFn:  () => fetchIncomeVsExpenses(monthsBack, 0, currency),
+    enabled:  showFull && !!summary,
+  })
+
+  const { data: patrimonioData = [], isLoading: patrimonioLoading, isError: patrimonioError } = useQuery({
+    queryKey: ['patrimonio', monthsBack, 0, currency],
+    queryFn:  () => fetchPatrimonio(monthsBack, 0, currency),
+    enabled:  showFull,
   })
 
   const inviteMutation = useMutation({
@@ -748,6 +777,58 @@ export default function HouseholdPage() {
                             })}
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* N3a. INGRESOS · GASTOS · AHORRO (solo FULL)       */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {showFull && (
+                      <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                        <div className="px-5 py-4 border-b border-slate-800">
+                          <p className={sectionTitle}>Ingresos · Gastos · Ahorro</p>
+                          <p className="text-xs text-slate-500 mt-0.5">Evolución mensual personal</p>
+                        </div>
+                        <div className="p-4">
+                          {chartLoading ? (
+                            <div className="h-72 bg-slate-800/50 animate-pulse rounded-xl" />
+                          ) : chartData.length === 0 ? (
+                            <div className="h-40 flex items-center justify-center">
+                              <p className="text-xs text-slate-500">Sin datos de movimientos</p>
+                            </div>
+                          ) : (
+                            <MonthlyChart
+                              data={chartData}
+                              patrimonio={patrimonioData}
+                              privacy={privacy}
+                              currency={currency}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* N3b. PATRIMONIO NETO TOTAL (solo FULL)            */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {showFull && (
+                      <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                        <div className="px-5 py-4 border-b border-slate-800">
+                          <p className={sectionTitle}>Patrimonio Neto Total</p>
+                          <p className="text-xs text-slate-500 mt-0.5">Activos menos deudas personales</p>
+                        </div>
+                        <div className="p-4">
+                          <PatrimonioChart
+                            data={patrimonioData}
+                            isLoading={patrimonioLoading}
+                            isError={patrimonioError}
+                            firstTxMonth={summary?.first_tx_month}
+                            privacy={privacy}
+                            currency={currency}
+                            netWorth={Number(summary?.net_worth ?? 0)}
+                            netWorthLoading={!summary}
+                          />
+                        </div>
                       </div>
                     )}
 
