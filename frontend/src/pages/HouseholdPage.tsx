@@ -377,26 +377,35 @@ export default function HouseholdPage() {
                            household.analysis_level === 'expenses_and_goals' ? 'Gastos + metas' :
                            'Análisis completo'}
                         </span>
-                        <span className="text-slate-700 text-[10px]">·</span>
+                        <span className="text-slate-700 text-[10px] mx-1">·</span>
                         <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
                           <Users className="w-3 h-3" />
                           {activeMembers.length} {activeMembers.length === 1 ? 'miembro' : 'miembros'}
                         </span>
                         {analytics && Number(analytics.total_shared) > 0 && (
-                          <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                            <Wallet className="w-3 h-3" />
-                            {fmt(Number(analytics.total_shared))} {analytics.base_currency}
-                          </span>
+                          <>
+                            <span className="text-slate-700 text-[10px] mx-1">·</span>
+                            <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                              <Wallet className="w-3 h-3" />
+                              {fmt(Number(analytics.total_shared))} {analytics.base_currency}
+                            </span>
+                          </>
                         )}
                         {analytics && analytics.settlement.length === 0 && analytics.members.length > 0 && (
-                          <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />Saldado
-                          </span>
+                          <>
+                            <span className="text-slate-700 text-[10px] mx-1">·</span>
+                            <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />Saldado
+                            </span>
+                          </>
                         )}
                         {analytics && analytics.settlement.length > 0 && (
-                          <span className="flex items-center gap-1 text-[10px] font-semibold text-rose-400">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />Deuda pendiente
-                          </span>
+                          <>
+                            <span className="text-slate-700 text-[10px] mx-1">·</span>
+                            <span className="flex items-center gap-1 text-[10px] font-semibold text-rose-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />Deuda pendiente
+                            </span>
+                          </>
                         )}
                       </div>
                     </div>
