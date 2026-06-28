@@ -475,6 +475,10 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
                 Transaction.account_id == acc.id,
                 Transaction.is_deleted == False,
                 Transaction.date > date_to,
+                or_(
+                    Transaction.transfer_role.is_(None),
+                    Transaction.transfer_role == TransferRole.SOURCE,
+                ),
             )
             .all()
         )
