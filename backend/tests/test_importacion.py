@@ -124,6 +124,46 @@ class TestConfirmar:
         assert r2["importados"] == 0
 
 
+    def test_confirmar_sin_concepto(self, authed, uyu_account):
+        """El concepto es opcional: se importa sin concepto (no se inventa uno)."""
+        c, h = authed
+        body = _parsear(c, h, uyu_account["id"], _brou_csv()).json()
+        movs = [m for m in body["movimientos"] if m["estado"] == "validado"]
+        for m in movs:
+            m["concepto"] = ""
+        r = _confirmar(c, h, uyu_account["id"], movs)
+        assert r.json()["importados"] == 2
+        txs = c.get(f"{BASE}/transactions", headers=h).json()
+        assert len(txs) == 2
+        assert all(t["concept_id"] is None for t in txs)
+        names = [x["name"] for x in c.get(f"{BASE}/concepts", headers=h).json()]
+        assert "Importado" not in names
+
+    def test_confirmar_gasto_del_hogar(self, authed, uyu_account):
+        """Marcar 'pertenece al hogar' al importar → el gasto aparece en el hogar."""
+        c, h = authed
+        hh = c.post(f"{BASE}/households", json={"name": "Casa"}, headers=h).json()
+        body = _parsear(c, h, uyu_account["id"], _brou_csv()).json()
+        movs = [m for m in body["movimientos"] if m["estado"] == "validado"]
+        for m in movs:
+            m["household_id"] = hh["id"]  # también al ingreso: debe ignorarse
+        assert _confirmar(c, h, uyu_account["id"], movs).json()["importados"] == 2
+        txs = {t["type"]: t for t in c.get(f"{BASE}/transactions", headers=h).json()}
+        assert txs["expense"]["household_ids"] == [hh["id"]]
+        assert txs["expense"]["household_id"] == hh["id"]
+        assert txs["income"]["household_ids"] == []
+
+    def test_confirmar_hogar_ajeno_se_ignora(self, authed, uyu_account):
+        import uuid
+        c, h = authed
+        body = _parsear(c, h, uyu_account["id"], _brou_csv()).json()
+        movs = [m for m in body["movimientos"] if m["estado"] == "validado"]
+        for m in movs:
+            m["household_id"] = str(uuid.uuid4())
+        assert _confirmar(c, h, uyu_account["id"], movs).json()["importados"] == 2
+        assert all(t["household_ids"] == [] for t in c.get(f"{BASE}/transactions", headers=h).json())
+
+
 class TestHistorial:
     def test_historial_vacio(self, authed):
         c, h = authed

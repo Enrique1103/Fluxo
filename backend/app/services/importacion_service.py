@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.crud import category_crud, concept_crud, transaction_crud, account_crud
 from app.models.importacion import Importacion, ReglaCategorias
-from app.models.transactions_models import Transaction, TransactionType, TransferRole, PaymentMethod
+from app.models.transactions_models import Transaction, TransactionHousehold, TransactionType, TransferRole, PaymentMethod
 
 
 # ---------------------------------------------------------------------------
@@ -1830,7 +1830,9 @@ class ImportacionService:
         fecha = datetime.strptime(mov["fecha"], "%Y-%m-%d").date()
 
         categoria = self._resolver_categoria(mov.get("categoria"), categoria_fallback, categoria_cache)
-        concepto  = self._resolver_concepto(mov.get("concepto") or "Importado", concepto_cache)
+        # El concepto es opcional (igual que al registrar un movimiento a mano)
+        nombre_concepto = (mov.get("concepto") or "").strip()
+        concepto = self._resolver_concepto(nombre_concepto, concepto_cache) if nombre_concepto else None
 
         metodo_raw = mov.get("metodo_pago", "otro")
         try:
@@ -1843,19 +1845,26 @@ class ImportacionService:
         else:
             _aplicar_ingreso(account, monto)
 
+        # Hogar: solo gastos y solo hogares donde el usuario es miembro activo
         hh_id = None
         raw_hh = mov.get("household_id")
-        if raw_hh:
+        if raw_hh and tipo == TransactionType.EXPENSE:
+            from app.crud import household_crud
+            from app.models.household_models import MemberStatus
             try:
-                hh_id = uuid.UUID(str(raw_hh))
+                candidate = uuid.UUID(str(raw_hh))
             except (ValueError, AttributeError):
-                pass
+                candidate = None
+            if candidate:
+                member = household_crud.get_member(self.db, candidate, self.user_id)
+                if member and member.status == MemberStatus.ACTIVE:
+                    hh_id = candidate
 
         tx = Transaction(
             user_id=self.user_id,
             account_id=account.id,
             category_id=categoria.id,
-            concept_id=concepto.id,
+            concept_id=concepto.id if concepto else None,
             amount=monto,
             type=tipo,
             date=fecha,
@@ -1864,9 +1873,13 @@ class ImportacionService:
             import_hash=mov.get("import_hash"),
             household_id=hh_id,
         )
+        # La vista del hogar lee la tabla de vínculos (F04), no solo household_id
+        if hh_id:
+            tx.household_links.append(TransactionHousehold(household_id=hh_id))
         self.db.add(tx)
 
-        concepto.frequency_score += 1
+        if concepto:
+            concepto.frequency_score += 1
         return tx
 
     def _crear_transferencia_zcuentas(
