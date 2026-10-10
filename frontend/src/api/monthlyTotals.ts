@@ -34,3 +34,19 @@ export const saveMonthlyTotals = async (rows: MonthlyTotalIn[]): Promise<{ creat
 export const deleteMonthlyTotal = async (id: string): Promise<void> => {
   await client.delete(`/v1/monthly-totals/${id}`)
 }
+
+export interface MonthlyTotalParseResult {
+  rows: { year: number; month: number; currency: string; income: string; expense: string }[]
+  errors: { row: number; message: string }[]
+}
+
+/** POST /api/v1/monthly-totals/parse — lee la plantilla completada; no guarda nada */
+export const parseMonthlyTotalsFile = async (file: File, currency: string): Promise<MonthlyTotalParseResult> => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('currency', currency)
+  const { data } = await client.post<MonthlyTotalParseResult>('/v1/monthly-totals/parse', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}

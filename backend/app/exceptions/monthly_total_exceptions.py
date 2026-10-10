@@ -3,3 +3,6 @@ class MonthlyTotalNotFound(Exception):
 
 class MonthlyTotalFutureMonth(Exception):
     pass
+
+class MonthlyTotalFileError(Exception):
+    pass

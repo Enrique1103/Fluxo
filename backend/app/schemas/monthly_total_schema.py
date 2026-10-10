@@ -34,6 +34,17 @@ class MonthlyTotalResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class MonthlyTotalParseError(BaseModel):
+    row: int
+    message: str
+
+
+class MonthlyTotalParseResult(BaseModel):
+    # Previsualización: nada se guarda hasta llamar a POST /monthly-totals
+    rows: list[MonthlyTotalIn]
+    errors: list[MonthlyTotalParseError]
+
+
 class MonthlyTotalBulkResult(BaseModel):
     created: int
     updated: int

@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarRange, Loader2, Plus, Trash2, X } from 'lucide-react'
+import { CalendarRange, Download, FileSpreadsheet, Loader2, Plus, Trash2, Upload, X } from 'lucide-react'
 import { fetchAccounts } from '../api/dashboard'
 import {
   fetchMonthlyTotals,
   saveMonthlyTotals,
   deleteMonthlyTotal,
+  parseMonthlyTotalsFile,
   type MonthlyTotalIn,
 } from '../api/monthlyTotals'
 import { invalidateFinancialData } from '../lib/queryClient'
@@ -89,6 +90,8 @@ export default function MonthlyTotalsImport() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [fileErrors, setFileErrors] = useState<{ row: number; message: string }[]>([])
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const parsed = useMemo(() => parsePasted(pasted, currency), [pasted, currency])
   const parseErrors = parsed.filter(p => p.error)
@@ -111,6 +114,20 @@ export default function MonthlyTotalsImport() {
     },
   })
   const delMut = useMutation({ mutationFn: deleteMonthlyTotal, onSuccess: refresh })
+  const parseMut = useMutation({
+    mutationFn: (file: File) => parseMonthlyTotalsFile(file, currency),
+    onSuccess: r => {
+      setError(null)
+      setFileErrors(r.errors)
+      if (r.rows.length === 0 && r.errors.length === 0) setError('La planilla no tiene meses con montos cargados')
+      addRows(r.rows.map(x => ({ ...x, income: Number(x.income), expense: Number(x.expense) })))
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+      setFileErrors([])
+      setError(typeof detail === 'string' ? detail : 'No se pudo leer la planilla')
+    },
+  })
 
   const addRows = (rows: MonthlyTotalIn[]) => {
     setResult(null)
@@ -153,6 +170,55 @@ export default function MonthlyTotalsImport() {
             sin cuentas parte de 0 y queda negativo. Creá primero tus cuentas con el saldo que tienen hoy.
           </div>
         )}
+
+        {/* Plantilla de Excel: descargar, completar afuera y subir */}
+        <div className="mb-5 rounded-xl border border-slate-700/70 bg-slate-800/30 p-4">
+          <div className="flex items-start gap-3">
+            <FileSpreadsheet className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-200">Plantilla de Excel</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Descargala, completá un mes por fila con calma y subila acá. Vas a poder revisar los meses antes de guardarlos.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <a
+                  href="/plantilla-totales-mensuales.xlsx"
+                  download="Fluxo - Plantilla totales mensuales.xlsx"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 text-xs font-medium text-slate-200"
+                >
+                  <Download className="w-3.5 h-3.5" /> Descargar plantilla
+                </a>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={parseMut.isPending}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-medium text-emerald-300 disabled:opacity-50"
+                >
+                  {parseMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  Subir plantilla completada
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.csv"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0]
+                    if (f) { setResult(null); parseMut.mutate(f) }
+                    e.target.value = ''
+                  }}
+                />
+              </div>
+              {fileErrors.length > 0 && (
+                <div className="mt-2 space-y-0.5">
+                  {fileErrors.slice(0, 5).map(fe => (
+                    <p key={fe.row} className="text-xs text-rose-400">Fila {fe.row}: {fe.message}</p>
+                  ))}
+                  {fileErrors.length > 5 && <p className="text-xs text-rose-400">y {fileErrors.length - 5} más…</p>}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-slate-400 mb-1">Moneda de los montos</label>

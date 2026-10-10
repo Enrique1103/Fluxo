@@ -106,3 +106,61 @@ def test_first_tx_month_includes_imported_totals(authed):
     c.post(MT, json={"rows": [{"year": y, "month": m, "currency": "UYU", "income": "1", "expense": "1"}]}, headers=h)
     s = c.get(f"{BASE}/summary", headers=h).json()
     assert s["first_tx_month"] == _label(y, m)
+
+
+# ─── Plantilla .xlsx / .csv ───────────────────────────────────────────────────
+
+def _filled_template(rows) -> bytes:
+    """Completa la plantilla real (frontend/public) como lo haría el usuario en Excel."""
+    import io
+    from pathlib import Path
+    from openpyxl import load_workbook
+    path = Path(__file__).resolve().parents[2] / "frontend" / "public" / "plantilla-totales-mensuales.xlsx"
+    wb = load_workbook(path)
+    ws = wb.active
+    for i, row in enumerate(rows, start=8):  # la tabla empieza en la fila 8
+        for j, v in enumerate(row, start=1):
+            ws.cell(row=i, column=j, value=v)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_parse_filled_template(authed):
+    from datetime import datetime
+    c, h = authed
+    y1, m1 = _month(2)
+    y2, m2 = _month(1)
+    content = _filled_template([
+        [f"{y1}-{m1:02d}", "UYU", 52000, 41300.5],
+        [datetime(y2, m2, 1), "usd", "1.250,00", "900"],   # Excel convirtió el mes en fecha
+        [f"{TODAY.year + 1}-01", "UYU", 1, 1],               # futuro → error
+        ["marzo", "UYU", 1, 1],                              # mes inválido → error
+    ])
+    r = c.post(f"{MT}/parse", files={"file": ("plantilla.xlsx", content)}, headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["rows"] == [
+        {"year": y1, "month": m1, "currency": "UYU", "income": "52000.00", "expense": "41300.50"},
+        {"year": y2, "month": m2, "currency": "USD", "income": "1250.00", "expense": "900.00"},
+    ]
+    assert [e["row"] for e in body["errors"]] == [10, 11]
+    # Nada se guardó todavía
+    assert c.get(MT, headers=h).json() == []
+
+
+def test_parse_csv_uses_default_currency(authed):
+    c, h = authed
+    y, m = _month(1)
+    csv_text = f"Mes;Ingresos;Gastos\n{y}-{m:02d};45.000;30.500,75\n"
+    r = c.post(f"{MT}/parse", files={"file": ("totales.csv", csv_text.encode())}, data={"currency": "UYU"}, headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["rows"] == [{"year": y, "month": m, "currency": "UYU", "income": "45000.00", "expense": "30500.75"}]
+
+
+def test_parse_rejects_unknown_file(authed):
+    c, h = authed
+    r = c.post(f"{MT}/parse", files={"file": ("foto.png", b"\x89PNG")}, headers=h)
+    assert r.status_code == 422
+    r = c.post(f"{MT}/parse", files={"file": ("x.csv", b"a;b;c\n1;2;3\n")}, headers=h)
+    assert r.status_code == 422

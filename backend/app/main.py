@@ -24,7 +24,7 @@ from app.api.routers import household_router
 from app.api.routers import reviews_router
 from app.api.routers import budgets_router
 from app.api.routers import monthly_totals_router
-from app.exceptions.monthly_total_exceptions import MonthlyTotalNotFound, MonthlyTotalFutureMonth
+from app.exceptions.monthly_total_exceptions import MonthlyTotalNotFound, MonthlyTotalFutureMonth, MonthlyTotalFileError
 from app.exceptions.user_exceptions import (
     EmailAlreadyExists,
     UserNotFound,
@@ -376,6 +376,11 @@ async def handle_monthly_total_not_found(r: Request, exc: MonthlyTotalNotFound):
 
 @app.exception_handler(MonthlyTotalFutureMonth)
 async def handle_monthly_total_future(r: Request, exc: MonthlyTotalFutureMonth):
+    return _json(_422, str(exc))
+
+
+@app.exception_handler(MonthlyTotalFileError)
+async def handle_monthly_total_file(r: Request, exc: MonthlyTotalFileError):
     return _json(_422, str(exc))
 
 

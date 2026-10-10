@@ -4,7 +4,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.crud import monthly_total_crud
-from app.exceptions.monthly_total_exceptions import MonthlyTotalNotFound, MonthlyTotalFutureMonth
+from app.exceptions.monthly_total_exceptions import MonthlyTotalNotFound, MonthlyTotalFutureMonth, MonthlyTotalFileError
 from app.models.monthly_total_models import MonthlyTotal
 from app.models.users_models import User
 from app.schemas.monthly_total_schema import MonthlyTotalBulk, MonthlyTotalBulkResult
@@ -36,6 +36,14 @@ def upsert_many(db: Session, user: User, payload: MonthlyTotalBulk) -> MonthlyTo
         db.rollback()
         raise
     return MonthlyTotalBulkResult(created=created, updated=updated)
+
+
+def parse_upload(user: User, content: bytes, filename: str, currency: str | None) -> dict:
+    """Lee la plantilla completada (.xlsx/.csv) y devuelve las filas para previsualizar."""
+    from app.services.monthly_total_parser import parse_file
+    if len(content) > 2 * 1024 * 1024:
+        raise MonthlyTotalFileError("El archivo es demasiado grande (máximo 2 MB)")
+    return parse_file(content, filename, (currency or str(user.currency_default)).upper())
 
 
 def delete(db: Session, user: User, total_id: uuid.UUID) -> None:
