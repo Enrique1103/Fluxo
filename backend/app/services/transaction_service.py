@@ -394,7 +394,8 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
             raise CategoryNotFound("La categoría no existe o no pertenece al usuario")
         fields["category_id"] = tx_update.category_id
 
-    if tx_update.description is not None:
+    # description se puede vaciar enviando null explícitamente
+    if "description" in tx_update.model_fields_set:
         fields["description"] = tx_update.description
 
     if tx_update.date is not None:
@@ -404,12 +405,42 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
     if tx.type == TransactionType.EXPENSE and tx_update.metodo_pago is not None:
         fields["metodo_pago"] = tx_update.metodo_pago
 
+    # Hogares (F04) solo aplican para EXPENSE. None = sin cambios.
+    if tx.type == TransactionType.EXPENSE:
+        requested: list[uuid.UUID] | None = tx_update.household_ids
+        if requested is None and "household_id" in tx_update.model_fields_set:
+            requested = [tx_update.household_id] if tx_update.household_id else []
+        if requested is not None:
+            _set_households(db, user, tx, requested)
+
     if fields:
         transaction_crud.update(db, tx, fields)
 
     db.commit()
     db.refresh(tx)
     return tx
+
+
+def _set_households(db: Session, user: User, tx: Transaction, requested: list[uuid.UUID]) -> None:
+    """Sincroniza la tabla junction con los hogares pedidos (solo hogares donde el usuario es miembro activo)."""
+    from app.crud import household_crud
+    from app.models.household_models import MemberStatus
+
+    wanted: list[uuid.UUID] = []
+    for hh_id in dict.fromkeys(requested):
+        member = household_crud.get_member(db, hh_id, user.id)
+        if member and member.status == MemberStatus.ACTIVE:
+            wanted.append(hh_id)
+
+    current = {link.household_id: link for link in tx.household_links}
+    for hh_id, link in current.items():
+        if hh_id not in wanted:
+            tx.household_links.remove(link)
+    for hh_id in wanted:
+        if hh_id not in current:
+            tx.household_links.append(TransactionHousehold(household_id=hh_id))
+    tx.household_id = wanted[0] if wanted else None
+    db.flush()
 
 
 def delete(

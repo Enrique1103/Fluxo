@@ -318,6 +318,7 @@ export const updateTransaction = async (id: string, payload: {
   amount?: number; description?: string | null; date?: string
   concept_id?: string; category_id?: string; metodo_pago?: PaymentMethod
   household_id?: string | null
+  household_ids?: string[]
 }): Promise<void> => {
   await client.patch(`/v1/transactions/${id}`, payload)
 }

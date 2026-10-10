@@ -81,6 +81,8 @@ class TransactionUpdate(BaseModel):
     category_id: uuid.UUID | None = None
     metodo_pago: PaymentMethod | None = None
     household_id: uuid.UUID | None = None
+    # None = no tocar los hogares; [] = desasociar de todos los hogares.
+    household_ids: list[uuid.UUID] | None = None
 
 
 # --- Respuesta al frontend ---

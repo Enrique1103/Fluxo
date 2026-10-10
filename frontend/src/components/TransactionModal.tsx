@@ -250,7 +250,12 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   const { data: categories  = [] } = useQuery({ queryKey: ['categories'],  queryFn: fetchCategories,  enabled: open })
   const { data: concepts    = [] } = useQuery({ queryKey: ['concepts'],    queryFn: fetchConcepts,    enabled: open })
   const { data: households  = [] } = useQuery({ queryKey: ['households'],  queryFn: fetchHouseholds,  enabled: open })
-  const { data: editTx      }      = useQuery({ queryKey: ['tx', editTxId], queryFn: () => fetchTransaction(editTxId!), enabled: !!editTxId && open })
+  // staleTime 0 + refetch al abrir: al reabrir un movimiento recién editado
+  // no se deben mostrar (ni re-guardar) los valores viejos del caché.
+  const { data: editTx      }      = useQuery({
+    queryKey: ['tx', editTxId], queryFn: () => fetchTransaction(editTxId!),
+    enabled: !!editTxId && open, staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: false,
+  })
 
   useEffect(() => {
     if (accounts.length > 0 && !accountId && !isEditing) {
@@ -277,7 +282,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
     setMetodoPago(editTx.metodo_pago)
     // F04: restaurar household_ids al editar
     setSelectedHouseholdIds(editTx.household_ids ?? (editTx.household_id ? [editTx.household_id] : []))
-  }, [editTx])
+  }, [editTx, open])
 
   // Cuando se abre un modal nuevo (no edición), limpiar la selección
   useEffect(() => {
@@ -350,9 +355,9 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
           description:  description.trim() || null,
           concept_id:   conceptId || undefined,
           category_id:  categoryId,
-          ...(txType === 'expense' ? { metodo_pago: metodoPago } : {}),
-          ...(txType === 'expense' && selectedHouseholdIds.length > 0 ? { household_ids: selectedHouseholdIds } : {}),
+          ...(txType === 'expense' ? { metodo_pago: metodoPago, household_ids: selectedHouseholdIds } : {}),
         })
+        queryClient.removeQueries({ queryKey: ['tx', editTxId] })
       } else if (enCuotas && txType === 'expense') {
         await createInstalmentPlan({
           account_id:   accountId,
