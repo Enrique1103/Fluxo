@@ -3,7 +3,7 @@ from datetime import date as PyDate
 from decimal import Decimal
 from sqlalchemy.orm import Session
 
-from app.crud import transaction_crud, account_crud, concept_crud, category_crud
+from app.crud import transaction_crud, account_crud, concept_crud, category_crud, transaction_history_crud
 from app.exceptions.account_exceptions import (
     AccountNotFound,
     InsufficientFunds,
@@ -90,6 +90,64 @@ def _get_account(db: Session, account_id: uuid.UUID, user_id: uuid.UUID) -> Acco
 # ---------------------------------------------------------------------------
 # Service functions
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Historial (trazabilidad)
+# ---------------------------------------------------------------------------
+
+def _val(v):
+    return v.value if hasattr(v, "value") else v
+
+
+def _snapshot(db: Session, tx: Transaction) -> dict:
+    """Estado legible de un movimiento para el historial (incluye nombres y saldo de la cuenta)."""
+    account = account_crud.get_by_id(db, tx.account_id)
+    category = category_crud.get_by_id(db, tx.category_id) if tx.category_id else None
+    concept = concept_crud.get_by_id(db, tx.concept_id) if tx.concept_id else None
+    snap = {
+        "type": _val(tx.type),
+        "amount": str(tx.amount),
+        "date": tx.date.isoformat() if tx.date else None,
+        "description": tx.description,
+        "account_id": str(tx.account_id),
+        "account_name": account.name if account else None,
+        "account_currency": str(account.currency) if account else None,
+        "account_balance": str(account.balance) if account else None,
+        "category_id": str(tx.category_id) if tx.category_id else None,
+        "category_name": category.name if category else None,
+        "concept_id": str(tx.concept_id) if tx.concept_id else None,
+        "concept_name": concept.name if concept else None,
+        "metodo_pago": _val(tx.metodo_pago),
+        "household_ids": sorted(str(h) for h in tx.household_ids),
+        "transfer_role": _val(tx.transfer_role),
+        "commission": str(tx.commission) if tx.commission is not None else None,
+    }
+    if tx.transfer_role == TransferRole.SOURCE and tx.transfer_id:
+        dest = transaction_crud.get_by_id(db, tx.transfer_id)
+        dest_acc = account_crud.get_by_id(db, dest.account_id) if dest else None
+        if dest and dest_acc:
+            snap["destination_account_name"] = dest_acc.name
+            snap["destination_currency"] = str(dest_acc.currency)
+            snap["destination_amount"] = str(dest.amount)
+            snap["destination_balance"] = str(dest_acc.balance)
+    return snap
+
+
+# Campos que cuentan como "cambio" en una edición (el saldo es consecuencia, no un campo editado)
+_DIFF_FIELDS = ("amount", "date", "description", "category_name", "concept_name", "metodo_pago", "household_ids")
+
+
+def _record(db: Session, tx: Transaction, action: str, before: dict | None = None) -> None:
+    db.flush()
+    db.refresh(tx)
+    snap = before if action == "delete" and before is not None else _snapshot(db, tx)
+    changes = None
+    if action == "update" and before is not None:
+        changes = {f: [before.get(f), snap.get(f)] for f in _DIFF_FIELDS if before.get(f) != snap.get(f)}
+        if not changes:
+            return
+    transaction_history_crud.create(db, tx.id, tx.user_id, action, snap, changes)
+
 
 def _check_exchange_rate_for_date(
     db: Session,
@@ -213,6 +271,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
             if concept:
                 concept_crud.increment_frequency(db, concept)
                 concept_crud.update_category(db, concept, category_id)
+            _record(db, source_tx, "create")
             db.commit()
             db.refresh(source_tx)
             return source_tx
@@ -272,6 +331,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         if concept:
             concept_crud.increment_frequency(db, concept)
             concept_crud.update_category(db, concept, category_id)
+        _record(db, source_tx, "create")
         db.commit()
         db.refresh(source_tx)
         return source_tx
@@ -320,6 +380,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
     if concept:
         concept_crud.increment_frequency(db, concept)
         concept_crud.update_category(db, concept, category_id)
+    _record(db, db_tx, "create")
     db.commit()
     db.refresh(db_tx)
     return db_tx
@@ -395,6 +456,7 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
         raise TransferEditNotAllowed("Las transferencias no se pueden editar. Elimínalas y créalas de nuevo")
 
     account = account_crud.get_by_id(db, tx.account_id)
+    before = _snapshot(db, tx)
     fields: dict = {}
 
     # Handle amount change: reverse old, apply new
@@ -448,6 +510,7 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
     if fields:
         transaction_crud.update(db, tx, fields)
 
+    _record(db, tx, "update", before)
     db.commit()
     db.refresh(tx)
     return tx
@@ -483,6 +546,7 @@ def delete(
     target_household_id: uuid.UUID | None = None,
 ) -> None:
     tx = _get_owned_tx(db, tx_id, user.id)
+    before = _snapshot(db, tx)
 
     if scope == DeleteScope.HOUSEHOLD:
         # Eliminar entradas de la junction table (F04)
@@ -506,6 +570,8 @@ def delete(
             TransactionHousehold.transaction_id == tx_id
         ).all()
         tx.household_id = remaining[0].household_id if remaining else None
+        db.expire(tx, ["household_links"])
+        _record(db, tx, "update", before)
         db.commit()
         return
 
@@ -553,4 +619,22 @@ def delete(
 
         transaction_crud.soft_delete(db, tx)
 
+    _record(db, tx, "delete", before)
     db.commit()
+
+
+def get_history(db: Session, user: User, tx_id: uuid.UUID) -> list:
+    """Historial de un movimiento (también si fue borrado)."""
+    entries = transaction_history_crud.get_by_transaction(db, tx_id)
+    if not entries:
+        # Movimientos anteriores al historial: validar que exista y sea del usuario
+        _get_owned_tx(db, tx_id, user.id)
+        return []
+    if entries[0].user_id != user.id:
+        raise UnauthorizedTransactionAccess("No tienes acceso a esta transacción")
+    return entries
+
+
+def get_recent_history(db: Session, user: User, limit: int = 50, offset: int = 0) -> list:
+    """Actividad reciente: altas, ediciones y borrados de movimientos del usuario."""
+    return transaction_history_crud.get_recent_by_user(db, user.id, limit, offset)
