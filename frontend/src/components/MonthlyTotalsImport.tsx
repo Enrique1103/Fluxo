@@ -49,30 +49,6 @@ export function parseMonth(raw: string): { year: number; month: number } | null 
   return { year, month }
 }
 
-interface ParsedLine { row?: MonthlyTotalIn; error?: string; line: string }
-
-/** Una fila por mes: mes, ingresos, gastos — separado por tab (pegado de Excel), ';' o ','. */
-function parsePasted(text: string, currency: string): ParsedLine[] {
-  return text
-    .split(/\r?\n/)
-    .map(l => l.trim())
-    .filter(l => l && !/^mes\b/i.test(l))
-    .map(line => {
-      // Con decimales con coma ("52.000,50") usar tab o ';' como separador
-      const cols = line.includes('\t') ? line.split('\t')
-        : line.includes(';') ? line.split(';')
-        : line.split(',').length === 3 ? line.split(',')
-        : line.split(/\s+/)
-      if (cols.length < 3) return { line, error: 'Faltan columnas (mes, ingresos, gastos)' }
-      const month = parseMonth(cols[0])
-      const income = parseAmount(cols[1])
-      const expense = parseAmount(cols[2])
-      if (!month) return { line, error: 'Mes inválido (usá 2025-03 o 03/2025)' }
-      if (income === null || expense === null) return { line, error: 'Monto inválido' }
-      return { line, row: { ...month, currency, income, expense } }
-    })
-}
-
 export default function MonthlyTotalsImport() {
   const qc = useQueryClient()
   const homeCurrency = useHomeCurrency()
@@ -84,7 +60,6 @@ export default function MonthlyTotalsImport() {
   )
 
   const [currency, setCurrency] = useState(homeCurrency)
-  const [pasted, setPasted] = useState('')
   const [manual, setManual] = useState({ month: '', income: '', expense: '' })
   const [pending, setPending] = useState<MonthlyTotalIn[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -92,9 +67,6 @@ export default function MonthlyTotalsImport() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [fileErrors, setFileErrors] = useState<{ row: number; message: string }[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
-
-  const parsed = useMemo(() => parsePasted(pasted, currency), [pasted, currency])
-  const parseErrors = parsed.filter(p => p.error)
 
   const refresh = async () => {
     await qc.invalidateQueries({ queryKey: ['monthly-totals'] })
@@ -104,7 +76,7 @@ export default function MonthlyTotalsImport() {
   const saveMut = useMutation({
     mutationFn: saveMonthlyTotals,
     onSuccess: async r => {
-      setPending([]); setPasted(''); setError(null)
+      setPending([]); setError(null)
       setResult(`${r.created} mes(es) agregados${r.updated ? `, ${r.updated} reemplazados` : ''}.`)
       await refresh()
     },
@@ -115,7 +87,7 @@ export default function MonthlyTotalsImport() {
   })
   const delMut = useMutation({ mutationFn: deleteMonthlyTotal, onSuccess: refresh })
   const parseMut = useMutation({
-    mutationFn: (file: File) => parseMonthlyTotalsFile(file, currency),
+    mutationFn: (file: File) => parseMonthlyTotalsFile(file, homeCurrency),
     onSuccess: r => {
       setError(null)
       setFileErrors(r.errors)
@@ -150,6 +122,8 @@ export default function MonthlyTotalsImport() {
     setManual({ month: '', income: '', expense: '' })
   }
 
+  const savedKeys = useMemo(() => new Set(saved.map(t => `${t.year}-${t.month}-${t.currency}`)), [saved])
+
   const fmt = (n: number | string) => Number(n).toLocaleString('es-UY', { maximumFractionDigits: 2 })
   const input = 'w-full bg-slate-800/60 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500/50'
 
@@ -158,9 +132,8 @@ export default function MonthlyTotalsImport() {
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-6">
         <h2 className="text-lg font-semibold text-white mb-1">Importar totales mensuales</h2>
         <p className="text-sm text-slate-400 mb-5">
-          Cargá solo el total de ingresos y de gastos de cada mes que registraste en otra app.
-          No se crean comprobantes: Fenix los suma al gráfico Ingresos · Gastos · Ahorro y al patrimonio,
-          y desde ahí seguís registrando día a día.
+          Traé el total de ingresos y gastos de cada mes de tu app anterior. No se crean comprobantes:
+          los meses aparecen en tus gráficos y desde acá seguís registrando día a día.
         </p>
 
         {accounts.length === 0 && (
@@ -176,10 +149,8 @@ export default function MonthlyTotalsImport() {
           <div className="flex items-start gap-3">
             <FileSpreadsheet className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-200">Plantilla de Excel</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Descargala, completá un mes por fila con calma y subila acá. Vas a poder revisar los meses antes de guardarlos.
-              </p>
+              <p className="text-sm font-medium text-slate-200">Con la plantilla de Excel</p>
+              <p className="text-xs text-slate-500 mt-0.5">Ideal para varios meses: completala con calma y subila.</p>
               <div className="flex flex-wrap gap-2 mt-3">
                 <a
                   href="/plantilla-totales-mensuales.xlsx"
@@ -220,47 +191,16 @@ export default function MonthlyTotalsImport() {
           </div>
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-slate-400 mb-1">Moneda de los montos</label>
-          <select value={currency} onChange={e => setCurrency(e.target.value)} className={input}>
-            {currencies.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-
-        <label className="block text-sm font-medium text-slate-400 mb-1">Pegar desde Excel o CSV</label>
-        <textarea
-          value={pasted}
-          onChange={e => { setPasted(e.target.value); setResult(null) }}
-          rows={5}
-          placeholder={'Una fila por mes: mes, ingresos, gastos\n2025-03\t52.000\t41.300\n2025-04\t52.000\t38.950'}
-          className={`${input} font-mono text-xs`}
-        />
-        {pasted.trim() && (
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-xs text-slate-500">
-              {parsed.length - parseErrors.length} fila(s) válidas
-              {parseErrors.length > 0 && <span className="text-rose-400"> · {parseErrors.length} con error</span>}
-            </span>
-            <button
-              onClick={() => addRows(parsed.flatMap(p => (p.row ? [p.row] : [])))}
-              disabled={parsed.length === parseErrors.length}
-              className="text-xs font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40"
-            >
-              Agregar a la lista
-            </button>
-          </div>
-        )}
-        {parseErrors.slice(0, 3).map(p => (
-          <p key={p.line} className="text-xs text-rose-400 mt-1 truncate">"{p.line}": {p.error}</p>
-        ))}
-
         <div className="mt-5">
           <label className="block text-sm font-medium text-slate-400 mb-1">O cargá un mes a mano</label>
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-[1.3fr_0.8fr_1fr_1fr_auto] gap-2">
             <input type="month" value={manual.month} onChange={e => setManual(m => ({ ...m, month: e.target.value }))} className={input} />
+            <select value={currency} onChange={e => setCurrency(e.target.value)} className={input} aria-label="Moneda">
+              {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
             <input inputMode="decimal" placeholder="Ingresos" value={manual.income} onChange={e => setManual(m => ({ ...m, income: e.target.value }))} className={input} />
             <input inputMode="decimal" placeholder="Gastos" value={manual.expense} onChange={e => setManual(m => ({ ...m, expense: e.target.value }))} className={input} />
-            <button onClick={addManual} className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm text-slate-200">
+            <button onClick={addManual} className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm text-slate-200">
               <Plus className="w-4 h-4" /> Agregar
             </button>
           </div>
@@ -275,14 +215,16 @@ export default function MonthlyTotalsImport() {
                   <span className="text-slate-300 w-24">{monthLabel(r.year, r.month)}</span>
                   <span className="text-cyan-400 tabular-nums">+{fmt(r.income)}</span>
                   <span className="text-rose-400 tabular-nums">-{fmt(r.expense)}</span>
-                  <span className="text-slate-500 text-xs">{r.currency}</span>
+                  <span className="text-slate-500 text-xs">
+                    {r.currency}
+                    {savedKeys.has(`${r.year}-${r.month}-${r.currency}`) && <span className="ml-1.5 text-amber-400">reemplaza</span>}
+                  </span>
                   <button onClick={() => setPending(p => p.filter(x => x !== r))} className="text-slate-600 hover:text-slate-300">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
             </div>
-            <p className="text-xs text-slate-500 mt-2">Si un mes ya estaba cargado en la misma moneda, se reemplaza.</p>
             <button
               onClick={() => saveMut.mutate(pending)}
               disabled={saveMut.isPending}
