@@ -118,7 +118,7 @@ def _filled_template(rows) -> bytes:
     path = Path(__file__).resolve().parents[2] / "frontend" / "public" / "plantilla-totales-mensuales.xlsx"
     wb = load_workbook(path)
     ws = wb.active
-    for i, row in enumerate(rows, start=8):  # la tabla empieza en la fila 8
+    for i, row in enumerate(rows, start=10):  # la tabla empieza en la fila 10
         for j, v in enumerate(row, start=1):
             ws.cell(row=i, column=j, value=v)
     buf = io.BytesIO()
@@ -144,7 +144,7 @@ def test_parse_filled_template(authed):
         {"year": y1, "month": m1, "currency": "UYU", "income": "52000.00", "expense": "41300.50"},
         {"year": y2, "month": m2, "currency": "USD", "income": "1250.00", "expense": "900.00"},
     ]
-    assert [e["row"] for e in body["errors"]] == [10, 11]
+    assert [e["row"] for e in body["errors"]] == [12, 13]
     # Nada se guardó todavía
     assert c.get(MT, headers=h).json() == []
 
