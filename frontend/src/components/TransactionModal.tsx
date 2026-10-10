@@ -457,7 +457,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
         {/* Tipo toggle — deshabilitado en modo edición */}
         <div className="flex gap-2 mb-5">
           {(['income', 'expense', 'transfer'] as const).map(type => {
-            const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia' }
+            const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia / Retiro' }
             const activeStyles = {
               income:   'bg-cyan-400/15 border-cyan-400/40 text-cyan-400',
               expense:  'bg-rose-400/15 border-rose-400/40 text-rose-400',
@@ -469,7 +469,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                 key={type}
                 disabled={isEditing}
                 onClick={() => { if (!isEditing) { setTxType(type); if (type !== 'expense') { setSelectedHouseholdIds([]) } } }}
-                className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                className={`flex-1 py-2 px-1 leading-tight rounded-xl text-sm font-semibold border transition-all ${
                   isActive
                     ? activeStyles[type]
                     : isEditing
