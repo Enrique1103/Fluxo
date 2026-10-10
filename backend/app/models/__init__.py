@@ -13,7 +13,6 @@ from .instalment_plan_models import InstalmentPlan
 from .household_models import Household, HouseholdMember, HouseholdInvite, SplitType, MemberRole, MemberStatus, InviteStatus
 from .review_models import TransactionReview, ReviewType, ReviewStatus
 from .budget_models import Budget
-from .transaction_history_models import TransactionHistory
 from .monthly_total_models import MonthlyTotal
 
 __all__ = [
@@ -44,6 +43,5 @@ __all__ = [
     "ReviewType",
     "ReviewStatus",
     "Budget",
-    "TransactionHistory",
     "MonthlyTotal",
 ]

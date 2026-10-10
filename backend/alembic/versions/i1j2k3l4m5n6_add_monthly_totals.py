@@ -1,7 +1,7 @@
 """add monthly_totals (importación de totales mensuales)
 
 Revision ID: i1j2k3l4m5n6
-Revises: h1i2j3k4l5m6
+Revises: g1h2i3j4k5l6
 Create Date: 2026-10-10
 
 Solo agrega una tabla nueva; no modifica ni borra datos existentes.
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = 'i1j2k3l4m5n6'
-down_revision = 'h1i2j3k4l5m6'
+down_revision = 'g1h2i3j4k5l6'
 branch_labels = None
 depends_on = None
 

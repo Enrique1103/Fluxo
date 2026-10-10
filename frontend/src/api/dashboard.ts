@@ -468,26 +468,3 @@ export const fetchWeeklyExpenses = async (
     date_to,
   }
 }
-
-// --- Historial de movimientos (trazabilidad) ---
-
-export interface TransactionHistoryEntry {
-  id: string
-  transaction_id: string
-  action: 'create' | 'update' | 'delete'
-  snapshot: Record<string, string | string[] | null>
-  changes: Record<string, [unknown, unknown]> | null
-  created_at: string
-}
-
-/** GET /api/v1/transactions/{id}/history */
-export const fetchTransactionHistory = async (id: string): Promise<TransactionHistoryEntry[]> => {
-  const { data } = await client.get<TransactionHistoryEntry[]>(`/v1/transactions/${id}/history`)
-  return data
-}
-
-/** GET /api/v1/transactions/history — actividad reciente (incluye borrados) */
-export const fetchRecentHistory = async (limit = 50): Promise<TransactionHistoryEntry[]> => {
-  const { data } = await client.get<TransactionHistoryEntry[]>('/v1/transactions/history', { params: { limit } })
-  return data
-}

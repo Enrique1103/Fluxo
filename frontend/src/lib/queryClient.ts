@@ -28,6 +28,5 @@ export function invalidateFinancialData(qc: QueryClient): Promise<void> {
     qc.invalidateQueries({ queryKey: ['household-analytics'] }),
     qc.invalidateQueries({ queryKey: ['budgets'] }),
     qc.invalidateQueries({ queryKey: ['tx'] }),
-    qc.invalidateQueries({ queryKey: ['tx-history'] }),
   ]).then(() => undefined)
 }

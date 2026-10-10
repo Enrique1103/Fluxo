@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Activity, BarChart2, ChevronLeft, ChevronRight, ChevronDown,
   Eye, EyeOff, TrendingUp, TrendingDown, Settings, Calendar,
-  CreditCard, Wallet, Upload, X, Search, Home, Pencil, DollarSign, History as HistoryIcon,
+  CreditCard, Wallet, Upload, X, Search, Home, Pencil, DollarSign,
 } from 'lucide-react'
 import ExportButton from '../components/ExportButton'
 import MonthYearPicker from '../components/MonthYearPicker'
@@ -25,7 +25,6 @@ import type { Budget } from '../api/budgets'
 import SettingsDrawer from '../components/SettingsDrawer'
 import TransactionModal from '../components/TransactionModal'
 import DeleteTransactionModal from '../components/DeleteTransactionModal'
-import TransactionHistoryModal from '../components/TransactionHistoryModal'
 import FAB from '../components/FAB'
 import VoiceExpenseModal from '../components/VoiceExpenseModal'
 import { invalidateFinancialData } from '../lib/queryClient'
@@ -96,14 +95,13 @@ const ALL_PAYMENT_METHODS: PaymentMethod[] = [
 ]
 
 function TxTable({
-  transactions, privacy, currency, onDelete, onEdit, onHistory, onConfirmOpenChange, categoryFilter,
+  transactions, privacy, currency, onDelete, onEdit, onConfirmOpenChange, categoryFilter,
 }: {
   transactions: MonthlyBreakdown['transactions']
   privacy: boolean
   currency: string
   onDelete?: (id: string, scope?: 'personal' | 'household') => Promise<void>
   onEdit?: (id: string) => void
-  onHistory?: (id: string) => void
   onConfirmOpenChange?: (open: boolean) => void
   categoryFilter?: string | null
 }) {
@@ -462,15 +460,6 @@ function TxTable({
                   </td>
                   <td className="py-2 pr-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {onHistory && (
-                        <button
-                          onClick={() => onHistory(tx.id)}
-                          className="p-1 text-slate-700 hover:text-indigo-400 transition-colors"
-                          title="Historial de cambios"
-                        >
-                          <HistoryIcon className="w-3 h-3" />
-                        </button>
-                      )}
                       {onEdit && (
                         <button
                           onClick={() => onEdit(tx.id)}
@@ -573,8 +562,6 @@ export default function StatsDashboardPage() {
   const [settingsOpen,      setSettingsOpen]      = useState(false)
   const [txModalOpen,       setTxModalOpen]       = useState(false)
   const [editTxId,          setEditTxId]          = useState<string | undefined>(undefined)
-  const [historyOpen,       setHistoryOpen]       = useState(false)
-  const [historyTxId,       setHistoryTxId]       = useState<string | undefined>(undefined)
   const [voiceOpen,         setVoiceOpen]         = useState(false)
   const [txConfirmOpen,     setTxConfirmOpen]     = useState(false)
   const [selectedCategory,  setSelectedCategory]  = useState<string | null>(null)
@@ -1032,15 +1019,7 @@ export default function StatsDashboardPage() {
 
       {/* ROW 2: Historial — full width */}
       <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm mb-24">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-slate-200">Historial de Movimientos</h2>
-          <button
-            onClick={() => { setHistoryTxId(undefined); setHistoryOpen(true) }}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-300 transition-colors"
-          >
-            <HistoryIcon className="w-3.5 h-3.5" /> Actividad reciente
-          </button>
-        </div>
+        <h2 className="text-sm font-semibold text-slate-200 mb-4">Historial de Movimientos</h2>
         {isLoading ? (
           <div className="space-y-2">
             {[1,2,3,4].map(i => <div key={i} className="h-10 bg-slate-800/50 animate-pulse rounded-lg" />)}
@@ -1055,7 +1034,6 @@ export default function StatsDashboardPage() {
             categoryFilter={groupBy === 'category' ? selectedCategory : null}
             onConfirmOpenChange={setTxConfirmOpen}
             onEdit={id => { setEditTxId(id); setTxModalOpen(true) }}
-            onHistory={id => { setHistoryTxId(id); setHistoryOpen(true) }}
             onDelete={async (id, scope = 'personal') => {
               await deleteTransaction(id, scope)
               await invalidateFinancialData(queryClient)
@@ -1082,11 +1060,6 @@ export default function StatsDashboardPage() {
       open={txModalOpen}
       editTxId={editTxId}
       onClose={() => { setTxModalOpen(false); setEditTxId(undefined) }}
-    />
-    <TransactionHistoryModal
-      open={historyOpen}
-      txId={historyTxId}
-      onClose={() => { setHistoryOpen(false); setHistoryTxId(undefined) }}
     />
     <VoiceExpenseModal open={voiceOpen} onClose={() => setVoiceOpen(false)} />
     </>

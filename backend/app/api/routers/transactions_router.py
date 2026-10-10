@@ -7,9 +7,7 @@ from app.api.dependeces import get_current_user
 from app.core.database import get_db
 from app.models.transactions_models import TransactionType, PaymentMethod
 from app.models.users_models import User
-from app.schemas.transaction_schema import (
-    TransactionCreate, TransactionUpdate, TransactionResponse, TransactionHistoryResponse, DeleteScope,
-)
+from app.schemas.transaction_schema import TransactionCreate, TransactionUpdate, TransactionResponse, DeleteScope
 from app.services import transaction_service
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
@@ -49,25 +47,6 @@ def list_transactions(
         date_to=date_to,
         metodo_pago=metodo_pago,
     )
-
-
-@router.get("/history", response_model=list[TransactionHistoryResponse])
-def recent_history(
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return transaction_service.get_recent_history(db, current_user, limit, offset)
-
-
-@router.get("/{tx_id}/history", response_model=list[TransactionHistoryResponse])
-def transaction_history(
-    tx_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return transaction_service.get_history(db, current_user, tx_id)
 
 
 @router.get("/{tx_id}", response_model=TransactionResponse)

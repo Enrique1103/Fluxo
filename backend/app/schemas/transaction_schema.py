@@ -113,15 +113,3 @@ class TransactionResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
-
-
-# --- Historial (trazabilidad) ---
-class TransactionHistoryResponse(BaseModel):
-    id: uuid.UUID
-    transaction_id: uuid.UUID
-    action: str  # create | update | delete
-    snapshot: dict
-    changes: dict | None = None
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
