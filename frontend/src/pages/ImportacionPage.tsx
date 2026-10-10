@@ -27,6 +27,7 @@ import {
   type Concept,
 } from '../api/dashboard'
 import { fetchHouseholds, type Household } from '../api/households'
+import MonthlyTotalsImport from '../components/MonthlyTotalsImport'
 
 // ─── tipos ──────────────────────────────────────────────────────────────────
 
@@ -367,6 +368,8 @@ export default function ImportacionPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep]           = useState<Step>('select')
+  // Comprobantes = cada movimiento del extracto; Totales = solo ingreso/gasto por mes
+  const [modo, setModo]           = useState<'comprobantes' | 'totales'>('comprobantes')
   const [banco, setBanco]         = useState('')
   const [cuentaId, setCuentaId]   = useState('')
   const [archivo, setArchivo]     = useState<File | null>(null)
@@ -536,6 +539,26 @@ export default function ImportacionPage() {
               <Upload className="w-4 h-4" /><span className="hidden sm:inline">Importar</span>
             </button>
           </nav>
+
+          <div className="grid grid-cols-2 gap-1 p-1 mb-6 bg-slate-900/60 border border-slate-800/60 rounded-xl">
+            {([
+              ['comprobantes', 'Comprobantes', 'Cada movimiento del extracto'],
+              ['totales', 'Totales mensuales', 'Solo ingreso y gasto por mes'],
+            ] as const).map(([value, label, hint]) => (
+              <button
+                key={value}
+                onClick={() => setModo(value)}
+                className={`px-3 py-2 rounded-lg text-left transition-colors ${
+                  modo === value ? 'bg-emerald-500/15 border border-emerald-500/30' : 'border border-transparent hover:bg-slate-800/60'
+                }`}
+              >
+                <span className={`block text-sm font-semibold ${modo === value ? 'text-emerald-400' : 'text-slate-300'}`}>{label}</span>
+                <span className="block text-[11px] text-slate-500">{hint}</span>
+              </button>
+            ))}
+          </div>
+
+          {modo === 'totales' ? <MonthlyTotalsImport /> : (<>
 
           <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-6 mb-6">
             <h2 className="text-lg font-semibold text-white mb-1">Nueva Importación</h2>
@@ -714,6 +737,7 @@ export default function ImportacionPage() {
               )}
             </div>
           )}
+          </>)}
         </div>
       </div>
     )

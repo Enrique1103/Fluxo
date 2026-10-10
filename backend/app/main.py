@@ -23,6 +23,8 @@ from app.api.routers import instalment_plan_router
 from app.api.routers import household_router
 from app.api.routers import reviews_router
 from app.api.routers import budgets_router
+from app.api.routers import monthly_totals_router
+from app.exceptions.monthly_total_exceptions import MonthlyTotalNotFound, MonthlyTotalFutureMonth
 from app.exceptions.user_exceptions import (
     EmailAlreadyExists,
     UserNotFound,
@@ -367,6 +369,16 @@ async def handle_unauthorized_budget(r: Request, exc: UnauthorizedBudgetAccess):
     return _json(_403, str(exc))
 
 
+@app.exception_handler(MonthlyTotalNotFound)
+async def handle_monthly_total_not_found(r: Request, exc: MonthlyTotalNotFound):
+    return _json(_404, str(exc))
+
+
+@app.exception_handler(MonthlyTotalFutureMonth)
+async def handle_monthly_total_future(r: Request, exc: MonthlyTotalFutureMonth):
+    return _json(_422, str(exc))
+
+
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
@@ -390,3 +402,4 @@ app.include_router(instalment_plan_router.router, prefix=API_PREFIX)
 app.include_router(household_router.router, prefix=API_PREFIX)
 app.include_router(reviews_router.router, prefix=API_PREFIX)
 app.include_router(budgets_router.router, prefix=API_PREFIX)
+app.include_router(monthly_totals_router.router, prefix=API_PREFIX)

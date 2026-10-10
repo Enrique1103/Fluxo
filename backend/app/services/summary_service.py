@@ -8,7 +8,7 @@ from app.models.accounts_models import Account, AccountType
 from app.models.transactions_models import Transaction, TransactionType, TransferRole
 from app.models.users_models import User
 from app.schemas.summary_schema import SummaryResponse, AccountSummary, CategoryBreakdown
-from app.services import exchange_rate_service
+from app.services import exchange_rate_service, monthly_total_service
 
 
 def get_summary(db: Session, user: User, display_currency: str | None = None) -> SummaryResponse:
@@ -111,6 +111,11 @@ def get_summary(db: Session, user: User, display_currency: str | None = None) ->
             if outflow:
                 expense_this_month += _to_target(outflow, currency, tx_date)
 
+    # Total mensual importado del mes en curso (si lo hubiera)
+    for _, cur, inc, exp in monthly_total_service.totals_by_month(db, user.id, month_start, month_start):
+        income_this_month += _to_target(inc, cur, month_start)
+        expense_this_month += _to_target(exp, cur, month_start)
+
     expense_by_category = [
         CategoryBreakdown(category_name=name, total=total.quantize(Decimal("0.01")))
         for name, total in sorted(by_category.items(), key=lambda kv: kv[1], reverse=True)
@@ -127,6 +132,11 @@ def get_summary(db: Session, user: User, display_currency: str | None = None) ->
         .scalar()
     )
     first_tx_month = first_tx.strftime("%Y-%m") if first_tx else None
+    # Los totales mensuales importados también son historial: el gráfico arranca desde el más viejo
+    imported = monthly_total_service.get_all(db, user)
+    if imported:
+        oldest = f"{imported[-1].year}-{imported[-1].month:02d}"
+        first_tx_month = min(first_tx_month, oldest) if first_tx_month else oldest
 
     return SummaryResponse(
         net_worth=net_worth,

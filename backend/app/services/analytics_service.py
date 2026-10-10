@@ -16,7 +16,7 @@ from app.models.external_account_models import ExternalAccount
 from app.models.transactions_models import Transaction, TransactionType, TransferRole
 from app.models.users_models import User
 from app.schemas.analytics_schema import MonthlyBreakdown, CategoryStat, DailyExpense, MonthlyTx, MonthlyPatrimonio, AccountBalanceStat
-from app.services import exchange_rate_service
+from app.services import exchange_rate_service, monthly_total_service
 from app.crud import account_crud
 
 
@@ -174,7 +174,10 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
     # Build complete month grid so missing months appear as 0
     month_labels = [s.strftime("%Y-%m") for s in starts]
 
-    if not rows_ie and not rows_ext:
+    # Totales mensuales importados de otra app (sin detalle de comprobantes)
+    imported = monthly_total_service.totals_by_month(db, user.id, date_from, date_to)
+
+    if not rows_ie and not rows_ext and not imported:
         fig = go.Figure()
         fig.add_trace(go.Bar(name="Ingresos", x=month_labels, y=[0] * months))
         fig.add_trace(go.Bar(name="Egresos", x=month_labels, y=[0] * months))
@@ -207,6 +210,13 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
             acc_cur = acc_currency.value if hasattr(acc_currency, 'value') else str(acc_currency)
             rate = _rate(db, user.id, acc_cur, target_currency, tx_date)
             expense_by_month[lbl] += float(outflow * rate)
+
+    for lbl, cur, inc, exp in imported:
+        if lbl not in income_by_month:
+            continue
+        rate = _rate(db, user.id, cur, target_currency, date(int(lbl[:4]), int(lbl[5:]), 1))
+        income_by_month[lbl] += float(inc * rate)
+        expense_by_month[lbl] += float(exp * rate)
 
     income_vals = [income_by_month[lbl] for lbl in month_labels]
     expense_vals = [expense_by_month[lbl] for lbl in month_labels]
@@ -416,6 +426,10 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
         for tx, _, _, _, acc_currency, _, _ in rows
         if tx.type == TransactionType.EXPENSE
     )
+    month_first = date(year, month, 1)
+    for _, cur, inc, exp in monthly_total_service.totals_by_month(db, user.id, month_first, month_first):
+        income += _convert(inc, cur, month_first)
+        expenses += _convert(exp, cur, month_first)
 
     cat_totals: dict[str, float] = {}
     income_cat_totals: dict[str, float] = {}
@@ -655,6 +669,22 @@ def patrimonio(
         elif tx_type == TransactionType.TRANSFER:
             # Externa (monto + comisión) o interna (solo comisión) — ver arriba
             net_flow[month_label] -= converted
+
+    # Totales mensuales importados: ingreso - gasto del mes
+    if starts:
+        for lbl, cur, inc, exp in monthly_total_service.totals_by_month(db, user.id, date_from, date_to):
+            if lbl not in net_flow:
+                continue
+            flow = inc - exp
+            if cur != target_currency:
+                rate = exchange_rate_service.get_rate_nearest(
+                    db, user.id, cur, target_currency, int(lbl[:4]), int(lbl[5:])
+                )
+                if rate is None:
+                    missing_currencies_per_month[lbl].add(f"{cur}→{target_currency}")
+                    continue
+                flow = flow * rate
+            net_flow[lbl] += flow
 
     # --- Step 3: walk backwards from current net worth ---
     # Use effective_today as anchor: if the user entered future-dated transactions,

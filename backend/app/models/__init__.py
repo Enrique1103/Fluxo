@@ -14,6 +14,7 @@ from .household_models import Household, HouseholdMember, HouseholdInvite, Split
 from .review_models import TransactionReview, ReviewType, ReviewStatus
 from .budget_models import Budget
 from .transaction_history_models import TransactionHistory
+from .monthly_total_models import MonthlyTotal
 
 __all__ = [
     "Base",
@@ -44,4 +45,5 @@ __all__ = [
     "ReviewStatus",
     "Budget",
     "TransactionHistory",
+    "MonthlyTotal",
 ]
