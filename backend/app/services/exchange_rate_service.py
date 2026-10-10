@@ -136,3 +136,34 @@ def get_rate_for_month(
         return Decimal("1") / Decimal(str(er_inv.rate))
 
     return None
+
+
+def get_rate_nearest(
+    db: Session,
+    user_id: uuid.UUID,
+    from_currency: str,
+    to_currency: str,
+    year: int,
+    month: int,
+) -> Decimal | None:
+    """
+    Igual que get_rate_for_month, pero si no hay ninguna tasa hasta ese mes
+    usa la primera tasa cargada después (ej: movimientos de meses anteriores
+    a la primera tasa que cargó el usuario). None solo si el par no tiene
+    ninguna tasa cargada.
+    """
+    rate = get_rate_for_month(db, user_id, from_currency, to_currency, year, month)
+    if rate is not None:
+        return rate
+
+    er = exchange_rate_crud.get_earliest_for_pair_from(
+        db, user_id, from_currency, to_currency, year, month
+    )
+    if er:
+        return Decimal(str(er.rate))
+    er_inv = exchange_rate_crud.get_earliest_for_pair_from(
+        db, user_id, to_currency, from_currency, year, month
+    )
+    if er_inv:
+        return Decimal("1") / Decimal(str(er_inv.rate))
+    return None

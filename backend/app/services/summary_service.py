@@ -55,8 +55,22 @@ def get_summary(db: Session, user: User, display_currency: str | None = None) ->
     month_start = today.replace(day=1)
     month_end = today.replace(day=_monthrange(today.year, today.month)[1])
 
-    base_q = (
-        db.query(Transaction)
+    # Ingresos/gastos del mes convertidos a target_currency con la tasa del mes
+    # (antes se sumaban montos de cuentas en distintas monedas sin convertir).
+    from app.models.categories_models import Category
+
+    rows = (
+        db.query(
+            Transaction.type,
+            Transaction.amount,
+            Transaction.commission,
+            Transaction.external_account_id,
+            Transaction.date,
+            Account.currency,
+            Category.name,
+        )
+        .join(Account, Transaction.account_id == Account.id)
+        .outerjoin(Category, Transaction.category_id == Category.id)
         .filter(
             Transaction.user_id == user.id,
             Transaction.is_deleted == False,
@@ -64,43 +78,45 @@ def get_summary(db: Session, user: User, display_currency: str | None = None) ->
             Transaction.date >= month_start,
             Transaction.date <= month_end,
         )
-    )
-
-    income_this_month: Decimal = (
-        base_q.filter(Transaction.type == TransactionType.INCOME)
-        .with_entities(func.coalesce(func.sum(Transaction.amount), Decimal("0.00")))
-        .scalar()
-    )
-    expense_this_month: Decimal = (
-        base_q.filter(Transaction.type == TransactionType.EXPENSE)
-        .with_entities(func.coalesce(func.sum(Transaction.amount), Decimal("0.00")))
-        .scalar()
-    )
-
-    income_this_month = Decimal(str(income_this_month))
-    expense_this_month = Decimal(str(expense_this_month))
-
-    # --- Expense breakdown by category (current month) ---
-    from app.models.categories_models import Category
-
-    rows = (
-        db.query(Category.name, func.sum(Transaction.amount))
-        .join(Transaction, Transaction.category_id == Category.id)
-        .filter(
-            Transaction.user_id == user.id,
-            Transaction.is_deleted == False,
-            Transaction.type == TransactionType.EXPENSE,
-            Transaction.date >= month_start,
-            Transaction.date <= today,
-        )
-        .group_by(Category.name)
-        .order_by(func.sum(Transaction.amount).desc())
         .all()
     )
+
+    rate_cache: dict[str, Decimal] = {}
+
+    def _to_target(amount, currency, tx_date) -> Decimal:
+        cur = str(currency)
+        if cur == target_currency:
+            return Decimal(str(amount))
+        if cur not in rate_cache:
+            rate = exchange_rate_service.get_rate_nearest(
+                db, user.id, cur, target_currency, tx_date.year, tx_date.month
+            )
+            rate_cache[cur] = rate if rate is not None else Decimal("1")
+        return Decimal(str(amount)) * rate_cache[cur]
+
+    income_this_month = Decimal("0.00")
+    expense_this_month = Decimal("0.00")
+    by_category: dict[str, Decimal] = {}
+    for tx_type, amount, commission, ext_acc_id, tx_date, currency, cat_name in rows:
+        if tx_type == TransactionType.INCOME:
+            income_this_month += _to_target(amount, currency, tx_date)
+        elif tx_type == TransactionType.EXPENSE:
+            converted = _to_target(amount, currency, tx_date)
+            expense_this_month += converted
+            if tx_date <= today and cat_name is not None:
+                by_category[cat_name] = by_category.get(cat_name, Decimal("0.00")) + converted
+        elif tx_type == TransactionType.TRANSFER:
+            # Igual que el gráfico Ingresos·Gastos: transferencia externa y comisiones son salida
+            outflow = Decimal(str(commission or 0)) + (Decimal(str(amount)) if ext_acc_id else Decimal("0"))
+            if outflow:
+                expense_this_month += _to_target(outflow, currency, tx_date)
+
     expense_by_category = [
-        CategoryBreakdown(category_name=name, total=Decimal(str(total)))
-        for name, total in rows
+        CategoryBreakdown(category_name=name, total=total.quantize(Decimal("0.01")))
+        for name, total in sorted(by_category.items(), key=lambda kv: kv[1], reverse=True)
     ]
+    income_this_month = income_this_month.quantize(Decimal("0.01"))
+    expense_this_month = expense_this_month.quantize(Decimal("0.01"))
 
     first_tx = (
         db.query(func.min(Transaction.date))

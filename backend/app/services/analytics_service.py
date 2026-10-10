@@ -24,6 +24,16 @@ from app.crud import account_crud
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _rate(db: Session, user_id: uuid.UUID, from_cur: str, to_cur: str, d: date) -> Decimal:
+    """
+    Tasa para convertir un movimiento del mes de `d`. Si no hay tasa hasta ese mes
+    usa la más cercana posterior; 1 solo si el par no tiene ninguna tasa cargada
+    (el dashboard ya avisa de tasas faltantes).
+    """
+    rate = exchange_rate_service.get_rate_nearest(db, user_id, from_cur, to_cur, d.year, d.month)
+    return rate if rate is not None else Decimal("1")
+
+
 def _tx_base(db: Session, user_id: uuid.UUID, date_from: date, date_to: date):
     """Base query: non-deleted, non-DESTINATION, within date range."""
     return (
@@ -152,11 +162,12 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
         .all()
     )
 
-    # External transfers (outflow = treated as expense)
+    # Transferencias (solo pata SOURCE): las externas son salida real de dinero y
+    # la comisión bancaria de cualquier transferencia también es un gasto.
     rows_ext = (
-        db.query(Transaction.date, Transaction.amount, Account.currency)
+        db.query(Transaction.date, Transaction.amount, Transaction.commission, Transaction.external_account_id, Account.currency)
         .join(Account, Transaction.account_id == Account.id)
-        .filter(*base_filter, Transaction.external_account_id.isnot(None))
+        .filter(*base_filter, Transaction.type == TransactionType.TRANSFER)
         .all()
     )
 
@@ -178,23 +189,24 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
         if lbl not in income_by_month:
             continue
         acc_cur = acc_currency.value if hasattr(acc_currency, 'value') else str(acc_currency)
-        rate = exchange_rate_service.get_rate_for_month(
-            db, user.id, acc_cur, target_currency, tx_date.year, tx_date.month
-        ) or Decimal("1")
+        rate = _rate(db, user.id, acc_cur, target_currency, tx_date)
         converted = float(Decimal(str(tx_amount)) * rate)
         if tx_type == TransactionType.INCOME:
             income_by_month[lbl] += converted
         else:
             expense_by_month[lbl] += converted
 
-    for tx_date, tx_amount, acc_currency in rows_ext:
+    for tx_date, tx_amount, tx_commission, ext_acc_id, acc_currency in rows_ext:
         lbl = tx_date.strftime("%Y-%m")
         if lbl in expense_by_month:
+            outflow = Decimal(str(tx_commission or 0))
+            if ext_acc_id is not None:
+                outflow += Decimal(str(tx_amount))
+            if outflow == 0:
+                continue
             acc_cur = acc_currency.value if hasattr(acc_currency, 'value') else str(acc_currency)
-            rate = exchange_rate_service.get_rate_for_month(
-                db, user.id, acc_cur, target_currency, tx_date.year, tx_date.month
-            ) or Decimal("1")
-            expense_by_month[lbl] += float(Decimal(str(tx_amount)) * rate)
+            rate = _rate(db, user.id, acc_cur, target_currency, tx_date)
+            expense_by_month[lbl] += float(outflow * rate)
 
     income_vals = [income_by_month[lbl] for lbl in month_labels]
     expense_vals = [expense_by_month[lbl] for lbl in month_labels]
@@ -391,9 +403,7 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
 
     def _convert(tx_amount, acc_currency, tx_date) -> float:
         acc_cur = acc_currency.value if hasattr(acc_currency, 'value') else str(acc_currency)
-        rate = exchange_rate_service.get_rate_for_month(
-            db, user.id, acc_cur, target_currency, tx_date.year, tx_date.month
-        ) or Decimal("1")
+        rate = _rate(db, user.id, acc_cur, target_currency, tx_date)
         return float(Decimal(str(tx_amount)) * rate)
 
     income = sum(
@@ -583,6 +593,7 @@ def patrimonio(
                 Transaction.amount,
                 Transaction.transfer_role,
                 Transaction.external_account_id,
+                Transaction.commission,
                 Account.currency,
             )
             .join(Account, Transaction.account_id == Account.id)
@@ -605,20 +616,27 @@ def patrimonio(
     net_flow: dict[str, Decimal] = {lbl: Decimal("0") for lbl in month_labels}
     missing_currencies_per_month: dict[str, set[str]] = {lbl: set() for lbl in month_labels}
 
-    for tx_date, tx_type, tx_amount, tx_role, ext_acc_id, acc_currency in rows:
+    for tx_date, tx_type, tx_amount, tx_role, ext_acc_id, tx_commission, acc_currency in rows:
         month_label = tx_date.strftime("%Y-%m")
         if month_label not in net_flow:
             continue
 
         year, month = int(month_label[:4]), int(month_label[5:])
         amount = Decimal(str(tx_amount))
+        if tx_type == TransactionType.TRANSFER:
+            # Lo que realmente sale del patrimonio en una transferencia:
+            # externa = monto + comisión; interna = solo la comisión.
+            commission = Decimal(str(tx_commission or 0))
+            amount = (amount if ext_acc_id is not None else Decimal("0")) + commission
+            if amount == 0:
+                continue
         acc_currency_str = acc_currency.value if hasattr(acc_currency, 'value') else str(acc_currency)
 
         # Convert to target currency
         if acc_currency_str == target_currency:
             converted = amount
         else:
-            rate = exchange_rate_service.get_rate_for_month(
+            rate = exchange_rate_service.get_rate_nearest(
                 db, user.id, acc_currency_str, target_currency, year, month
             )
             if rate is None:
@@ -634,10 +652,9 @@ def patrimonio(
             net_flow[month_label] += converted
         elif tx_type == TransactionType.EXPENSE:
             net_flow[month_label] -= converted
-        elif tx_type == TransactionType.TRANSFER and ext_acc_id is not None:
-            # Transfer to external account = real outflow
+        elif tx_type == TransactionType.TRANSFER:
+            # Externa (monto + comisión) o interna (solo comisión) — ver arriba
             net_flow[month_label] -= converted
-        # Internal transfers (no ext_acc_id) are skipped — net zero effect
 
     # --- Step 3: walk backwards from current net worth ---
     # Use effective_today as anchor: if the user entered future-dated transactions,

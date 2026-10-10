@@ -62,6 +62,31 @@ def get_most_recent_for_pair_up_to(
     )
 
 
+def get_earliest_for_pair_from(
+    db: Session,
+    user_id: uuid.UUID,
+    from_currency: str,
+    to_currency: str,
+    year: int,
+    month: int,
+) -> ExchangeRate | None:
+    """Oldest stored rate for a pair, from year/month onwards."""
+    return (
+        db.query(ExchangeRate)
+        .filter(
+            ExchangeRate.user_id == user_id,
+            ExchangeRate.from_currency == from_currency,
+            ExchangeRate.to_currency == to_currency,
+            or_(
+                ExchangeRate.year > year,
+                and_(ExchangeRate.year == year, ExchangeRate.month >= month),
+            ),
+        )
+        .order_by(ExchangeRate.year.asc(), ExchangeRate.month.asc())
+        .first()
+    )
+
+
 def get_all_for_pair(
     db: Session,
     user_id: uuid.UUID,
