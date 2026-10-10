@@ -45,6 +45,10 @@ class TransactionCreate(BaseModel):
     external_account_id: uuid.UUID | None = None
     # Comisión bancaria — solo aplica para TRANSFER, ignorado para otros tipos
     commission: Decimal | None = Field(default=None, ge=0)
+    # Monto que llega a la cuenta destino, en SU moneda — solo para TRANSFER interna
+    # entre cuentas de distinta moneda (ej: sale 4000 UYU de Prex, llegan 100 USD).
+    # Si se omite, se calcula con la tasa de cambio del mes.
+    destination_amount: Decimal | None = Field(default=None, gt=0)
     # Método de pago — solo aplica para EXPENSE, ignorado para otros tipos
     metodo_pago: PaymentMethod = PaymentMethod.OTRO
     # Hogar(es) compartido(s) — solo aplica para EXPENSE, ignorado para otros tipos.
@@ -66,6 +70,8 @@ class TransactionCreate(BaseModel):
                 raise ValueError("transfer_to_account_id solo aplica para TRANSFER")
             if self.external_account_id is not None:
                 raise ValueError("external_account_id solo aplica para TRANSFER")
+        if self.destination_amount is not None and self.transfer_to_account_id is None:
+            raise ValueError("destination_amount solo aplica para transferencias entre cuentas propias")
         return self
 
 

@@ -87,3 +87,41 @@ def test_patrimonio_counts_transfer_commission(mixed, debit_account):
     cur, before = pat[TODAY.strftime("%Y-%m")], pat[prev.strftime("%Y-%m")]
     assert cur == 10000 - 50 + 50000 + 500 * 40
     assert before - cur == 50
+
+
+def _bal(c, h, acc):
+    return float(c.get(f"{BASE}/accounts/{acc}", headers=h).json()["balance"])
+
+
+def test_transfer_uyu_to_usd_with_destination_amount_and_commission(mixed):
+    """Sale 4100 UYU de la cuenta UYU (+ 60 de comisión), llegan 100 USD."""
+    c, h, uyu, usd, cid, cat = mixed
+    r = c.post(TX, json={"account_id": uyu, "concept_id": cid, "category_id": cat, "amount": "4100",
+                         "type": "transfer", "date": str(TODAY), "transfer_to_account_id": usd,
+                         "destination_amount": "100", "commission": "60"}, headers=h)
+    assert r.status_code == 201, r.text
+    assert _bal(c, h, uyu) == 10000 - 4100 - 60
+    assert _bal(c, h, usd) == 500 + 100
+
+    # Borrar la transferencia revierte ambas cuentas con sus propios montos
+    assert c.delete(f"{TX}/{r.json()['id']}", headers=h).status_code == 204
+    assert _bal(c, h, uyu) == 10000
+    assert _bal(c, h, usd) == 500
+
+
+def test_transfer_cross_currency_uses_rate_when_no_destination_amount(mixed):
+    c, h, uyu, usd, cid, cat = mixed
+    r = c.post(TX, json={"account_id": usd, "concept_id": cid, "category_id": cat, "amount": "10",
+                         "type": "transfer", "date": str(TODAY), "transfer_to_account_id": uyu}, headers=h)
+    assert r.status_code == 201, r.text
+    assert _bal(c, h, usd) == 490
+    assert _bal(c, h, uyu) == 10400
+
+
+def test_destination_amount_ignored_for_same_currency(mixed, debit_account):
+    c, h, uyu, usd, cid, cat = mixed
+    r = c.post(TX, json={"account_id": uyu, "concept_id": cid, "category_id": cat, "amount": "1000",
+                         "type": "transfer", "date": str(TODAY), "transfer_to_account_id": debit_account["id"],
+                         "destination_amount": "5"}, headers=h)
+    assert r.status_code == 201, r.text
+    assert _bal(c, h, debit_account["id"]) == 51000

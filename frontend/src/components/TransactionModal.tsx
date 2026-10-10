@@ -13,7 +13,9 @@ import {
   createAccount,
   createCategory,
   createConcept,
+  fetchExchangeRates,
   type Account,
+  type ExchangeRate,
   type PaymentMethod,
 } from '../api/dashboard'
 import { fetchHouseholds } from '../api/households'
@@ -197,6 +199,25 @@ function QuickCreateCategory({ onCreated, onCancel }: QuickCreateCategoryProps) 
   )
 }
 
+/** Tasa from→to para el mes de `date`: la del mes o la anterior más reciente; si no, la primera posterior. Soporta par inverso. */
+function findRate(rates: ExchangeRate[], from: string, to: string, date: string): number | null {
+  const key = Number(date.slice(0, 4)) * 12 + Number(date.slice(5, 7))
+  const candidates = rates
+    .map(r => r.from_currency === from && r.to_currency === to ? { k: r.year * 12 + r.month, rate: Number(r.rate) }
+      : r.from_currency === to && r.to_currency === from ? { k: r.year * 12 + r.month, rate: 1 / Number(r.rate) }
+      : null)
+    .filter((c): c is { k: number; rate: number } => c !== null)
+  if (candidates.length === 0) return null
+  const past = candidates.filter(c => c.k <= key).sort((a, b) => b.k - a.k)
+  if (past.length) return past[0].rate
+  return candidates.sort((a, b) => a.k - b.k)[0].rate
+}
+
+/** "1 USD = 40.50 UYU" — siempre expresado con la moneda más fuerte a la izquierda. rate = cuántos `to` por 1 `from`. */
+function fmtRate(rate: number, from: string, to: string): string {
+  return rate >= 1 ? `1 ${from} = ${rate.toFixed(2)} ${to}` : `1 ${to} = ${(1 / rate).toFixed(2)} ${from}`
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export default function TransactionModal({ open, onClose, editTxId }: Props) {
@@ -222,6 +243,8 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
 
   // Comisión de transferencia
   const [commission, setCommission] = useState('')
+  // Transferencia entre monedas: monto que llega a la cuenta destino
+  const [destAmount, setDestAmount] = useState('')
 
   // Cuotas
   const [enCuotas,  setEnCuotas]  = useState(false)
@@ -250,6 +273,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   const { data: categories  = [] } = useQuery({ queryKey: ['categories'],  queryFn: fetchCategories,  enabled: open })
   const { data: concepts    = [] } = useQuery({ queryKey: ['concepts'],    queryFn: fetchConcepts,    enabled: open })
   const { data: households  = [] } = useQuery({ queryKey: ['households'],  queryFn: fetchHouseholds,  enabled: open })
+  const { data: rates       = [] } = useQuery({ queryKey: ['exchange-rates'], queryFn: fetchExchangeRates, enabled: open && txType === 'transfer' })
   // staleTime 0 + refetch al abrir: al reabrir un movimiento recién editado
   // no se deben mostrar (ni re-guardar) los valores viejos del caché.
   const { data: editTx      }      = useQuery({
@@ -290,6 +314,13 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   }, [open, isEditing])
 
   useEffect(() => { setDestAccountId('') }, [accountId])
+  useEffect(() => { setDestAmount('') }, [accountId, destAccountId])
+
+  const srcAccount   = accounts.find(a => a.id === accountId)
+  const destAccount  = accounts.find(a => a.id === destAccountId)
+  const crossCurrency = txType === 'transfer' && !!srcAccount && !!destAccount && srcAccount.currency !== destAccount.currency
+  const crossRate    = crossCurrency ? findRate(rates, srcAccount!.currency, destAccount!.currency, date) : null
+  const estDestAmount = crossRate !== null && parseFloat(amount) > 0 ? (parseFloat(amount) * crossRate).toFixed(2) : null
 
   useEffect(() => {
     if (!open) {
@@ -302,6 +333,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
       setAcctBalance(''); setAcctLimit(''); setAcctError(null)
       setMetodoPago('efectivo')
       setCommission('')
+      setDestAmount('')
       setEnCuotas(false); setNCuotas('2')
       setSelectedHouseholdIds([])
     }
@@ -341,6 +373,9 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
     if (!isEditing) {
       if (!accountId) { setServerError('Seleccioná una cuenta'); return }
       if (txType === 'transfer' && !destAccountId) { setServerError('Seleccioná la cuenta destino'); return }
+      if (crossCurrency && !(parseFloat(destAmount) > 0) && crossRate === null) {
+        setServerError(`Indicá cuánto llegó en ${destAccount!.currency} o cargá la tasa de cambio`); return
+      }
       if (enCuotas && txType === 'expense') {
         const n = parseInt(nCuotas)
         if (isNaN(n) || n < 2 || n > 60) { setServerError('Las cuotas deben ser entre 2 y 60'); return }
@@ -383,6 +418,9 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
             : {}),
           ...(txType === 'transfer' && commission && parseFloat(commission) > 0
             ? { commission: parseFloat(commission) }
+            : {}),
+          ...(crossCurrency && parseFloat(destAmount) > 0
+            ? { destination_amount: parseFloat(destAmount) }
             : {}),
           ...(txType === 'expense' ? { metodo_pago: metodoPago } : {}),
           ...(txType === 'expense' && selectedHouseholdIds.length > 0 ? { household_ids: selectedHouseholdIds } : {}),
@@ -607,10 +645,38 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               </div>
             )}
 
+            {/* Cambio de moneda — transferencia/extracción entre cuentas de distinta moneda */}
+            {crossCurrency && (
+              <div>
+                <label className={labelClass}>
+                  Monto que llega a {destAccount!.name} ({destAccount!.currency})
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={destAmount}
+                  onChange={e => setDestAmount(e.target.value)}
+                  placeholder={estDestAmount ?? '0.00'}
+                  className={inputClass}
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {parseFloat(destAmount) > 0 && parseFloat(amount) > 0
+                    ? `Cambio aplicado: ${fmtRate(parseFloat(destAmount) / parseFloat(amount), srcAccount!.currency, destAccount!.currency)}`
+                    : crossRate !== null
+                      ? `Si lo dejás vacío se usa tu tasa cargada: ${fmtRate(crossRate, srcAccount!.currency, destAccount!.currency)}`
+                      : `No tenés tasa ${srcAccount!.currency}→${destAccount!.currency} cargada: indicá cuánto llegó`}
+                </p>
+              </div>
+            )}
+
             {/* Comisión — solo para transferencias */}
             {txType === 'transfer' && (
               <div>
-                <label className={labelClass}>Comisión bancaria <span className="text-slate-600">(opcional)</span></label>
+                <label className={labelClass}>
+                  Comisión bancaria{srcAccount ? ` (${srcAccount.currency}, se descuenta de ${srcAccount.name})` : ''}{' '}
+                  <span className="text-slate-600">(opcional)</span>
+                </label>
                 <input
                   type="number"
                   min="0"

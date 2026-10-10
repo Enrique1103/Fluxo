@@ -136,6 +136,35 @@ def _check_exchange_rate_for_date(
         )
 
 
+def _destination_amount(
+    db: Session,
+    user: User,
+    tx_in: TransactionCreate,
+    source_account: Account,
+    dest_account: Account,
+) -> Decimal:
+    """
+    Monto que se acredita en la cuenta destino de una transferencia interna.
+    Misma moneda → el mismo monto. Distinta moneda → destination_amount si el
+    usuario lo indicó (lo que realmente recibió), si no amount × tasa del mes.
+    """
+    if str(source_account.currency) == str(dest_account.currency):
+        return tx_in.amount
+    if tx_in.destination_amount is not None:
+        return tx_in.destination_amount
+    from app.services import exchange_rate_service
+    rate = exchange_rate_service.get_rate_nearest(
+        db, user.id, str(source_account.currency), str(dest_account.currency),
+        tx_in.date.year, tx_in.date.month,
+    )
+    if rate is None:
+        raise ExchangeRateMissing(
+            f"No hay tasa {source_account.currency}→{dest_account.currency} cargada. "
+            f"Indicá cuánto llegó a la cuenta destino o cargá la tasa de cambio."
+        )
+    return (tx_in.amount * rate).quantize(Decimal("0.01"))
+
+
 def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
     # 1. Validate concept ownership (optional — None is allowed)
     concept = None
@@ -197,12 +226,15 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         # Verificar tasa para las cuentas involucradas (origen y destino)
         _check_exchange_rate_for_date(db, user, tx_in.date, [source_account, dest_account])
 
-        # 4. Apply balance mutations for transfer
+        # 4. Monto que llega al destino (cambio de moneda si las cuentas difieren)
+        dest_amount = _destination_amount(db, user, tx_in, source_account, dest_account)
+
+        # 5. Apply balance mutations for transfer — la comisión sale del origen, en su moneda
         commission = tx_in.commission or Decimal("0.00")
         _apply_expense(source_account, tx_in.amount + commission)
-        _apply_income(dest_account, tx_in.amount)
+        _apply_income(dest_account, dest_amount)
 
-        # 5. Create SOURCE transaction
+        # 6. Create SOURCE transaction
         source_tx = transaction_crud.create(
             db,
             user_id=user.id,
@@ -218,14 +250,14 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
             commission=tx_in.commission,
         )
 
-        # 6. Create DESTINATION transaction
+        # 7. Create DESTINATION transaction
         dest_tx = transaction_crud.create(
             db,
             user_id=user.id,
             account_id=dest_account.id,
             category_id=category_id,
             concept_id=concept.id if concept else None,
-            amount=tx_in.amount,
+            amount=dest_amount,
             transaction_type=TransactionType.TRANSFER,
             date=tx_in.date,
             description=tx_in.description,
@@ -233,7 +265,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
             transfer_role=TransferRole.DESTINATION,
         )
 
-        # 7. Link SOURCE → DESTINATION
+        # 8. Link SOURCE → DESTINATION
         source_tx.transfer_id = dest_tx.id
         db.flush()
 
