@@ -146,6 +146,14 @@ export default function MonthlyTotalsImport() {
           y desde ahí seguís registrando día a día.
         </p>
 
+        {accounts.length === 0 && (
+          <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            Todavía no tenés cuentas. Los totales se pueden cargar igual y el gráfico de ingresos y gastos
+            se ve bien, pero el patrimonio de esos meses se calcula hacia atrás desde tu saldo actual:
+            sin cuentas parte de 0 y queda negativo. Creá primero tus cuentas con el saldo que tienen hoy.
+          </div>
+        )}
+
         <div className="mb-4">
           <label className="block text-sm font-medium text-slate-400 mb-1">Moneda de los montos</label>
           <select value={currency} onChange={e => setCurrency(e.target.value)} className={input}>
