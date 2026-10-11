@@ -58,13 +58,29 @@ def _apply_income(account: Account, amount: Decimal) -> None:
 
 
 def _reverse_expense(account: Account, amount: Decimal) -> None:
-    """Undo a previous expense/source debit — no validation needed."""
+    """Undo a previous expense/source debit. Una tarjeta no puede quedar con saldo a favor."""
+    if account.type == AccountType.CREDIT and account.balance + amount > Decimal("0.00"):
+        raise CreditBalanceCannotBePositive(
+            f"No se puede: la tarjeta {account.name} quedaría con saldo a favor "
+            f"({account.balance + amount}). Probablemente ya registraste el pago de este gasto."
+        )
     account.balance += amount
 
 
 def _reverse_income(account: Account, amount: Decimal) -> None:
-    """Undo a previous income/destination credit — no validation needed."""
-    account.balance -= amount
+    """Undo a previous income/destination credit. El saldo no puede quedar negativo (ni pasar el límite)."""
+    new_balance = account.balance - amount
+    if account.type == AccountType.CREDIT:
+        if new_balance < -account.credit_limit:
+            raise InsufficientCreditLimit(
+                f"No se puede: la tarjeta {account.name} superaría su límite de crédito."
+            )
+    elif new_balance < Decimal("0.00"):
+        raise InsufficientFunds(
+            f"No se puede: el saldo de {account.name} quedaría en {new_balance}. "
+            f"Ese dinero ya se usó en otros movimientos de la cuenta."
+        )
+    account.balance = new_balance
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +140,8 @@ def _check_exchange_rate_for_date(
     for fc in sorted(foreign_currencies):
         rate = exchange_rate_crud.get_for_month(
             db, user.id, fc, str(user.currency_default), today.year, today.month
+        ) or exchange_rate_crud.get_for_month(  # también vale el par inverso (ej: UYU→USD)
+            db, user.id, str(user.currency_default), fc, today.year, today.month
         )
         if not rate:
             missing.append(f"{fc}→{user.currency_default}")
@@ -134,6 +152,35 @@ def _check_exchange_rate_for_date(
             f"Necesitás cargar la tasa de cambio de {today.strftime('%B %Y')} "
             f"para: {pairs}"
         )
+
+
+def _destination_amount(
+    db: Session,
+    user: User,
+    tx_in: TransactionCreate,
+    source_account: Account,
+    dest_account: Account,
+) -> Decimal:
+    """
+    Monto que se acredita en la cuenta destino de una transferencia interna.
+    Misma moneda → el mismo monto. Distinta moneda → destination_amount si el
+    usuario lo indicó (lo que realmente recibió), si no amount × tasa del mes.
+    """
+    if str(source_account.currency) == str(dest_account.currency):
+        return tx_in.amount
+    if tx_in.destination_amount is not None:
+        return tx_in.destination_amount
+    from app.services import exchange_rate_service
+    rate = exchange_rate_service.get_rate_nearest(
+        db, user.id, str(source_account.currency), str(dest_account.currency),
+        tx_in.date.year, tx_in.date.month,
+    )
+    if rate is None:
+        raise ExchangeRateMissing(
+            f"No hay tasa {source_account.currency}→{dest_account.currency} cargada. "
+            f"Indicá cuánto llegó a la cuenta destino o cargá la tasa de cambio."
+        )
+    return (tx_in.amount * rate).quantize(Decimal("0.01"))
 
 
 def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
@@ -197,12 +244,15 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         # Verificar tasa para las cuentas involucradas (origen y destino)
         _check_exchange_rate_for_date(db, user, tx_in.date, [source_account, dest_account])
 
-        # 4. Apply balance mutations for transfer
+        # 4. Monto que llega al destino (cambio de moneda si las cuentas difieren)
+        dest_amount = _destination_amount(db, user, tx_in, source_account, dest_account)
+
+        # 5. Apply balance mutations for transfer — la comisión sale del origen, en su moneda
         commission = tx_in.commission or Decimal("0.00")
         _apply_expense(source_account, tx_in.amount + commission)
-        _apply_income(dest_account, tx_in.amount)
+        _apply_income(dest_account, dest_amount)
 
-        # 5. Create SOURCE transaction
+        # 6. Create SOURCE transaction
         source_tx = transaction_crud.create(
             db,
             user_id=user.id,
@@ -218,14 +268,14 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
             commission=tx_in.commission,
         )
 
-        # 6. Create DESTINATION transaction
+        # 7. Create DESTINATION transaction
         dest_tx = transaction_crud.create(
             db,
             user_id=user.id,
             account_id=dest_account.id,
             category_id=category_id,
             concept_id=concept.id if concept else None,
-            amount=tx_in.amount,
+            amount=dest_amount,
             transaction_type=TransactionType.TRANSFER,
             date=tx_in.date,
             description=tx_in.description,
@@ -233,7 +283,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
             transfer_role=TransferRole.DESTINATION,
         )
 
-        # 7. Link SOURCE → DESTINATION
+        # 8. Link SOURCE → DESTINATION
         source_tx.transfer_id = dest_tx.id
         db.flush()
 
@@ -368,12 +418,18 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
     # Handle amount change: reverse old, apply new
     new_amount = tx_update.amount if tx_update.amount is not None else tx.amount
     if tx_update.amount is not None and tx_update.amount != tx.amount:
+        # Se aplica solo la diferencia: así se valida el saldo final y no un paso intermedio
+        delta = new_amount - tx.amount
         if tx.type == TransactionType.EXPENSE:
-            _reverse_expense(account, tx.amount)
-            _apply_expense(account, new_amount)
+            if delta > 0:
+                _apply_expense(account, delta)
+            else:
+                _reverse_expense(account, -delta)
         else:
-            _reverse_income(account, tx.amount)
-            _apply_income(account, new_amount)
+            if delta > 0:
+                _apply_income(account, delta)
+            else:
+                _reverse_income(account, -delta)
         fields["amount"] = new_amount
 
     # Handle concept change (frequency only — category is independent)
@@ -394,7 +450,8 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
             raise CategoryNotFound("La categoría no existe o no pertenece al usuario")
         fields["category_id"] = tx_update.category_id
 
-    if tx_update.description is not None:
+    # description se puede vaciar enviando null explícitamente
+    if "description" in tx_update.model_fields_set:
         fields["description"] = tx_update.description
 
     if tx_update.date is not None:
@@ -404,12 +461,42 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
     if tx.type == TransactionType.EXPENSE and tx_update.metodo_pago is not None:
         fields["metodo_pago"] = tx_update.metodo_pago
 
+    # Hogares (F04) solo aplican para EXPENSE. None = sin cambios.
+    if tx.type == TransactionType.EXPENSE:
+        requested: list[uuid.UUID] | None = tx_update.household_ids
+        if requested is None and "household_id" in tx_update.model_fields_set:
+            requested = [tx_update.household_id] if tx_update.household_id else []
+        if requested is not None:
+            _set_households(db, user, tx, requested)
+
     if fields:
         transaction_crud.update(db, tx, fields)
 
     db.commit()
     db.refresh(tx)
     return tx
+
+
+def _set_households(db: Session, user: User, tx: Transaction, requested: list[uuid.UUID]) -> None:
+    """Sincroniza la tabla junction con los hogares pedidos (solo hogares donde el usuario es miembro activo)."""
+    from app.crud import household_crud
+    from app.models.household_models import MemberStatus
+
+    wanted: list[uuid.UUID] = []
+    for hh_id in dict.fromkeys(requested):
+        member = household_crud.get_member(db, hh_id, user.id)
+        if member and member.status == MemberStatus.ACTIVE:
+            wanted.append(hh_id)
+
+    current = {link.household_id: link for link in tx.household_links}
+    for hh_id, link in current.items():
+        if hh_id not in wanted:
+            tx.household_links.remove(link)
+    for hh_id in wanted:
+        if hh_id not in current:
+            tx.household_links.append(TransactionHousehold(household_id=hh_id))
+    tx.household_id = wanted[0] if wanted else None
+    db.flush()
 
 
 def delete(

@@ -95,3 +95,13 @@ class TestExchangeRates:
         r = c.delete(f"{RATES}/{rate_id}", headers=h)
         assert r.status_code == 204
         assert c.get(RATES, headers=h).json() == []
+
+
+def test_check_with_foreign_account_reports_missing(authed, cash_account):
+    """/check no debe fallar cuando el usuario tiene cuentas (antes daba 500)."""
+    c, h = authed
+    c.post(f"{BASE}/accounts", json={"name": "USD", "type": "cash", "currency": "USD", "balance": "0"}, headers=h)
+    r = c.get(f"{BASE}/exchange-rates/check", headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["has_all_rates"] is False
+    assert r.json()["missing_pairs"] == ["USD↔UYU"]

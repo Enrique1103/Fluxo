@@ -464,3 +464,66 @@ class TestMultipleHouseholdsF04:
         body = r.json()
         assert body["household_id"] == hh_id
         assert hh_id in body["household_ids"]
+
+
+class TestUpdateTransactionFields:
+    def _expense(self, c, h, acc_id, cid, cat_id, **extra):
+        return c.post(f"{BASE}/transactions", json={
+            "account_id": acc_id, "concept_id": cid, "category_id": cat_id,
+            "amount": "1000.00", "type": "expense", "date": TODAY,
+            "description": "original", **extra,
+        }, headers=h).json()
+
+    def test_update_amount_date_description_persist(self, tx_setup):
+        c, h, acc_id, cid, cat_id = tx_setup
+        tx = self._expense(c, h, acc_id, cid, cat_id)
+        r = c.patch(f"{BASE}/transactions/{tx['id']}", json={
+            "amount": 700, "date": "2026-01-05", "description": "editado",
+            "concept_id": cid, "category_id": cat_id, "metodo_pago": "efectivo",
+        }, headers=h)
+        assert r.status_code == 200
+        got = c.get(f"{BASE}/transactions/{tx['id']}", headers=h).json()
+        assert got["amount"] == "700.00"
+        assert got["date"] == "2026-01-05"
+        assert got["description"] == "editado"
+
+    def test_clear_description(self, tx_setup):
+        c, h, acc_id, cid, cat_id = tx_setup
+        tx = self._expense(c, h, acc_id, cid, cat_id)
+        r = c.patch(f"{BASE}/transactions/{tx['id']}", json={"description": None}, headers=h)
+        assert r.status_code == 200
+        assert r.json()["description"] is None
+
+    def test_omitting_description_keeps_it(self, tx_setup):
+        c, h, acc_id, cid, cat_id = tx_setup
+        tx = self._expense(c, h, acc_id, cid, cat_id)
+        r = c.patch(f"{BASE}/transactions/{tx['id']}", json={"amount": 10}, headers=h)
+        assert r.json()["description"] == "original"
+
+    def test_add_and_remove_household(self, tx_setup):
+        c, h, acc_id, cid, cat_id = tx_setup
+        hh = c.post(f"{BASE}/households", json={"name": "Casa"}, headers=h).json()
+        tx = self._expense(c, h, acc_id, cid, cat_id)
+        assert tx["household_ids"] == []
+
+        r = c.patch(f"{BASE}/transactions/{tx['id']}", json={"household_ids": [hh["id"]]}, headers=h)
+        assert r.status_code == 200
+        assert r.json()["household_ids"] == [hh["id"]]
+        assert r.json()["household_id"] == hh["id"]
+
+        # Sin household_ids en el payload → no cambia
+        r = c.patch(f"{BASE}/transactions/{tx['id']}", json={"amount": 5}, headers=h)
+        assert r.json()["household_ids"] == [hh["id"]]
+
+        r = c.patch(f"{BASE}/transactions/{tx['id']}", json={"household_ids": []}, headers=h)
+        assert r.status_code == 200
+        assert r.json()["household_ids"] == []
+        assert r.json()["household_id"] is None
+
+    def test_cannot_add_foreign_household(self, tx_setup):
+        import uuid
+        c, h, acc_id, cid, cat_id = tx_setup
+        tx = self._expense(c, h, acc_id, cid, cat_id)
+        r = c.patch(f"{BASE}/transactions/{tx['id']}", json={"household_ids": [str(uuid.uuid4())]}, headers=h)
+        assert r.status_code == 200
+        assert r.json()["household_ids"] == []

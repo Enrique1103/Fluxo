@@ -10,6 +10,8 @@ test_endpoints.py
 .claude/
 Zcuentas/
 *.xlsx
+# La plantilla de totales mensuales sí se publica (la descarga el usuario)
+!frontend/public/plantilla-totales-mensuales.xlsx
 *.xls
 fluxo_2026-*.pdf
 C.png
@@ -27,3 +29,5 @@ Resumen.md
 *.PDF
 *.pdf
 frontend/.vite/
+# Backups de la base (contienen datos personales)
+backend/backups/

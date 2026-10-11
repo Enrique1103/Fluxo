@@ -23,6 +23,8 @@ from app.api.routers import instalment_plan_router
 from app.api.routers import household_router
 from app.api.routers import reviews_router
 from app.api.routers import budgets_router
+from app.api.routers import monthly_totals_router
+from app.exceptions.monthly_total_exceptions import MonthlyTotalNotFound, MonthlyTotalFutureMonth, MonthlyTotalFileError
 from app.exceptions.user_exceptions import (
     EmailAlreadyExists,
     UserNotFound,
@@ -38,6 +40,7 @@ from app.exceptions.account_exceptions import (
     InsufficientCreditLimit,
     CreditBalanceCannotBePositive,
     AccountHasTransactions,
+    InvalidAccountUpdate,
 )
 from app.exceptions.transaction_exceptions import (
     TransactionNotFound,
@@ -189,6 +192,11 @@ async def handle_insufficient_credit(r: Request, exc: InsufficientCreditLimit):
 
 @app.exception_handler(CreditBalanceCannotBePositive)
 async def handle_credit_positive(r: Request, exc: CreditBalanceCannotBePositive):
+    return _json(_422, str(exc))
+
+
+@app.exception_handler(InvalidAccountUpdate)
+async def handle_invalid_account_update(r: Request, exc: InvalidAccountUpdate):
     return _json(_422, str(exc))
 
 
@@ -367,6 +375,21 @@ async def handle_unauthorized_budget(r: Request, exc: UnauthorizedBudgetAccess):
     return _json(_403, str(exc))
 
 
+@app.exception_handler(MonthlyTotalNotFound)
+async def handle_monthly_total_not_found(r: Request, exc: MonthlyTotalNotFound):
+    return _json(_404, str(exc))
+
+
+@app.exception_handler(MonthlyTotalFutureMonth)
+async def handle_monthly_total_future(r: Request, exc: MonthlyTotalFutureMonth):
+    return _json(_422, str(exc))
+
+
+@app.exception_handler(MonthlyTotalFileError)
+async def handle_monthly_total_file(r: Request, exc: MonthlyTotalFileError):
+    return _json(_422, str(exc))
+
+
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
@@ -390,3 +413,4 @@ app.include_router(instalment_plan_router.router, prefix=API_PREFIX)
 app.include_router(household_router.router, prefix=API_PREFIX)
 app.include_router(reviews_router.router, prefix=API_PREFIX)
 app.include_router(budgets_router.router, prefix=API_PREFIX)
+app.include_router(monthly_totals_router.router, prefix=API_PREFIX)

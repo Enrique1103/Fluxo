@@ -174,8 +174,9 @@ def cancel(db: Session, user: User, plan_id: uuid.UUID) -> None:
     today = PyDate.today()
 
     future_cuotas = instalment_plan_crud.get_future_cuotas(db, plan.id, today)
+    from app.services.transaction_service import _reverse_expense
+    _reverse_expense(account, sum((tx.amount for tx in future_cuotas), Decimal("0.00")))
     for tx in future_cuotas:
-        account.balance += tx.amount  # _reverse_expense sin validación
         transaction_crud.soft_delete(db, tx)
 
     instalment_plan_crud.soft_delete(db, plan)

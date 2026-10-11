@@ -1,4 +1,5 @@
-const CACHE = 'fluxo-v1'
+// v2: íconos nuevos — cambiar la versión invalida los assets cacheados
+const CACHE = 'fluxo-v2'
 
 const SHELL = [
   '/',

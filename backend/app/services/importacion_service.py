@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.crud import category_crud, concept_crud, transaction_crud, account_crud
 from app.models.importacion import Importacion, ReglaCategorias
-from app.models.transactions_models import Transaction, TransactionType, TransferRole, PaymentMethod
+from app.models.transactions_models import Transaction, TransactionHousehold, TransactionType, TransferRole, PaymentMethod
 
 
 # ---------------------------------------------------------------------------
@@ -1590,24 +1590,26 @@ class ImportacionService:
         else:
             movimientos = parser.parsear(archivo_bytes, _cuenta_id)
 
+        # 0) Filas idénticas dentro del mismo archivo (ej: dos cafés iguales el mismo día) son
+        #    movimientos distintos: la 2ª, 3ª… ocurrencia recibe un hash propio. Reimportar el
+        #    mismo archivo genera los mismos hashes, así que se siguen detectando como duplicados.
+        ocurrencias: dict[str, int] = {}
+        for mov in movimientos:
+            h = mov.get("import_hash")
+            if not h or mov.get("estado") != "validado":
+                continue
+            n = ocurrencias.get(h, 0) + 1
+            ocurrencias[h] = n
+            if n > 1:
+                mov["import_hash"] = hashlib.sha256(f"{h}#{n}".encode()).hexdigest()[:16]
+                mov["advertencia"] = "Hay otra fila igual en el archivo; revisá que no sea un duplicado"
+
         # 1) Duplicados exactos contra BD (mismo import_hash ya importado)
         hashes_bd = DetectorDuplicados.hashes_existentes(self.db, self.user_id, _cuenta_id)
         for mov in movimientos:
             if mov.get("import_hash") and mov["import_hash"] in hashes_bd:
                 mov["estado"] = "duplicado"
                 mov["duplicate_detail"] = hashes_bd[mov["import_hash"]]
-
-        # 2) Duplicados dentro del lote actual (dos filas idénticas en el mismo archivo)
-        hashes_lote: set[str] = set()
-        for mov in movimientos:
-            if mov.get("estado") != "validado":
-                continue
-            h = mov.get("import_hash")
-            if h:
-                if h in hashes_lote:
-                    mov["estado"] = "duplicado"
-                else:
-                    hashes_lote.add(h)
 
         # 3) Advertencia suave: ya existe en la cuenta alguna transacción con
         #    la misma fecha y monto (puede ser manual o de otro import).
@@ -1616,7 +1618,7 @@ class ImportacionService:
             if mov.get("estado") != "validado":
                 continue
             clave = (mov.get("fecha", ""), round(float(mov.get("monto", 0)), 2))
-            if clave in claves_bd:
+            if clave in claves_bd and not mov.get("advertencia"):
                 mov["advertencia"] = "Ya existe una transacción con esta fecha y monto en la cuenta"
                 mov["duplicate_detail"] = claves_bd[clave]
 
@@ -1671,7 +1673,19 @@ class ImportacionService:
             self.db, "Sin clasificar", self.user_id
         )
 
-        a_importar = [m for m in movimientos if m.get("estado") == "validado"]
+        # Doble click / dos pestañas: lo que ya está importado (mismo hash) no se vuelve a crear
+        hashes_ya_importados = {
+            h for (h,) in self.db.query(Transaction.import_hash).filter(
+                Transaction.user_id == self.user_id,
+                Transaction.import_hash.isnot(None),
+                Transaction.is_deleted.is_(False),
+            ).all()
+        }
+        a_importar = [
+            m for m in movimientos
+            if m.get("estado") == "validado"
+            and not (m.get("import_hash") and m["import_hash"] in hashes_ya_importados)
+        ]
         importados = 0
         errores_confirmacion: list[dict] = []
 
@@ -1752,6 +1766,13 @@ class ImportacionService:
                 palabra = descripcion_banco.upper().strip()[:100]
                 clave = (cat, palabra)
                 if clave not in reglas_existentes:
+                    # La corrección gana: se borran las reglas de esa misma descripción con otra categoría
+                    self.db.query(ReglaCategorias).filter(
+                        ReglaCategorias.user_id == self.user_id,
+                        ReglaCategorias.palabra_clave == palabra,
+                        ReglaCategorias.categoria != cat,
+                    ).delete(synchronize_session=False)
+                    reglas_existentes = {r for r in reglas_existentes if r[1] != palabra}
                     reglas_existentes.add(clave)
                     self.db.add(ReglaCategorias(
                         user_id=self.user_id,
@@ -1826,11 +1847,15 @@ class ImportacionService:
             categoria_cache = {}
 
         monto = Decimal(str(abs(mov["monto"])))
+        if monto == 0:
+            raise ValueError("Movimiento con monto 0")
         tipo = TransactionType.EXPENSE if mov["monto"] < 0 else TransactionType.INCOME
         fecha = datetime.strptime(mov["fecha"], "%Y-%m-%d").date()
 
         categoria = self._resolver_categoria(mov.get("categoria"), categoria_fallback, categoria_cache)
-        concepto  = self._resolver_concepto(mov.get("concepto") or "Importado", concepto_cache)
+        # El concepto es opcional (igual que al registrar un movimiento a mano)
+        nombre_concepto = (mov.get("concepto") or "").strip()
+        concepto = self._resolver_concepto(nombre_concepto, concepto_cache) if nombre_concepto else None
 
         metodo_raw = mov.get("metodo_pago", "otro")
         try:
@@ -1843,19 +1868,26 @@ class ImportacionService:
         else:
             _aplicar_ingreso(account, monto)
 
+        # Hogar: solo gastos y solo hogares donde el usuario es miembro activo
         hh_id = None
         raw_hh = mov.get("household_id")
-        if raw_hh:
+        if raw_hh and tipo == TransactionType.EXPENSE:
+            from app.crud import household_crud
+            from app.models.household_models import MemberStatus
             try:
-                hh_id = uuid.UUID(str(raw_hh))
+                candidate = uuid.UUID(str(raw_hh))
             except (ValueError, AttributeError):
-                pass
+                candidate = None
+            if candidate:
+                member = household_crud.get_member(self.db, candidate, self.user_id)
+                if member and member.status == MemberStatus.ACTIVE:
+                    hh_id = candidate
 
         tx = Transaction(
             user_id=self.user_id,
             account_id=account.id,
             category_id=categoria.id,
-            concept_id=concepto.id,
+            concept_id=concepto.id if concepto else None,
             amount=monto,
             type=tipo,
             date=fecha,
@@ -1864,9 +1896,13 @@ class ImportacionService:
             import_hash=mov.get("import_hash"),
             household_id=hh_id,
         )
+        # La vista del hogar lee la tabla de vínculos (F04), no solo household_id
+        if hh_id:
+            tx.household_links.append(TransactionHousehold(household_id=hh_id))
         self.db.add(tx)
 
-        concepto.frequency_score += 1
+        if concepto:
+            concepto.frequency_score += 1
         return tx
 
     def _crear_transferencia_zcuentas(
@@ -1888,6 +1924,8 @@ class ImportacionService:
             categoria_cache = {}
 
         monto = Decimal(str(abs(mov["monto"])))
+        if monto == 0:
+            raise ValueError("Movimiento con monto 0")
         fecha = datetime.strptime(mov["fecha"], "%Y-%m-%d").date()
 
         concepto  = self._resolver_concepto(mov.get("concepto") or "Transferencia", concepto_cache)
@@ -1899,40 +1937,45 @@ class ImportacionService:
         except ValueError:
             metodo = PaymentMethod.OTRO
 
-        shared_transfer_id = uuid.uuid4()
-
-        # Pata SOURCE: dinero sale de source_account
-        _aplicar_gasto(source_account, monto)
-        self.db.add(Transaction(
+        # Igual que una transferencia creada a mano (transaction_service.create):
+        # tipo TRANSFER en las dos patas y cada una apunta a la otra con transfer_id.
+        # Así no se cuenta como gasto/ingreso y al borrarla se revierten ambas cuentas.
+        source_tx = Transaction(
+            id=uuid.uuid4(),
             user_id=self.user_id,
             account_id=source_account.id,
             category_id=categoria.id,
             concept_id=concepto.id,
             amount=monto,
-            type=TransactionType.EXPENSE,
+            type=TransactionType.TRANSFER,
             date=fecha,
             description=(mov.get("descripcion") or "")[:100] or None,
             metodo_pago=metodo,
-            transfer_id=shared_transfer_id,
             transfer_role=TransferRole.SOURCE,
             import_hash=mov.get("import_hash"),
-        ))
-
-        # Pata DESTINATION: dinero llega a dest_account
-        _aplicar_ingreso(dest_account, monto)
-        self.db.add(Transaction(
+        )
+        dest_tx = Transaction(
+            id=uuid.uuid4(),
             user_id=self.user_id,
             account_id=dest_account.id,
             category_id=categoria.id,
             concept_id=concepto.id,
             amount=monto,
-            type=TransactionType.INCOME,
+            type=TransactionType.TRANSFER,
             date=fecha,
             description=(mov.get("descripcion") or "")[:100] or None,
             metodo_pago=metodo,
-            transfer_id=shared_transfer_id,
             transfer_role=TransferRole.DESTINATION,
             import_hash=None,  # solo la fuente tiene hash de deduplicación
-        ))
+        )
+        _aplicar_gasto(source_account, monto)
+        _aplicar_ingreso(dest_account, monto)
+        # transfer_id es FK a transactions.id: primero existen ambas filas, después se enlazan
+        dest_tx.transfer_id = source_tx.id
+        self.db.add(source_tx)
+        self.db.flush()
+        self.db.add(dest_tx)
+        self.db.flush()
+        source_tx.transfer_id = dest_tx.id
 
         concepto.frequency_score += 1

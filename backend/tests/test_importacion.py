@@ -124,6 +124,77 @@ class TestConfirmar:
         assert r2["importados"] == 0
 
 
+    def test_confirmar_sin_concepto(self, authed, uyu_account):
+        """El concepto es opcional: se importa sin concepto (no se inventa uno)."""
+        c, h = authed
+        body = _parsear(c, h, uyu_account["id"], _brou_csv()).json()
+        movs = [m for m in body["movimientos"] if m["estado"] == "validado"]
+        for m in movs:
+            m["concepto"] = ""
+        r = _confirmar(c, h, uyu_account["id"], movs)
+        assert r.json()["importados"] == 2
+        txs = c.get(f"{BASE}/transactions", headers=h).json()
+        assert len(txs) == 2
+        assert all(t["concept_id"] is None for t in txs)
+        names = [x["name"] for x in c.get(f"{BASE}/concepts", headers=h).json()]
+        assert "Importado" not in names
+
+    def test_confirmar_gasto_del_hogar(self, authed, uyu_account):
+        """Marcar 'pertenece al hogar' al importar → el gasto aparece en el hogar."""
+        c, h = authed
+        hh = c.post(f"{BASE}/households", json={"name": "Casa"}, headers=h).json()
+        body = _parsear(c, h, uyu_account["id"], _brou_csv()).json()
+        movs = [m for m in body["movimientos"] if m["estado"] == "validado"]
+        for m in movs:
+            m["household_id"] = hh["id"]  # también al ingreso: debe ignorarse
+        assert _confirmar(c, h, uyu_account["id"], movs).json()["importados"] == 2
+        txs = {t["type"]: t for t in c.get(f"{BASE}/transactions", headers=h).json()}
+        assert txs["expense"]["household_ids"] == [hh["id"]]
+        assert txs["expense"]["household_id"] == hh["id"]
+        assert txs["income"]["household_ids"] == []
+
+    def test_confirmar_hogar_ajeno_se_ignora(self, authed, uyu_account):
+        import uuid
+        c, h = authed
+        body = _parsear(c, h, uyu_account["id"], _brou_csv()).json()
+        movs = [m for m in body["movimientos"] if m["estado"] == "validado"]
+        for m in movs:
+            m["household_id"] = str(uuid.uuid4())
+        assert _confirmar(c, h, uyu_account["id"], movs).json()["importados"] == 2
+        assert all(t["household_ids"] == [] for t in c.get(f"{BASE}/transactions", headers=h).json())
+
+
+    def test_transferencia_zcuentas_es_transferencia(self, authed, uyu_account, debit_account):
+        """Una transferencia de Zcuentas no cuenta como gasto y al borrarla se revierten las dos cuentas."""
+        c, h = authed
+        mov = {
+            "fecha": "2026-04-03", "concepto": "", "monto": -1000.0, "moneda": "UYU",
+            "estado": "validado", "import_hash": "zc-test-1",
+            "metadata": {"tipo_zcuentas": "Transferencia", "cuenta_fluxo_id": uyu_account["id"],
+                         "transfer_dest_account_id": debit_account["id"]},
+        }
+        r = c.post(f"{IMP}/confirmar", json={"movimientos": [mov], "cuenta_id": None,
+                                              "banco": "zcuentas", "nombre_archivo": "z.xlsx"}, headers=h)
+        assert r.json()["importados"] == 1
+        bal = lambda acc: float(c.get(f"{BASE}/accounts/{acc['id']}", headers=h).json()["balance"])
+        uyu_before, deb_before = 20000.0, 50000.0
+        assert bal(uyu_account) == uyu_before - 1000
+        assert bal(debit_account) == deb_before + 1000
+
+        txs = c.get(f"{BASE}/transactions", headers=h).json()  # el listado muestra solo la pata origen
+        assert [t["type"] for t in txs] == ["transfer"]
+        src = txs[0]
+        dst = c.get(f"{BASE}/transactions/{src['transfer_id']}", headers=h).json()
+        assert dst["transfer_role"] == "destination" and dst["transfer_id"] == src["id"]
+
+        fig = c.get(f"{BASE}/analytics/income-vs-expenses", params={"months": 12, "currency": "UYU"}, headers=h).json()
+        assert all(v == 0 for tr in fig["data"] for v in tr["y"])
+
+        assert c.delete(f"{BASE}/transactions/{src['id']}", headers=h).status_code == 204
+        assert bal(uyu_account) == uyu_before
+        assert bal(debit_account) == deb_before
+
+
 class TestHistorial:
     def test_historial_vacio(self, authed):
         c, h = authed

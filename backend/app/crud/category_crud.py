@@ -14,6 +14,13 @@ def get_by_name_and_user(db: Session, name: str, user_id: uuid.UUID) -> Category
     ).first()
 
 
+def get_by_slug_and_user(db: Session, slug: str, user_id: uuid.UUID) -> Category | None:
+    return db.query(Category).filter(
+        Category.slug == slug,
+        Category.user_id == user_id,
+    ).first()
+
+
 def get_all_by_user(db: Session, user_id: uuid.UUID) -> list[Category]:
     return db.query(Category).filter(Category.user_id == user_id).all()
 

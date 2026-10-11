@@ -27,6 +27,7 @@ import {
   type Concept,
 } from '../api/dashboard'
 import { fetchHouseholds, type Household } from '../api/households'
+import MonthlyTotalsImport from '../components/MonthlyTotalsImport'
 
 // ─── tipos ──────────────────────────────────────────────────────────────────
 
@@ -128,7 +129,7 @@ function ConceptoCell({
       }}
       className={`w-full appearance-none cursor-pointer min-w-[160px] ${cls}`}
     >
-      <option value="">Seleccionar concepto…</option>
+      <option value="">Sin concepto</option>
       {concepts.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
       <option value="__nuevo__">➕ Crear nuevo…</option>
     </select>
@@ -367,6 +368,8 @@ export default function ImportacionPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep]           = useState<Step>('select')
+  // Comprobantes = cada movimiento del extracto; Totales = solo ingreso/gasto por mes
+  const [modo, setModo]           = useState<'comprobantes' | 'totales'>('comprobantes')
   const [banco, setBanco]         = useState('')
   const [cuentaId, setCuentaId]   = useState('')
   const [archivo, setArchivo]     = useState<File | null>(null)
@@ -374,7 +377,6 @@ export default function ImportacionPage() {
   const [seleccionados, setSeleccionados] = useState<Set<number>>(new Set())
   const [rowEdits, setRowEdits]   = useState<Record<number, RowEdit>>({})
   const [doneResult,       setDoneResult]       = useState<{ importados: number; descartados: number } | null>(null)
-  const [highlightMissing, setHighlightMissing] = useState(false)
 
   // Detección automática
   const [cuentasDetectadas, setCuentasDetectadas] = useState<CuentaDetectada[]>([])
@@ -397,7 +399,6 @@ export default function ImportacionPage() {
 
   function updateEdit(idx: number, partial: Partial<RowEdit>) {
     setRowEdits(prev => ({ ...prev, [idx]: { ...prev[idx], ...partial } }))
-    if (partial.concepto) setHighlightMissing(false)
   }
 
   const detectMutation = useMutation({
@@ -494,11 +495,6 @@ export default function ImportacionPage() {
     })
   }
 
-  // filas seleccionadas sin concepto → bloquear confirmar
-  const sinConcepto = [...seleccionados].filter(i => {
-    const e = rowEdits[i]
-    return !e?.concepto || (e.esNuevo && !e.concepto.trim())
-  }).length
 
   // ── STEP: select ────────────────────────────────────────────────────────
   if (step === 'select') {
@@ -536,6 +532,26 @@ export default function ImportacionPage() {
               <Upload className="w-4 h-4" /><span className="hidden sm:inline">Importar</span>
             </button>
           </nav>
+
+          <div className="grid grid-cols-2 gap-1 p-1 mb-6 bg-slate-900/60 border border-slate-800/60 rounded-xl">
+            {([
+              ['comprobantes', 'Comprobantes', 'Cada movimiento del extracto'],
+              ['totales', 'Totales mensuales', 'Solo ingreso y gasto por mes'],
+            ] as const).map(([value, label, hint]) => (
+              <button
+                key={value}
+                onClick={() => setModo(value)}
+                className={`px-3 py-2 rounded-lg text-left transition-colors ${
+                  modo === value ? 'bg-emerald-500/15 border border-emerald-500/30' : 'border border-transparent hover:bg-slate-800/60'
+                }`}
+              >
+                <span className={`block text-sm font-semibold ${modo === value ? 'text-emerald-400' : 'text-slate-300'}`}>{label}</span>
+                <span className="block text-[11px] text-slate-500">{hint}</span>
+              </button>
+            ))}
+          </div>
+
+          {modo === 'totales' ? <MonthlyTotalsImport /> : (<>
 
           <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-6 mb-6">
             <h2 className="text-lg font-semibold text-white mb-1">Nueva Importación</h2>
@@ -714,6 +730,7 @@ export default function ImportacionPage() {
               )}
             </div>
           )}
+          </>)}
         </div>
       </div>
     )
@@ -889,14 +906,6 @@ export default function ImportacionPage() {
             </div>
           </div>
 
-          {sinConcepto > 0 && (
-            <div className={`mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl border-l-4 border-amber-400 text-sm ${
-              isLight ? 'bg-amber-50/50 text-amber-800' : 'bg-amber-900/20 text-amber-100'
-            }`}>
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {sinConcepto} movimiento{sinConcepto > 1 ? 's' : ''} sin concepto asignado — seleccioná o creá uno para continuar.
-            </div>
-          )}
 
           {/* tabla */}
           <div className={`border rounded-2xl overflow-hidden mb-6 ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900/50 border-slate-800/50'}`}>
@@ -920,7 +929,6 @@ export default function ImportacionPage() {
                     const edit = rowEdits[i] ?? { concepto: '', esNuevo: false, categoria: m.categoria ?? '', esNuevaCategoria: false, metodo_pago: m.metodo_pago || 'otro', householdId: '' }
                     const isError = m.estado === 'error'
                     const selected = seleccionados.has(i)
-                    const missingConcept = highlightMissing && selected && (!edit?.concepto || (edit.esNuevo && !edit.concepto.trim()))
 
                     return (
                       <tr
@@ -928,9 +936,7 @@ export default function ImportacionPage() {
                         className={`border-b transition-colors ${isLight ? 'border-slate-200' : 'border-slate-800/30'} ${
                           isError
                             ? 'opacity-40'
-                            : missingConcept
-                              ? 'cursor-pointer bg-rose-500/10 border border-rose-500/20'
-                              : `cursor-pointer ${selected ? 'bg-emerald-500/5' : isLight ? 'hover:bg-slate-50/80' : 'hover:bg-slate-800/30'}`
+                            : `cursor-pointer ${selected ? 'bg-emerald-500/5' : isLight ? 'hover:bg-slate-50/80' : 'hover:bg-slate-800/30'}`
                         }`}
                       >
                         {/* checkbox */}
@@ -1045,11 +1051,8 @@ export default function ImportacionPage() {
               Cancelar
             </button>
             <button
-              disabled={seleccionados.size === 0 || sinConcepto > 0 || confirmarMutation.isPending}
-              onClick={() => {
-                if (sinConcepto > 0) { setHighlightMissing(true); return }
-                confirmarMutation.mutate()
-              }}
+              disabled={seleccionados.size === 0 || confirmarMutation.isPending}
+              onClick={() => confirmarMutation.mutate()}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {confirmarMutation.isPending

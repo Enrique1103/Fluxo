@@ -46,7 +46,12 @@ def get_current_user(
     return user
 
 
-def require_admin(token: str = Depends(oauth2_scheme)):
+def require_admin(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    if revoked_token_crud.is_revoked(db, token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
     try:
         payload = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
         if not payload.get("is_admin"):

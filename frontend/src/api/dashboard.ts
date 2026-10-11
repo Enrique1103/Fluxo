@@ -207,6 +207,8 @@ export const createTransaction = async (payload: {
   type: 'income' | 'expense' | 'transfer'; date: string; description?: string
   transfer_to_account_id?: string; external_account_id?: string
   commission?: number
+  /** Transferencia entre monedas distintas: lo que llega a la cuenta destino, en su moneda */
+  destination_amount?: number
   metodo_pago?: PaymentMethod; household_id?: string; household_ids?: string[]
 }): Promise<void> => {
   await client.post('/v1/transactions', payload)
@@ -318,6 +320,7 @@ export const updateTransaction = async (id: string, payload: {
   amount?: number; description?: string | null; date?: string
   concept_id?: string; category_id?: string; metodo_pago?: PaymentMethod
   household_id?: string | null
+  household_ids?: string[]
 }): Promise<void> => {
   await client.patch(`/v1/transactions/${id}`, payload)
 }

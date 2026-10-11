@@ -9,7 +9,9 @@ export function useHouseholdEvents() {
   useEffect(() => {
     if (!token) return
 
-    const es = new EventSource(`/api/v1/households/events?token=${encodeURIComponent(token)}`)
+    // Misma base que el cliente HTTP: en producción el backend está en otro dominio (VITE_API_URL)
+    const base = import.meta.env.VITE_API_URL ?? '/api'
+    const es = new EventSource(`${base}/v1/households/events?token=${encodeURIComponent(token)}`)
 
     es.onmessage = (e) => {
       try {

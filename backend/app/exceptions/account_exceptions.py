@@ -28,3 +28,7 @@ class CreditBalanceCannotBePositive(AccountException):
 
 class AccountHasTransactions(AccountException):
     pass
+
+
+class InvalidAccountUpdate(AccountException):
+    pass

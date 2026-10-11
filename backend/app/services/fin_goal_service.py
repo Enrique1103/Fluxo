@@ -57,8 +57,9 @@ def _calculate_current_amount(db: Session, goal: FinGoal) -> Decimal:
 def _to_response(db: Session, goal: FinGoal) -> FinGoalResponse:
     current_amount = _calculate_current_amount(db, goal)
 
-    if not goal.is_completed and current_amount >= goal.target_amount:
-        goal.is_completed = True
+    completed = current_amount >= goal.target_amount
+    if goal.is_completed != completed:
+        goal.is_completed = completed
         db.flush()
 
     response = FinGoalResponse.model_validate(goal)

@@ -115,6 +115,18 @@ function TxTable({
   const [deletingId,   setDeletingId]   = useState<string | null>(null)
   const [confirmTx,    setConfirmTx]    = useState<MonthlyBreakdown['transactions'][number] | null>(null)
   const [cuotaConfirm, setCuotaConfirm] = useState<{ txId: string; planId: string } | null>(null)
+  // El servidor puede rechazar un borrado (ej: el saldo quedaría negativo): se muestra el motivo
+  const [deleteError,  setDeleteError]  = useState<string | null>(null)
+  const runDelete = async (id: string, fn: () => Promise<void>) => {
+    setDeletingId(id)
+    setDeleteError(null)
+    try { await fn() }
+    catch (err) {
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+      setDeleteError(typeof detail === 'string' ? detail : 'No se pudo eliminar el movimiento')
+    }
+    finally { setDeletingId(null) }
+  }
 
   useEffect(() => { setInternalCategory(categoryFilter ?? null) }, [categoryFilter])
 
@@ -145,8 +157,7 @@ function TxTable({
     const id = confirmTx.id
     setConfirmTx(null)
     onConfirmOpenChange?.(false)
-    setDeletingId(id)
-    try { await onDelete(id, scope) } finally { setDeletingId(null) }
+    await runDelete(id, () => onDelete(id, scope))
   }
 
   const handleDeleteCuota = async () => {
@@ -154,8 +165,7 @@ function TxTable({
     const { txId } = cuotaConfirm
     setCuotaConfirm(null)
     onConfirmOpenChange?.(false)
-    setDeletingId(txId)
-    try { await onDelete(txId) } finally { setDeletingId(null) }
+    await runDelete(txId, () => onDelete(txId))
   }
 
   const handleCancelPlan = async () => {
@@ -163,10 +173,10 @@ function TxTable({
     const { planId } = cuotaConfirm
     setCuotaConfirm(null)
     onConfirmOpenChange?.(false)
-    try {
+    await runDelete(planId, async () => {
       await cancelInstalmentPlan(planId)
       await invalidateFinancialData(queryClient)
-    } catch { /* error silencioso — el usuario puede reintentar */ }
+    })
   }
 
   const filtered = useMemo(() => {
@@ -234,6 +244,12 @@ function TxTable({
 
   return (
     <div>
+      {deleteError && (
+        <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">
+          <span>{deleteError}</span>
+          <button onClick={() => setDeleteError(null)} className="text-rose-300 hover:text-white shrink-0"><X className="w-4 h-4" /></button>
+        </div>
+      )}
       {/* Dropdown filters row */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
 

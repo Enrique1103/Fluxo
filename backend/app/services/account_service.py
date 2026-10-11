@@ -8,6 +8,7 @@ from app.exceptions.account_exceptions import (
     AccountAlreadyExists,
     UnauthorizedAccountAccess,
     AccountHasTransactions,
+    InvalidAccountUpdate,
 )
 from app.models.accounts_models import Account, AccountType
 from app.models.users_models import User
@@ -70,9 +71,24 @@ def update(db: Session, user: User, account_id: uuid.UUID, update_data: AccountU
             "No se puede modificar el saldo de una cuenta con movimientos registrados"
         )
 
-    # Si cambia a un tipo que no es crédito, limpiar credit_limit
+    # Validar el estado final de la cuenta (mismas reglas que al crearla)
     new_type = update_data.type if update_data.type is not None else account.type
-    if new_type != AccountType.CREDIT:
+    new_balance = update_data.balance if update_data.balance is not None else account.balance
+    if new_type == AccountType.CREDIT:
+        new_limit = update_data.credit_limit if update_data.credit_limit is not None else account.credit_limit
+        if new_limit is None:
+            raise InvalidAccountUpdate("Indicá el límite de crédito de la tarjeta")
+        if new_balance > 0:
+            raise InvalidAccountUpdate("El saldo de una tarjeta de crédito no puede ser positivo")
+        if new_limit < -new_balance:
+            raise InvalidAccountUpdate(
+                f"El límite no puede ser menor que la deuda actual ({-new_balance})"
+            )
+    else:
+        if update_data.credit_limit is not None:
+            raise InvalidAccountUpdate("El límite de crédito solo aplica a tarjetas de crédito")
+        if new_balance < 0:
+            raise InvalidAccountUpdate("El saldo no puede ser negativo")
         account.credit_limit = None
 
     account_crud.update(db, account, update_data)

@@ -16,13 +16,23 @@ from app.models.external_account_models import ExternalAccount
 from app.models.transactions_models import Transaction, TransactionType, TransferRole
 from app.models.users_models import User
 from app.schemas.analytics_schema import MonthlyBreakdown, CategoryStat, DailyExpense, MonthlyTx, MonthlyPatrimonio, AccountBalanceStat
-from app.services import exchange_rate_service
+from app.services import exchange_rate_service, monthly_total_service
 from app.crud import account_crud
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _rate(db: Session, user_id: uuid.UUID, from_cur: str, to_cur: str, d: date) -> Decimal:
+    """
+    Tasa para convertir un movimiento del mes de `d`. Si no hay tasa hasta ese mes
+    usa la más cercana posterior; 1 solo si el par no tiene ninguna tasa cargada
+    (el dashboard ya avisa de tasas faltantes).
+    """
+    rate = exchange_rate_service.get_rate_nearest(db, user_id, from_cur, to_cur, d.year, d.month)
+    return rate if rate is not None else Decimal("1")
+
 
 def _tx_base(db: Session, user_id: uuid.UUID, date_from: date, date_to: date):
     """Base query: non-deleted, non-DESTINATION, within date range."""
@@ -81,9 +91,11 @@ def expenses_by_category(
     date_from: date,
     date_to: date,
 ) -> dict:
+    target = str(user.currency_default)
     rows = (
-        db.query(Category.name, Transaction.amount)
+        db.query(Category.name, Transaction.amount, Transaction.date, Account.currency)
         .join(Transaction, Transaction.category_id == Category.id)
+        .join(Account, Transaction.account_id == Account.id)
         .filter(
             Transaction.user_id == user.id,
             Transaction.is_deleted == False,
@@ -101,15 +113,17 @@ def expenses_by_category(
     if not rows:
         return go.Figure().to_dict()
 
-    df = pd.DataFrame(rows, columns=["category", "amount"])
-    df["amount"] = df["amount"].astype(float)
+    df = pd.DataFrame(
+        [(cat, float(Decimal(str(amt)) * _rate(db, user.id, str(cur), target, d))) for cat, amt, d, cur in rows],
+        columns=["category", "amount"],
+    )
     grouped = df.groupby("category")["amount"].sum().reset_index()
     grouped = grouped.sort_values("amount", ascending=False)
 
     fig = go.Figure(
         go.Pie(
-            labels=grouped["category"],
-            values=grouped["amount"],
+            labels=grouped["category"].tolist(),
+            values=grouped["amount"].tolist(),
             hole=0.45,
             textinfo="label+percent",
         )
@@ -152,21 +166,25 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
         .all()
     )
 
-    # External transfers (outflow = treated as expense)
+    # Transferencias (solo pata SOURCE): las externas son salida real de dinero y
+    # la comisión bancaria de cualquier transferencia también es un gasto.
     rows_ext = (
-        db.query(Transaction.date, Transaction.amount, Account.currency)
+        db.query(Transaction.date, Transaction.amount, Transaction.commission, Transaction.external_account_id, Account.currency)
         .join(Account, Transaction.account_id == Account.id)
-        .filter(*base_filter, Transaction.external_account_id.isnot(None))
+        .filter(*base_filter, Transaction.type == TransactionType.TRANSFER)
         .all()
     )
 
     # Build complete month grid so missing months appear as 0
     month_labels = [s.strftime("%Y-%m") for s in starts]
 
-    if not rows_ie and not rows_ext:
+    # Totales mensuales importados de otra app (sin detalle de comprobantes)
+    imported = monthly_total_service.totals_by_month(db, user.id, date_from, date_to)
+
+    if not rows_ie and not rows_ext and not imported:
         fig = go.Figure()
-        fig.add_trace(go.Bar(name="Ingresos", x=month_labels, y=[0] * months))
-        fig.add_trace(go.Bar(name="Egresos", x=month_labels, y=[0] * months))
+        fig.add_trace(go.Bar(name="Ingresos", x=month_labels, y=[0] * len(month_labels)))
+        fig.add_trace(go.Bar(name="Egresos", x=month_labels, y=[0] * len(month_labels)))
         fig.update_layout(barmode="group", title="Ingresos vs Egresos")
         return fig.to_dict()
 
@@ -178,23 +196,31 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
         if lbl not in income_by_month:
             continue
         acc_cur = acc_currency.value if hasattr(acc_currency, 'value') else str(acc_currency)
-        rate = exchange_rate_service.get_rate_for_month(
-            db, user.id, acc_cur, target_currency, tx_date.year, tx_date.month
-        ) or Decimal("1")
+        rate = _rate(db, user.id, acc_cur, target_currency, tx_date)
         converted = float(Decimal(str(tx_amount)) * rate)
         if tx_type == TransactionType.INCOME:
             income_by_month[lbl] += converted
         else:
             expense_by_month[lbl] += converted
 
-    for tx_date, tx_amount, acc_currency in rows_ext:
+    for tx_date, tx_amount, tx_commission, ext_acc_id, acc_currency in rows_ext:
         lbl = tx_date.strftime("%Y-%m")
         if lbl in expense_by_month:
+            outflow = Decimal(str(tx_commission or 0))
+            if ext_acc_id is not None:
+                outflow += Decimal(str(tx_amount))
+            if outflow == 0:
+                continue
             acc_cur = acc_currency.value if hasattr(acc_currency, 'value') else str(acc_currency)
-            rate = exchange_rate_service.get_rate_for_month(
-                db, user.id, acc_cur, target_currency, tx_date.year, tx_date.month
-            ) or Decimal("1")
-            expense_by_month[lbl] += float(Decimal(str(tx_amount)) * rate)
+            rate = _rate(db, user.id, acc_cur, target_currency, tx_date)
+            expense_by_month[lbl] += float(outflow * rate)
+
+    for lbl, cur, inc, exp in imported:
+        if lbl not in income_by_month:
+            continue
+        rate = _rate(db, user.id, cur, target_currency, date(int(lbl[:4]), int(lbl[5:]), 1))
+        income_by_month[lbl] += float(inc * rate)
+        expense_by_month[lbl] += float(exp * rate)
 
     income_vals = [income_by_month[lbl] for lbl in month_labels]
     expense_vals = [expense_by_month[lbl] for lbl in month_labels]
@@ -222,10 +248,12 @@ def top_concepts(
     date_to: date,
     limit: int = 10,
 ) -> dict:
+    target = str(user.currency_default)
     rows = (
-        db.query(Concept.name, Category.name, Transaction.amount)
+        db.query(Concept.name, Category.name, Transaction.amount, Transaction.date, Account.currency)
         .join(Transaction, Transaction.concept_id == Concept.id)
         .join(Category, Transaction.category_id == Category.id)
+        .join(Account, Transaction.account_id == Account.id)
         .filter(
             Transaction.user_id == user.id,
             Transaction.is_deleted == False,
@@ -243,8 +271,11 @@ def top_concepts(
     if not rows:
         return go.Figure().to_dict()
 
-    df = pd.DataFrame(rows, columns=["concept", "category", "amount"])
-    df["amount"] = df["amount"].astype(float)
+    df = pd.DataFrame(
+        [(con, cat, float(Decimal(str(amt)) * _rate(db, user.id, str(cur), target, d)))
+         for con, cat, amt, d, cur in rows],
+        columns=["concept", "category", "amount"],
+    )
     df["label"] = df["concept"] + " (" + df["category"] + ")"
 
     grouped = (
@@ -257,8 +288,8 @@ def top_concepts(
 
     fig = go.Figure(
         go.Bar(
-            x=grouped["amount"],
-            y=grouped["label"],
+            x=grouped["amount"].tolist(),
+            y=grouped["label"].tolist(),
             orientation="h",
             marker_color="#6366f1",
         )
@@ -282,12 +313,14 @@ def daily_net_flow(
     date_from: date,
     date_to: date,
 ) -> dict:
-    rows = (
-        db.query(Transaction.date, Transaction.type, Transaction.amount)
+    target = str(user.currency_default)
+    raw = (
+        db.query(Transaction.date, Transaction.type, Transaction.amount, Transaction.commission,
+                 Transaction.external_account_id, Account.currency)
+        .join(Account, Transaction.account_id == Account.id)
         .filter(
             Transaction.user_id == user.id,
             Transaction.is_deleted == False,
-            Transaction.type.in_([TransactionType.INCOME, TransactionType.EXPENSE]),
             Transaction.date >= date_from,
             Transaction.date <= date_to,
             or_(
@@ -297,6 +330,20 @@ def daily_net_flow(
         )
         .all()
     )
+    # (fecha, monto con signo en la moneda principal). Transferencias: solo lo que sale
+    # del patrimonio (externa = monto + comisión; interna = comisión).
+    rows = []
+    for d, typ, amt, commission, ext_id, cur in raw:
+        amt = Decimal(str(amt))
+        if typ == TransactionType.INCOME:
+            signed = amt
+        elif typ == TransactionType.EXPENSE:
+            signed = -amt
+        else:
+            signed = -(Decimal(str(commission or 0)) + (amt if ext_id is not None else Decimal("0")))
+            if signed == 0:
+                continue
+        rows.append((d, float(signed * _rate(db, user.id, str(cur), target, d))))
 
     # Full date range so days without transactions appear as 0
     all_days = pd.date_range(date_from, date_to, freq="D")
@@ -306,12 +353,7 @@ def daily_net_flow(
         fig.update_layout(title="Flujo neto diario")
         return fig.to_dict()
 
-    df = pd.DataFrame(rows, columns=["date", "type", "amount"])
-    df["amount"] = df["amount"].astype(float)
-    df["signed"] = df.apply(
-        lambda r: r["amount"] if r["type"] == TransactionType.INCOME else -r["amount"],
-        axis=1,
-    )
+    df = pd.DataFrame(rows, columns=["date", "signed"])
     df["date"] = pd.to_datetime(df["date"])
 
     daily = (
@@ -326,8 +368,8 @@ def daily_net_flow(
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=daily["date"],
-            y=daily["cumulative"],
+            x=daily["date"].dt.strftime("%Y-%m-%d").tolist(),
+            y=daily["cumulative"].tolist(),
             mode="lines+markers",
             name="Flujo acumulado",
             line={"color": "#3b82f6", "width": 2},
@@ -337,8 +379,8 @@ def daily_net_flow(
     )
     fig.add_trace(
         go.Bar(
-            x=daily["date"],
-            y=daily["net"],
+            x=daily["date"].dt.strftime("%Y-%m-%d").tolist(),
+            y=daily["net"].tolist(),
             name="Neto diario",
             marker_color=daily["net"].apply(
                 lambda v: "#22c55e" if v >= 0 else "#ef4444"
@@ -391,9 +433,7 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
 
     def _convert(tx_amount, acc_currency, tx_date) -> float:
         acc_cur = acc_currency.value if hasattr(acc_currency, 'value') else str(acc_currency)
-        rate = exchange_rate_service.get_rate_for_month(
-            db, user.id, acc_cur, target_currency, tx_date.year, tx_date.month
-        ) or Decimal("1")
+        rate = _rate(db, user.id, acc_cur, target_currency, tx_date)
         return float(Decimal(str(tx_amount)) * rate)
 
     income = sum(
@@ -406,6 +446,19 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
         for tx, _, _, _, acc_currency, _, _ in rows
         if tx.type == TransactionType.EXPENSE
     )
+    # Igual que el resumen y el gráfico Ingresos·Gastos: lo que sale en transferencias
+    # externas y las comisiones también es gasto del mes
+    for tx, _, _, _, acc_currency, _, _ in rows:
+        if tx.type == TransactionType.TRANSFER:
+            outflow = Decimal(str(tx.commission or 0)) + (
+                Decimal(str(tx.amount)) if tx.external_account_id is not None else Decimal("0")
+            )
+            if outflow:
+                expenses += _convert(outflow, acc_currency, tx.date)
+    month_first = date(year, month, 1)
+    for _, cur, inc, exp in monthly_total_service.totals_by_month(db, user.id, month_first, month_first):
+        income += _convert(inc, cur, month_first)
+        expenses += _convert(exp, cur, month_first)
 
     cat_totals: dict[str, float] = {}
     income_cat_totals: dict[str, float] = {}
@@ -475,16 +528,18 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
                 Transaction.account_id == acc.id,
                 Transaction.is_deleted == False,
                 Transaction.date > date_to,
-                or_(
-                    Transaction.transfer_role.is_(None),
-                    Transaction.transfer_role == TransferRole.SOURCE,
-                ),
             )
             .all()
         )
+        # Lo que cambió el saldo de ESTA cuenta después del mes (incluye ambas patas
+        # de las transferencias: la que entra suma, la que sale resta monto + comisión)
         flow_after = Decimal("0")
         for tx in post_txs:
-            if tx.type == TransactionType.INCOME:
+            if tx.transfer_role == TransferRole.DESTINATION:
+                flow_after += tx.amount
+            elif tx.transfer_role == TransferRole.SOURCE:
+                flow_after -= tx.amount + (tx.commission or Decimal("0"))
+            elif tx.type == TransactionType.INCOME:
                 flow_after += tx.amount
             else:
                 flow_after -= tx.amount
@@ -583,6 +638,7 @@ def patrimonio(
                 Transaction.amount,
                 Transaction.transfer_role,
                 Transaction.external_account_id,
+                Transaction.commission,
                 Account.currency,
             )
             .join(Account, Transaction.account_id == Account.id)
@@ -605,20 +661,27 @@ def patrimonio(
     net_flow: dict[str, Decimal] = {lbl: Decimal("0") for lbl in month_labels}
     missing_currencies_per_month: dict[str, set[str]] = {lbl: set() for lbl in month_labels}
 
-    for tx_date, tx_type, tx_amount, tx_role, ext_acc_id, acc_currency in rows:
+    for tx_date, tx_type, tx_amount, tx_role, ext_acc_id, tx_commission, acc_currency in rows:
         month_label = tx_date.strftime("%Y-%m")
         if month_label not in net_flow:
             continue
 
         year, month = int(month_label[:4]), int(month_label[5:])
         amount = Decimal(str(tx_amount))
+        if tx_type == TransactionType.TRANSFER:
+            # Lo que realmente sale del patrimonio en una transferencia:
+            # externa = monto + comisión; interna = solo la comisión.
+            commission = Decimal(str(tx_commission or 0))
+            amount = (amount if ext_acc_id is not None else Decimal("0")) + commission
+            if amount == 0:
+                continue
         acc_currency_str = acc_currency.value if hasattr(acc_currency, 'value') else str(acc_currency)
 
         # Convert to target currency
         if acc_currency_str == target_currency:
             converted = amount
         else:
-            rate = exchange_rate_service.get_rate_for_month(
+            rate = exchange_rate_service.get_rate_nearest(
                 db, user.id, acc_currency_str, target_currency, year, month
             )
             if rate is None:
@@ -634,10 +697,25 @@ def patrimonio(
             net_flow[month_label] += converted
         elif tx_type == TransactionType.EXPENSE:
             net_flow[month_label] -= converted
-        elif tx_type == TransactionType.TRANSFER and ext_acc_id is not None:
-            # Transfer to external account = real outflow
+        elif tx_type == TransactionType.TRANSFER:
+            # Externa (monto + comisión) o interna (solo comisión) — ver arriba
             net_flow[month_label] -= converted
-        # Internal transfers (no ext_acc_id) are skipped — net zero effect
+
+    # Totales mensuales importados: ingreso - gasto del mes
+    if starts:
+        for lbl, cur, inc, exp in monthly_total_service.totals_by_month(db, user.id, date_from, date_to):
+            if lbl not in net_flow:
+                continue
+            flow = inc - exp
+            if cur != target_currency:
+                rate = exchange_rate_service.get_rate_nearest(
+                    db, user.id, cur, target_currency, int(lbl[:4]), int(lbl[5:])
+                )
+                if rate is None:
+                    missing_currencies_per_month[lbl].add(f"{cur}→{target_currency}")
+                    continue
+                flow = flow * rate
+            net_flow[lbl] += flow
 
     # --- Step 3: walk backwards from current net worth ---
     # Use effective_today as anchor: if the user entered future-dated transactions,
