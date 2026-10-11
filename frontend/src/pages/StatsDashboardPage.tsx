@@ -106,7 +106,7 @@ function TxTable({
   categoryFilter?: string | null
 }) {
   const queryClient = useQueryClient()
-  const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all')
+  const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'transfer' | 'withdrawal'>('all')
   const [methodFilter, setMethodFilter] = useState<PaymentMethod | 'all'>('all')
   const [search, setSearch] = useState('')
   const [internalCategory, setInternalCategory] = useState<string | null>(categoryFilter ?? null)
@@ -191,7 +191,11 @@ function TxTable({
   }
 
   const filtered = useMemo(() => {
-    let result = filter === 'all' ? transactions : transactions.filter(t => t.type === filter)
+    // Retiro = transferencia hacia una cuenta de efectivo
+    let result = filter === 'all' ? transactions
+      : filter === 'withdrawal' ? transactions.filter(t => t.type === 'transfer' && t.is_withdrawal)
+      : filter === 'transfer' ? transactions.filter(t => t.type === 'transfer' && !t.is_withdrawal)
+      : transactions.filter(t => t.type === filter)
     if (methodFilter !== 'all') {
       result = result.filter(t => t.metodo_pago === methodFilter)
     }
@@ -241,7 +245,8 @@ function TxTable({
     { value: 'all',      label: 'Todos',           activeClass: 'bg-slate-700 border-slate-600 text-slate-200' },
     { value: 'income',   label: 'Ingresos',         activeClass: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400' },
     { value: 'expense',  label: 'Gastos',           activeClass: 'bg-rose-500/15 border-rose-500/30 text-rose-400' },
-    { value: 'transfer', label: 'Transferencias / Retiros', activeClass: 'bg-amber-500/15 border-amber-500/30 text-amber-400' },
+    { value: 'transfer', label: 'Transferencias', activeClass: 'bg-amber-500/15 border-amber-500/30 text-amber-400' },
+    { value: 'withdrawal', label: 'Retiros',     activeClass: 'bg-lime-500/15 border-lime-500/30 text-lime-400' },
   ] as const
 
   const selectedTypeLabel = TYPE_OPTIONS.find(o => o.value === filter)?.label ?? 'Todos'
@@ -506,6 +511,11 @@ function TxTable({
                           ? `→ ${tx.transfer_dest_name}`
                           : tx.category_name}
                       </p>
+                      {tx.is_withdrawal && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-lime-500/15 text-lime-400 border border-lime-500/20 shrink-0">
+                          RETIRO
+                        </span>
+                      )}
                       {tx.instalment_plan_id && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/20 shrink-0">
                           CUOTA

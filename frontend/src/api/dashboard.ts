@@ -122,6 +122,8 @@ export interface MonthlyTx {
   account_name: string
   description: string | null
   transfer_dest_name: string | null
+  /** Transferencia hacia una cuenta de efectivo (retiro de cajero) */
+  is_withdrawal?: boolean
   metodo_pago: PaymentMethod | null
   instalment_plan_id: string | null
   household_id: string | null
