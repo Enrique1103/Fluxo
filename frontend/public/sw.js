@@ -1,5 +1,5 @@
-// v2: íconos nuevos — cambiar la versión invalida los assets cacheados
-const CACHE = 'fluxo-v2'
+// v3: ícono de app instalada — cambiar la versión invalida los assets cacheados
+const CACHE = 'fluxo-v3'
 
 const SHELL = [
   '/',
@@ -9,7 +9,9 @@ const SHELL = [
   '/favicon.png',
   '/favicon.svg',
   '/pwa-192.png',
+  '/pwa-256.png',
   '/pwa-512.png',
+  '/pwa-maskable-512.png',
   '/apple-touch-icon.png',
 ]
 

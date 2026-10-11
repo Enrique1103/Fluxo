@@ -645,6 +645,14 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               </div>
             )}
 
+            {txType === 'transfer' && !crossCurrency && (
+              <p className="text-[11px] text-slate-500 -mt-2">
+                {destAccount
+                  ? `Las dos cuentas son en ${destAccount.currency}: llega el mismo monto.`
+                  : 'Si la cuenta destino es en otra moneda (ej: efectivo en USD), te vamos a pedir cuánto llegó.'}
+              </p>
+            )}
+
             {/* Cambio de moneda — transferencia/extracción entre cuentas de distinta moneda */}
             {crossCurrency && (
               <div>
