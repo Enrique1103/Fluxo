@@ -283,7 +283,8 @@ class TestDeleteReview:
         r = c.delete(f"{_reviews_url(hh_id)}/{rev_id}", headers=admin_h)
         assert r.status_code == 403
 
-    def test_cannot_delete_resolved_review_409(self, shared_tx):
+    def test_author_can_delete_resolved_review(self, shared_tx):
+        """Desde bf718f1 el autor puede borrar su revisión en cualquier estado."""
         c, admin_h, member_h, hh_id, tx_id = shared_tx
         rev_id = c.post(_reviews_url(hh_id), json={
             "transaction_id": tx_id,
@@ -294,6 +295,6 @@ class TestDeleteReview:
         # Admin la resuelve
         c.patch(f"{_reviews_url(hh_id)}/{rev_id}", json={"status": "resuelta"}, headers=admin_h)
 
-        # El autor intenta borrarla → 409
+        # El autor puede borrarla igual
         r = c.delete(f"{_reviews_url(hh_id)}/{rev_id}", headers=member_h)
-        assert r.status_code == 409
+        assert r.status_code == 204

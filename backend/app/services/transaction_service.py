@@ -533,12 +533,6 @@ def delete(
         db.commit()
         return
 
-    if tx.instalment_plan_id is not None:
-        raise InstalmentPlanTransactionEditNotAllowed(
-            "Esta transacción es una cuota de un plan y no puede borrarse sola. "
-            "Para cancelar las cuotas restantes, cancelá el plan."
-        )
-
     account = account_crud.get_by_id(db, tx.account_id)
 
     if tx.transfer_role is not None:

@@ -27,10 +27,11 @@ def _get_owned(db: Session, category_id: uuid.UUID, user_id: uuid.UUID) -> Categ
 def create(db: Session, user: User, category_in: CategoryCreate) -> Category:
     name = normalize_category(category_in.name)
 
-    if category_crud.get_by_name_and_user(db, name, user.id):
+    slug = slugify(name)
+    # "Café" y "Cafe" tienen el mismo slug (único por usuario)
+    if category_crud.get_by_name_and_user(db, name, user.id) or category_crud.get_by_slug_and_user(db, slug, user.id):
         raise CategoryAlreadyExists("Ya existe una categoría con ese nombre")
 
-    slug = slugify(name)
     db_cat = category_crud.create(
         db,
         user_id=user.id,
@@ -64,7 +65,8 @@ def update(db: Session, user: User, category_id: uuid.UUID, category_update: Cat
     if category_update.name is not None:
         name = normalize_category(category_update.name)
         if name != cat.name:
-            if category_crud.get_by_name_and_user(db, name, user.id):
+            other = category_crud.get_by_slug_and_user(db, slugify(name), user.id)
+            if category_crud.get_by_name_and_user(db, name, user.id) or (other and other.id != cat.id):
                 raise CategoryAlreadyExists("Ya existe una categoría con ese nombre")
             fields["name"] = name
             fields["slug"] = slugify(name)
@@ -93,6 +95,27 @@ def delete(db: Session, user: User, category_id: uuid.UUID) -> None:
         raise CategoryHasActiveTransactions(
             "La categoría tiene transacciones activas y no puede eliminarse"
         )
+
+    # Lo que todavía apunta a la categoría (conceptos, movimientos ya borrados, planes
+    # de cuotas cancelados) se reasigna antes de borrarla, para no romper la base.
+    from app.models.concepts_models import Concept
+    from app.models.instalment_plan_models import InstalmentPlan
+    from app.models.transactions_models import Transaction
+    db.query(Concept).filter(Concept.category_id == cat.id).update(
+        {"category_id": None}, synchronize_session=False
+    )
+    fallback = category_crud.get_by_slug_and_user(db, "sin-clasificar", user.id)
+    if fallback is None or fallback.id == cat.id:
+        fallback = category_crud.create(
+            db, user_id=user.id, name="Sin clasificar", slug="sin-clasificar",
+            icon="help-circle", color="#6B7280", is_system=True,
+        )
+    db.query(Transaction).filter(Transaction.category_id == cat.id).update(
+        {"category_id": fallback.id}, synchronize_session=False
+    )
+    db.query(InstalmentPlan).filter(InstalmentPlan.category_id == cat.id).update(
+        {"category_id": fallback.id}, synchronize_session=False
+    )
 
     category_crud.delete(db, cat)
     db.commit()

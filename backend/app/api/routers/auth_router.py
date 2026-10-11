@@ -23,8 +23,16 @@ def login(
 def logout(
     db: Session = Depends(get_db),
     token: str = Depends(oauth2_scheme),
-    current_user: User = Depends(get_current_user),
 ):
-    """Revoca el token JWT del usuario. A partir de este momento el token es inválido."""
+    """Revoca el token JWT (de usuario o de admin). A partir de este momento el token es inválido."""
+    from jose import jwt, JWTError
+    from fastapi import HTTPException
+    from app.core import security
+    try:
+        jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
+    if revoked_token_crud.is_revoked(db, token):
+        return
     revoked_token_crud.add(db, token)
     db.commit()

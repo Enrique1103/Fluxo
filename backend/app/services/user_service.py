@@ -97,6 +97,9 @@ def _hard_delete_user(db: Session, db_user: User) -> None:
         {"transfer_id": None}, synchronize_session=False
     )
 
+    from app.models.review_models import TransactionReview
+    db.query(TransactionReview).filter(TransactionReview.flagged_by_user_id == uid).delete(synchronize_session=False)
+
     db.query(InstalmentPlan).filter(InstalmentPlan.user_id == uid).delete(synchronize_session=False)
     db.query(Transaction).filter(Transaction.user_id == uid).delete(synchronize_session=False)
     db.query(ExternalAccount).filter(ExternalAccount.user_id == uid).delete(synchronize_session=False)
@@ -119,7 +122,9 @@ def _hard_delete_user(db: Session, db_user: User) -> None:
                 .first()
             )
             if other:
+                # El hogar sigue: pasa a otro miembro activo, que queda como admin
                 h.created_by = other.user_id
+                other.role = MemberRole.ADMIN
                 continue
         household_ids_to_delete.append(h.id)
     db.flush()

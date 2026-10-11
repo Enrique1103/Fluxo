@@ -1590,24 +1590,26 @@ class ImportacionService:
         else:
             movimientos = parser.parsear(archivo_bytes, _cuenta_id)
 
+        # 0) Filas idénticas dentro del mismo archivo (ej: dos cafés iguales el mismo día) son
+        #    movimientos distintos: la 2ª, 3ª… ocurrencia recibe un hash propio. Reimportar el
+        #    mismo archivo genera los mismos hashes, así que se siguen detectando como duplicados.
+        ocurrencias: dict[str, int] = {}
+        for mov in movimientos:
+            h = mov.get("import_hash")
+            if not h or mov.get("estado") != "validado":
+                continue
+            n = ocurrencias.get(h, 0) + 1
+            ocurrencias[h] = n
+            if n > 1:
+                mov["import_hash"] = hashlib.sha256(f"{h}#{n}".encode()).hexdigest()[:16]
+                mov["advertencia"] = "Hay otra fila igual en el archivo; revisá que no sea un duplicado"
+
         # 1) Duplicados exactos contra BD (mismo import_hash ya importado)
         hashes_bd = DetectorDuplicados.hashes_existentes(self.db, self.user_id, _cuenta_id)
         for mov in movimientos:
             if mov.get("import_hash") and mov["import_hash"] in hashes_bd:
                 mov["estado"] = "duplicado"
                 mov["duplicate_detail"] = hashes_bd[mov["import_hash"]]
-
-        # 2) Duplicados dentro del lote actual (dos filas idénticas en el mismo archivo)
-        hashes_lote: set[str] = set()
-        for mov in movimientos:
-            if mov.get("estado") != "validado":
-                continue
-            h = mov.get("import_hash")
-            if h:
-                if h in hashes_lote:
-                    mov["estado"] = "duplicado"
-                else:
-                    hashes_lote.add(h)
 
         # 3) Advertencia suave: ya existe en la cuenta alguna transacción con
         #    la misma fecha y monto (puede ser manual o de otro import).
@@ -1616,7 +1618,7 @@ class ImportacionService:
             if mov.get("estado") != "validado":
                 continue
             clave = (mov.get("fecha", ""), round(float(mov.get("monto", 0)), 2))
-            if clave in claves_bd:
+            if clave in claves_bd and not mov.get("advertencia"):
                 mov["advertencia"] = "Ya existe una transacción con esta fecha y monto en la cuenta"
                 mov["duplicate_detail"] = claves_bd[clave]
 
@@ -1671,7 +1673,19 @@ class ImportacionService:
             self.db, "Sin clasificar", self.user_id
         )
 
-        a_importar = [m for m in movimientos if m.get("estado") == "validado"]
+        # Doble click / dos pestañas: lo que ya está importado (mismo hash) no se vuelve a crear
+        hashes_ya_importados = {
+            h for (h,) in self.db.query(Transaction.import_hash).filter(
+                Transaction.user_id == self.user_id,
+                Transaction.import_hash.isnot(None),
+                Transaction.is_deleted.is_(False),
+            ).all()
+        }
+        a_importar = [
+            m for m in movimientos
+            if m.get("estado") == "validado"
+            and not (m.get("import_hash") and m["import_hash"] in hashes_ya_importados)
+        ]
         importados = 0
         errores_confirmacion: list[dict] = []
 
@@ -1752,6 +1766,13 @@ class ImportacionService:
                 palabra = descripcion_banco.upper().strip()[:100]
                 clave = (cat, palabra)
                 if clave not in reglas_existentes:
+                    # La corrección gana: se borran las reglas de esa misma descripción con otra categoría
+                    self.db.query(ReglaCategorias).filter(
+                        ReglaCategorias.user_id == self.user_id,
+                        ReglaCategorias.palabra_clave == palabra,
+                        ReglaCategorias.categoria != cat,
+                    ).delete(synchronize_session=False)
+                    reglas_existentes = {r for r in reglas_existentes if r[1] != palabra}
                     reglas_existentes.add(clave)
                     self.db.add(ReglaCategorias(
                         user_id=self.user_id,
@@ -1826,6 +1847,8 @@ class ImportacionService:
             categoria_cache = {}
 
         monto = Decimal(str(abs(mov["monto"])))
+        if monto == 0:
+            raise ValueError("Movimiento con monto 0")
         tipo = TransactionType.EXPENSE if mov["monto"] < 0 else TransactionType.INCOME
         fecha = datetime.strptime(mov["fecha"], "%Y-%m-%d").date()
 
@@ -1901,6 +1924,8 @@ class ImportacionService:
             categoria_cache = {}
 
         monto = Decimal(str(abs(mov["monto"])))
+        if monto == 0:
+            raise ValueError("Movimiento con monto 0")
         fecha = datetime.strptime(mov["fecha"], "%Y-%m-%d").date()
 
         concepto  = self._resolver_concepto(mov.get("concepto") or "Transferencia", concepto_cache)

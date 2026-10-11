@@ -412,13 +412,14 @@ class TestInstalmentPlans:
         _fail(db, c.delete(f"{PLANS}/{p['id']}", headers=h), 404)
         assert _bal(c, h, credit["id"]) == pytest.approx(-1000)
 
-    def test_cannot_delete_single_plan_cuota(self, ctx, credit, db):
+    def test_delete_single_plan_cuota_restores_card(self, ctx, credit, db):
+        """'Eliminar solo esta cuota' es una opción de la pantalla: se permite y devuelve el monto."""
         c, h, cid, cat = ctx
         _ok(c.post(PLANS, json=_plan(credit["id"], cat, cid), headers=h))
+        before = _bal(c, h, credit["id"])
         t = c.get(TX, headers=h).json()[0]
-        r = c.delete(f"{TX}/{t['id']}", headers=h)
-        db.rollback()
-        assert 400 <= r.status_code < 500
+        assert c.delete(f"{TX}/{t['id']}", headers=h).status_code == 204
+        assert _bal(c, h, credit["id"]) == before + float(t["amount"])
 
     def test_cancel_after_paying_card_not_positive(self, ctx, credit, debit_account, db):
         c, h, cid, cat = ctx
