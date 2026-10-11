@@ -218,3 +218,11 @@ html.light ::-webkit-scrollbar-thumb {
   background-color: #cbd5e1;
 }
 
+
+/* Celular: con letra menor a 16px el iPhone hace zoom al tocar un campo y descuadra la pantalla.
+   Va fuera de @layer para ganarle a las clases text-sm de Tailwind. */
+@media (max-width: 639px) {
+  input, select, textarea {
+    font-size: 16px;
+  }
+}

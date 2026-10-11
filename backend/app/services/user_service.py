@@ -1,3 +1,5 @@
+import hmac
+import logging
 import os
 import uuid
 from datetime import timedelta
@@ -65,7 +67,12 @@ def register(db: Session, user_in: UserCreate) -> User:
 
 
 def login(db: Session, email: str, password: str) -> dict:
-    if ADMIN_PASSWORD and email == ADMIN_EMAIL and password == ADMIN_PASSWORD:
+    # compare_digest: compara en tiempo constante (no da pistas de cuántos caracteres acertó)
+    if (
+        ADMIN_PASSWORD
+        and hmac.compare_digest(email.encode(), ADMIN_EMAIL.encode())
+        and hmac.compare_digest(password.encode(), ADMIN_PASSWORD.encode())
+    ):
         token = security.create_access_token(
             data={"sub": "admin", "is_admin": True},
             expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES),
@@ -154,7 +161,9 @@ def _hard_delete_user(db: Session, db_user: User) -> None:
 def delete_me(db: Session, db_user: User, req: UserDeleteRequest) -> None:
     if not security.verify_password(req.password, db_user.password_hash):
         raise InvalidCredentials("Contraseña incorrecta")
+    uid = db_user.id
     _hard_delete_user(db, db_user)
+    logging.getLogger("fluxo.audit").warning("usuario %s borró su propia cuenta", uid)
 
 
 def update_me(db: Session, db_user: User, user_update: UserUpdate) -> User:

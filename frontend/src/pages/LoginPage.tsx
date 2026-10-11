@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, forwardRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../store/authStore'
-import { login, register } from '../api/auth'
+import { login, register, forgotPassword, resetPassword } from '../api/auth'
+
+// Email de soporte que se muestra en la pantalla de inicio (variable de entorno en Vercel)
+const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL as string | undefined
 
 // ── Canvas ─────────────────────────────────────────────────────────────────────
 
@@ -111,20 +114,28 @@ const loginSchema = z.object({
   email:    z.string().email('Email inválido'),
   password: z.string().min(6, 'Mínimo 6 caracteres'),
 })
+const strongPassword = z.string()
+  .min(8, 'Mínimo 8 caracteres')
+  .max(20, 'Máximo 20 caracteres')
+  .regex(/[a-z]/, 'Debe tener al menos una minúscula')
+  .regex(/[A-Z]/, 'Debe tener al menos una mayúscula')
+  .regex(/[0-9]/, 'Debe tener al menos un número')
+  .regex(/[@$!%*?&]/, 'Debe tener al menos un carácter especial (@$!%*?&)')
 const registerSchema = z.object({
   name:     z.string().min(2, 'Mínimo 2 caracteres'),
   email:    z.string().email('Email inválido'),
-  password: z.string()
-    .min(8, 'Mínimo 8 caracteres')
-    .max(20, 'Máximo 20 caracteres')
-    .regex(/[a-z]/, 'Debe tener al menos una minúscula')
-    .regex(/[A-Z]/, 'Debe tener al menos una mayúscula')
-    .regex(/[0-9]/, 'Debe tener al menos un número')
-    .regex(/[@$!%*?&]/, 'Debe tener al menos un carácter especial (@$!%*?&)'),
+  password: strongPassword,
 })
+const forgotSchema = z.object({ email: z.string().email('Email inválido') })
+const resetSchema = z.object({
+  password: strongPassword,
+  confirm:  z.string(),
+}).refine(d => d.password === d.confirm, { message: 'Las contraseñas no coinciden', path: ['confirm'] })
 
 type LoginForm    = z.infer<typeof loginSchema>
 type RegisterForm = z.infer<typeof registerSchema>
+type ForgotForm   = z.infer<typeof forgotSchema>
+type ResetForm    = z.infer<typeof resetSchema>
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
@@ -133,11 +144,18 @@ export default function LoginPage() {
   const [showPass, setShowPass]     = useState(false)
   const [error, setError]           = useState('')
   const [loading, setLoading]       = useState(false)
+  const [info, setInfo]             = useState('')
+  // Recuperar contraseña: 'forgot' pide el email; 'reset' llega desde el enlace del email
+  const [searchParams] = useSearchParams()
+  const resetToken = searchParams.get('token')
+  const [recovery, setRecovery] = useState<null | 'forgot' | 'reset'>(resetToken ? 'reset' : null)
   const navigate  = useNavigate()
   const authLogin = useAuthStore((s) => s.login)
 
   const lf = useForm<LoginForm>   ({ resolver: zodResolver(loginSchema),    mode: 'onChange' })
   const rf = useForm<RegisterForm>({ resolver: zodResolver(registerSchema), mode: 'onChange' })
+  const ff = useForm<ForgotForm>  ({ resolver: zodResolver(forgotSchema),   mode: 'onChange' })
+  const pf = useForm<ResetForm>   ({ resolver: zodResolver(resetSchema),    mode: 'onChange' })
 
   function parseError(err: any, fallback: string): string {
     if (!err?.response) return 'No se pudo conectar con el servidor'
@@ -181,7 +199,33 @@ export default function LoginPage() {
     }
   }
 
-  const switchMode = (to: boolean) => { setIsLogin(to); setError(''); setShowPass(false) }
+  const onForgot = async (data: ForgotForm) => {
+    setError(''); setLoading(true)
+    try {
+      await forgotPassword(data.email)
+      setInfo('Si el email está registrado, te enviamos un enlace para cambiar la contraseña. Revisá también la carpeta de spam.')
+    } catch (err: any) {
+      setError(parseError(err, 'No se pudo enviar el enlace'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const onReset = async (data: ResetForm) => {
+    setError(''); setLoading(true)
+    try {
+      await resetPassword(resetToken ?? '', data.password)
+      navigate('/login', { replace: true })
+      setRecovery(null); setIsLogin(true)
+      setInfo('Listo, ya podés iniciar sesión con tu nueva contraseña.')
+    } catch (err: any) {
+      setError(parseError(err, 'No se pudo cambiar la contraseña'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const switchMode = (to: boolean) => { setIsLogin(to); setError(''); setInfo(''); setShowPass(false); setRecovery(null) }
 
   return (
     <div className="force-dark relative min-h-screen bg-[#020817] flex items-center justify-center overflow-hidden">
@@ -189,8 +233,8 @@ export default function LoginPage() {
       {/* Animated canvas */}
       <TradingCanvas />
 
-      {/* Ambient glows */}
-      <div className="absolute inset-0 pointer-events-none">
+      {/* Ambient glows (overflow-hidden: si no, en celular la página se corre de costado al tocar un campo) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full animate-pulse-glow"
           style={{ background: 'radial-gradient(circle, rgba(52,211,153,0.07) 0%, transparent 65%)' }} />
         <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full animate-pulse-glow delay-300"
@@ -252,7 +296,38 @@ export default function LoginPage() {
             boxShadow: '0 25px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
           }}
         >
-          {isLogin ? (
+          {recovery === 'forgot' ? (
+            <form onSubmit={ff.handleSubmit(onForgot)} className="space-y-4" key="forgot">
+              <div>
+                <p className="text-white font-semibold">¿Olvidaste tu contraseña?</p>
+                <p className="text-slate-500 text-xs mt-1">Te mandamos un enlace a tu email para elegir una nueva.</p>
+              </div>
+              <Field icon={<Mail size={15}/>} placeholder="Email" type="email" autoComplete="email"
+                error={ff.formState.errors.email?.message} {...ff.register('email')} />
+              {error && <ErrorMsg msg={error} />}
+              {info && <InfoMsg msg={info} />}
+              <SubmitBtn loading={loading} label="Enviar enlace" />
+              <BackLink onClick={() => switchMode(true)} />
+            </form>
+          ) : recovery === 'reset' ? (
+            <form onSubmit={pf.handleSubmit(onReset)} className="space-y-4" key="reset">
+              <p className="text-white font-semibold">Elegí tu nueva contraseña</p>
+              <Field icon={<Lock size={15}/>} placeholder="Nueva contraseña" autoComplete="new-password"
+                type={showPass ? 'text' : 'password'}
+                error={pf.formState.errors.password?.message}
+                suffix={<EyeToggle show={showPass} onToggle={() => setShowPass(!showPass)} />}
+                {...pf.register('password')}
+              />
+              <Field icon={<Lock size={15}/>} placeholder="Repetí la contraseña" autoComplete="new-password"
+                type={showPass ? 'text' : 'password'}
+                error={pf.formState.errors.confirm?.message}
+                {...pf.register('confirm')}
+              />
+              {error && <ErrorMsg msg={error} />}
+              <SubmitBtn loading={loading} label="Cambiar contraseña" />
+              <BackLink onClick={() => { navigate('/login', { replace: true }); switchMode(true) }} />
+            </form>
+          ) : isLogin ? (
             <form onSubmit={lf.handleSubmit(onLogin)} className="space-y-4" key="login">
               <Field icon={<Mail size={15}/>} placeholder="Email" type="email"
                 error={lf.formState.errors.email?.message} {...lf.register('email')} />
@@ -263,7 +338,12 @@ export default function LoginPage() {
                 {...lf.register('password')}
               />
               {error && <ErrorMsg msg={error} />}
+              {info && <InfoMsg msg={info} />}
               <SubmitBtn loading={loading} label="Iniciar sesión" />
+              <button type="button" onClick={() => { setRecovery('forgot'); setError(''); setInfo('') }}
+                className="block mx-auto text-xs text-slate-500 hover:text-emerald-400 transition-colors">
+                ¿Olvidaste tu contraseña?
+              </button>
             </form>
           ) : (
             <form onSubmit={rf.handleSubmit(onRegister)} className="space-y-4" key="register">
@@ -287,6 +367,11 @@ export default function LoginPage() {
         <p className="text-center text-slate-600 text-xs mt-6 animate-fade-in" style={{ animationDelay: '0.5s' }}>
           Conexión segura · tu contraseña se guarda cifrada
         </p>
+        {SUPPORT_EMAIL && (
+          <p className="text-center text-slate-600 text-xs mt-2">
+            ¿Necesitás ayuda? <a href={`mailto:${SUPPORT_EMAIL}`} className="text-slate-400 hover:text-emerald-400">{SUPPORT_EMAIL}</a>
+          </p>
+        )}
       </div>
     </div>
   )
@@ -341,6 +426,24 @@ function ErrorMsg({ msg }: { msg: string }) {
       <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
       <p className="text-rose-400 text-xs">{msg}</p>
     </div>
+  )
+}
+
+function InfoMsg({ msg }: { msg: string }) {
+  return (
+    <div className="flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2.5">
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
+      <p className="text-emerald-300 text-xs">{msg}</p>
+    </div>
+  )
+}
+
+function BackLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="block mx-auto text-xs text-slate-500 hover:text-slate-300 transition-colors">
+      Volver a iniciar sesión
+    </button>
   )
 }
 

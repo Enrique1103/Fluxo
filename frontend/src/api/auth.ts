@@ -30,3 +30,13 @@ export const login = async (payload: LoginPayload): Promise<TokenResponse> => {
 export const register = async (payload: RegisterPayload): Promise<void> => {
   await client.post('/v1/users/register', payload)
 }
+
+/** Pide un enlace por email para cambiar la contraseña (responde igual exista o no la cuenta). */
+export const forgotPassword = async (email: string): Promise<void> => {
+  await client.post('/v1/auth/forgot-password', { email })
+}
+
+/** Cambia la contraseña con el token del enlace del email. */
+export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
+  await client.post('/v1/auth/reset-password', { token, new_password: newPassword })
+}

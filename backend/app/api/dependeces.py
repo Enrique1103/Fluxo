@@ -25,15 +25,17 @@ def get_current_user(
 
     try:
         payload = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-        if payload.get("is_admin"):
+        # Los tokens de admin y los de "recuperar contraseña" no sirven para entrar a la app
+        if payload.get("is_admin") or payload.get("purpose"):
             raise credentials_exception
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except JWTError:
+        user_uuid = uuid.UUID(user_id)
+    except (JWTError, ValueError):
         raise credentials_exception
 
-    user = user_crud.get_by_id(db, uuid.UUID(user_id))
+    user = user_crud.get_by_id(db, user_uuid)
     if user is None:
         raise credentials_exception
 

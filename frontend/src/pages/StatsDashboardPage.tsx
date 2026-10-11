@@ -716,7 +716,7 @@ export default function StatsDashboardPage() {
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans p-4 lg:p-8 selection:bg-emerald-500/30">
 
       {/* NAV TABS */}
-      <nav className="flex gap-1.5 mb-4 overflow-x-auto [scrollbar-width:none] pb-0.5">
+      <nav className="hidden sm:flex gap-1.5 mb-4 overflow-x-auto [scrollbar-width:none] pb-0.5">
         <button
           onClick={() => navigate('/')}
           className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent transition-colors"
@@ -860,9 +860,9 @@ export default function StatsDashboardPage() {
               <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full ${bg} opacity-40 blur-2xl pointer-events-none`} />
 
               {/* Icon + label */}
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{label}</p>
-                <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center`}>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider sm:tracking-widest min-w-0">{label}</p>
+                <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center shrink-0`}>
                   <Icon className={`w-4 h-4 ${color}`} />
                 </div>
               </div>
@@ -896,7 +896,7 @@ export default function StatsDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-6 mb-4 sm:mb-6">
 
         {/* Estado de Cuentas — 1/4 */}
-        <div className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-5 backdrop-blur-sm flex flex-col gap-4 h-[500px]">
+        <div className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-5 backdrop-blur-sm flex flex-col gap-4 max-h-[420px] lg:max-h-none lg:h-[500px]">
           <div className="shrink-0">
             <h2 className="text-sm font-semibold text-slate-200">Estado de Cuentas</h2>
             <p className="text-sm text-slate-500 mt-0.5">Cierre · {MONTH_NAMES[month - 1]} {year}</p>
@@ -945,7 +945,7 @@ export default function StatsDashboardPage() {
         </div>
 
         {/* Donut + Categories — 2/4 */}
-        <div id="fluxo-export-distribution" className="lg:col-span-2 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col h-[500px]">
+        <div id="fluxo-export-distribution" className="lg:col-span-2 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col lg:h-[500px]">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl mb-1.5">
@@ -1077,7 +1077,7 @@ export default function StatsDashboardPage() {
         </div>
 
         {/* Heatmap — 1/3, compacto */}
-        <div id="fluxo-export-heatmap" className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm flex flex-col h-[500px]">
+        <div id="fluxo-export-heatmap" className="bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm flex flex-col lg:h-[500px]">
           <div className="mb-3">
             <h2 className="text-sm font-semibold text-slate-200">Mapa de Gastos</h2>
             <p className="text-sm text-slate-500 mt-0.5">Intensidad diaria</p>
@@ -1126,7 +1126,7 @@ export default function StatsDashboardPage() {
         <button
           onClick={() => setVoiceOpen(true)}
           title="Registrar con voz"
-          className="fixed bottom-24 right-7 z-30 w-11 h-11 bg-slate-800 hover:bg-slate-700 border border-slate-600 hover:border-emerald-500/50 text-emerald-400 rounded-2xl shadow-lg flex items-center justify-center transition-all active:scale-95 hover:scale-105"
+          className="fixed bottom-[10.5rem] sm:bottom-24 right-7 z-30 w-11 h-11 bg-slate-800 hover:bg-slate-700 border border-slate-600 hover:border-emerald-500/50 text-emerald-400 rounded-2xl shadow-lg flex items-center justify-center transition-all active:scale-95 hover:scale-105"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
         </button>

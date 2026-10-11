@@ -218,7 +218,7 @@ export default function HouseholdPage() {
     <div className="min-h-screen font-sans p-4 lg:p-8 bg-slate-950 text-white selection:bg-indigo-500/30">
 
       {/* ── Nav tabs ─────────────────────────────────────────────────────── */}
-      <nav className="flex gap-1.5 mb-4 overflow-x-auto [scrollbar-width:none] pb-0.5">
+      <nav className="hidden sm:flex gap-1.5 mb-4 overflow-x-auto [scrollbar-width:none] pb-0.5">
         <button onClick={() => navigate('/')}
           className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border border-transparent transition-colors text-slate-400 hover:text-slate-200 hover:bg-slate-800">
           <Activity className="w-4 h-4" /><span className="hidden sm:inline">Análisis Global</span>
@@ -415,8 +415,8 @@ export default function HouseholdPage() {
               <div className="relative px-5 pt-5 pb-4">
 
                 {/* Top row */}
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div className="flex items-center gap-3 min-w-0">
+                <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4 mb-3">
+                  <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                     {/* Icon badge */}
                     <div className="w-11 h-11 bg-gradient-to-br from-indigo-400 to-violet-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/25">
                       <Home className="w-5 h-5 text-white" />
@@ -438,14 +438,14 @@ export default function HouseholdPage() {
                            household.analysis_level === 'expenses_and_goals' ? 'Gastos + metas' :
                            'Análisis completo'}
                         </span>
-                        <span className="text-slate-700 text-[10px] mx-1">·</span>
+                        <span className="hidden sm:inline text-slate-700 text-[10px] mx-1">·</span>
                         <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
                           <Users className="w-3 h-3" />
                           {activeMembers.length} {activeMembers.length === 1 ? 'miembro' : 'miembros'}
                         </span>
                         {analytics && Number(analytics.total_shared) > 0 && (
                           <>
-                            <span className="text-slate-700 text-[10px] mx-1">·</span>
+                            <span className="hidden sm:inline text-slate-700 text-[10px] mx-1">·</span>
                             <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
                               <Wallet className="w-3 h-3" />
                               {fmt(Number(analytics.total_shared))} {analytics.base_currency}
@@ -454,7 +454,7 @@ export default function HouseholdPage() {
                         )}
                         {analytics && analytics.settlement.length === 0 && analytics.members.length > 0 && (
                           <>
-                            <span className="text-slate-700 text-[10px] mx-1">·</span>
+                            <span className="hidden sm:inline text-slate-700 text-[10px] mx-1">·</span>
                             <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />Saldado
                             </span>
@@ -462,7 +462,7 @@ export default function HouseholdPage() {
                         )}
                         {analytics && analytics.settlement.length > 0 && (
                           <>
-                            <span className="text-slate-700 text-[10px] mx-1">·</span>
+                            <span className="hidden sm:inline text-slate-700 text-[10px] mx-1">·</span>
                             <span className="flex items-center gap-1 text-[10px] font-semibold text-rose-400">
                               <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />Deuda pendiente
                             </span>
@@ -646,9 +646,9 @@ export default function HouseholdPage() {
                             return (
                               <div key={label} className={`relative bg-slate-900/40 border ${border} rounded-2xl p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-3`}>
                                 <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full ${bg} opacity-40 blur-2xl pointer-events-none`} />
-                                <div className="flex items-center justify-between">
-                                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{label}</p>
-                                  <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center`}>
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider sm:tracking-widest min-w-0">{label}</p>
+                                  <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center shrink-0`}>
                                     <Icon className={`w-4 h-4 ${color}`} />
                                   </div>
                                 </div>
@@ -738,7 +738,7 @@ export default function HouseholdPage() {
                       /* Nivel 3: datos personales con toggle gasto/ingreso */
                       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-6">
                         {/* Personal donut con toggle Gastos/Ingresos */}
-                        <div className="lg:col-span-3 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col h-[500px]">
+                        <div className="lg:col-span-3 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col lg:h-[500px]">
                           <div className="flex items-center gap-2 mb-4 flex-wrap">
                             <div className="flex items-center gap-1 p-0.5 bg-slate-800/60 border border-slate-700/50 rounded-xl">
                               <button onClick={() => setPersonalDonutMode('expense')}
@@ -804,7 +804,7 @@ export default function HouseholdPage() {
                           })()}
                         </div>
                         {/* Personal heatmap */}
-                        <div className="lg:col-span-1 bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm flex flex-col h-[500px]">
+                        <div className="lg:col-span-1 bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm flex flex-col lg:h-[500px]">
                           <div className="mb-3">
                             <h2 className="text-sm font-semibold text-slate-200">Mapa de Gastos</h2>
                             <p className="text-sm text-slate-500 mt-0.5">Intensidad diaria</p>
@@ -821,7 +821,7 @@ export default function HouseholdPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-6">
 
                       {/* Donut + Categorías/Conceptos — 3/4 */}
-                      <div id="fluxo-export-household-donut" className="lg:col-span-3 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col h-[500px]">
+                      <div id="fluxo-export-household-donut" className="lg:col-span-3 bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm flex flex-col lg:h-[500px]">
                         <div className="flex items-center justify-between mb-4">
                           <div>
                             <p className="text-xs text-slate-500">
@@ -900,7 +900,7 @@ export default function HouseholdPage() {
                       </div>
 
                       {/* Mapa de gastos — 1/4 */}
-                      <div id="fluxo-export-household-heatmap" className="lg:col-span-1 bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm flex flex-col h-[500px]">
+                      <div id="fluxo-export-household-heatmap" className="lg:col-span-1 bg-slate-900/40 border border-slate-800/50 rounded-3xl p-4 backdrop-blur-sm flex flex-col lg:h-[500px]">
                         <div className="mb-3">
                           <h2 className="text-sm font-semibold text-slate-200">Mapa de Gastos</h2>
                           <p className="text-sm text-slate-500 mt-0.5">Intensidad diaria</p>
