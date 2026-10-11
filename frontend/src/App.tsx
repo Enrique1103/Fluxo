@@ -5,6 +5,7 @@ import { queryClient } from './lib/queryClient'
 import { useAuthStore } from './store/authStore'
 import { ThemeProvider } from './hooks/useTheme'
 import DashboardPage from './pages/DashboardPage'
+import MobileNav from './components/MobileNav'
 
 const LoginPage          = lazy(() => import('./pages/LoginPage'))
 const StatsDashboardPage = lazy(() => import('./pages/StatsDashboardPage'))
@@ -17,7 +18,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAdmin = useAuthStore((s) => s.isAdmin)
   if (!token) return <Navigate to="/login" replace />
   if (isAdmin) return <Navigate to="/admin" replace />
-  return <>{children}</>
+  return <>{children}<MobileNav /></>
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -36,6 +37,7 @@ export default function App() {
           <Suspense fallback={<div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>Cargando…</div>}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/reset-password" element={<LoginPage />} />
               <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
               <Route path="/" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
               <Route path="/stats" element={<PrivateRoute><StatsDashboardPage /></PrivateRoute>} />

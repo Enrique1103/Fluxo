@@ -510,7 +510,7 @@ export default function ImportacionPage() {
       <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8">
         <div className="max-w-2xl mx-auto">
 
-          <nav className="flex gap-1.5 mb-6 overflow-x-auto [scrollbar-width:none] pb-0.5">
+          <nav className="hidden sm:flex gap-1.5 mb-6 overflow-x-auto [scrollbar-width:none] pb-0.5">
             <button
               onClick={() => navigate('/')}
               className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent transition-colors"
@@ -744,7 +744,7 @@ export default function ImportacionPage() {
       <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8">
         <div className="max-w-2xl mx-auto">
 
-          <nav className="flex gap-1.5 mb-6 overflow-x-auto [scrollbar-width:none] pb-0.5">
+          <nav className="hidden sm:flex gap-1.5 mb-6 overflow-x-auto [scrollbar-width:none] pb-0.5">
             <button
               onClick={() => setStep('select')}
               className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent transition-colors"
@@ -845,7 +845,7 @@ export default function ImportacionPage() {
       <div className="min-h-screen p-4 md:p-6 bg-slate-950 text-white">
         <div className="w-full">
 
-          <nav className="flex gap-1.5 mb-6 overflow-x-auto [scrollbar-width:none] pb-0.5">
+          <nav className="hidden sm:flex gap-1.5 mb-6 overflow-x-auto [scrollbar-width:none] pb-0.5">
             <button
               onClick={() => setStep('select')}
               className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border border-transparent transition-colors text-slate-400 hover:text-slate-200 hover:bg-slate-800"

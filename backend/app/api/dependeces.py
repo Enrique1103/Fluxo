@@ -25,7 +25,8 @@ def get_current_user(
 
     try:
         payload = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-        if payload.get("is_admin"):
+        # Los tokens de admin y los de "recuperar contraseña" no sirven para entrar a la app
+        if payload.get("is_admin") or payload.get("purpose"):
             raise credentials_exception
         user_id: str = payload.get("sub")
         if user_id is None:

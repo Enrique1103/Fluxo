@@ -41,7 +41,7 @@ def _get_user_from_token(token: str, db: Session) -> uuid.UUID:
     try:
         payload = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
         user_id: str = payload.get("sub")
-        if user_id is None or payload.get("is_admin"):
+        if user_id is None or payload.get("is_admin") or payload.get("purpose"):
             raise credentials_exception
         user_uuid = uuid.UUID(user_id)
     except (JWTError, ValueError):

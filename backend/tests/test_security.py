@@ -64,3 +64,63 @@ def test_token_con_sub_invalido_da_401(client):
     token = security.create_access_token({"sub": "no-es-un-uuid", "is_admin": False})
     r = client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 401
+
+
+# ── Recuperar contraseña ──────────────────────────────────────────────────────
+
+def _capture_emails(monkeypatch):
+    sent = []
+    from app.core import mailer
+    monkeypatch.setattr(mailer, "send_email", lambda to, subject, text, html=None: sent.append((to, text)) or True)
+    return sent
+
+
+def _token_from(text):
+    return text.split("token=")[1].split()[0]
+
+
+def test_recuperar_contrasena_completo(client, registered_user, monkeypatch):
+    sent = _capture_emails(monkeypatch)
+    r = client.post("/api/v1/auth/forgot-password", json={"email": registered_user["email"]})
+    assert r.status_code == 202
+    assert len(sent) == 1 and sent[0][0] == registered_user["email"]
+    token = _token_from(sent[0][1])
+
+    # El token de recuperación no sirve para entrar a la app
+    assert client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+
+    r = client.post("/api/v1/auth/reset-password", json={"token": token, "new_password": "Nueva1234!"})
+    assert r.status_code == 204
+    assert _login(client, registered_user["email"], "Nueva1234!").status_code == 200
+    assert _login(client, registered_user["email"], registered_user["password"]).status_code == 401
+
+    # Un solo uso: el mismo enlace ya no sirve
+    r = client.post("/api/v1/auth/reset-password", json={"token": token, "new_password": "Otra1234!"})
+    assert r.status_code == 401
+
+
+def test_recuperar_email_inexistente_responde_igual(client, monkeypatch):
+    sent = _capture_emails(monkeypatch)
+    r = client.post("/api/v1/auth/forgot-password", json={"email": "nadie@example.com"})
+    assert r.status_code == 202
+    assert sent == []
+
+
+def test_token_de_login_no_sirve_para_resetear(client, auth_headers):
+    token = auth_headers["Authorization"].split()[1]
+    r = client.post("/api/v1/auth/reset-password", json={"token": token, "new_password": "Nueva1234!"})
+    assert r.status_code == 401
+
+
+def test_recuperar_contrasena_valida_fortaleza(client, registered_user, monkeypatch):
+    sent = _capture_emails(monkeypatch)
+    client.post("/api/v1/auth/forgot-password", json={"email": registered_user["email"]})
+    r = client.post("/api/v1/auth/reset-password", json={"token": _token_from(sent[0][1]), "new_password": "simple123"})
+    assert r.status_code == 422
+
+
+def test_recuperar_contrasena_limita_pedidos(client, registered_user, monkeypatch):
+    _capture_emails(monkeypatch)
+    for _ in range(3):
+        assert client.post("/api/v1/auth/forgot-password", json={"email": registered_user["email"]}).status_code == 202
+    assert client.post("/api/v1/auth/forgot-password", json={"email": registered_user["email"]}).status_code == 429
