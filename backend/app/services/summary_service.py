@@ -48,6 +48,7 @@ def get_summary(db: Session, user: User, display_currency: str | None = None) ->
             credit_limit=a.credit_limit,
         )
         for a in accounts
+        if not a.is_archived
     ]
 
     # --- Current month range (full month, including future-dated transactions) ---

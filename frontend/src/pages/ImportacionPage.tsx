@@ -20,6 +20,7 @@ import {
 } from '../api/importacion'
 import {
   fetchAccounts,
+  withoutArchived,
   fetchCategories,
   fetchConcepts,
   type Account,
@@ -388,7 +389,7 @@ export default function ImportacionPage() {
   const [openDd, setOpenDd] = useState<string | null>(null)
   const closeDd = () => setTimeout(() => setOpenDd(null), 150)
 
-  const { data: accounts    = [] } = useQuery<Account[]>({ queryKey: ['accounts'],   queryFn: fetchAccounts })
+  const { data: accounts    = [] } = useQuery<Account[]>({ queryKey: ['accounts'],   queryFn: fetchAccounts, select: withoutArchived })
   const { data: categories  = [] } = useQuery<Category[]>({ queryKey: ['categories'], queryFn: fetchCategories })
   const { data: concepts    = [] } = useQuery<Concept[]>({ queryKey: ['concepts'],   queryFn: fetchConcepts })
   const { data: households  = [] } = useQuery({ queryKey: ['households'], queryFn: fetchHouseholds })

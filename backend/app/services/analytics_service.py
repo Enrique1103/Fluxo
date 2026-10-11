@@ -524,7 +524,7 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
     # Historical account balances: current balance minus net flow that occurred after month end
     accounts = (
         db.query(Account)
-        .filter(Account.user_id == user.id, Account.is_deleted == False)
+        .filter(Account.user_id == user.id, Account.is_deleted == False, Account.is_archived == False)
         .all()
     )
     account_balances: list[AccountBalanceStat] = []

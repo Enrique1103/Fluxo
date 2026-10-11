@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { X, ChevronDown } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchAccounts } from '../api/dashboard'
+import { fetchAccounts, withoutArchived } from '../api/dashboard'
 
 export type TransferDest =
   | { type: 'internal'; accountId: string; label: string }
@@ -21,6 +21,7 @@ export default function TransferDestinationPicker({ open, sourceAccountId, onSel
     queryKey: ['accounts'],
     queryFn:  fetchAccounts,
     enabled:  open,
+    select:   withoutArchived,
   })
 
   const myAccounts = accounts.filter(a => a.id !== sourceAccountId)

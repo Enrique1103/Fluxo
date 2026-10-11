@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   X, LogOut, KeyRound, Globe, Loader2, CheckCircle, AlertCircle,
   User, Trash2, Edit3, Camera, CreditCard, Tag, TrendingUp,
-  ChevronRight, ArrowLeft, Plus, Target, Eye, EyeOff, Sun, Moon, Wallet,
+  ChevronRight, ArrowLeft, Plus, Target, Eye, EyeOff, Sun, Moon, Wallet, Archive, ArchiveRestore,
 } from 'lucide-react'
 import useTheme from '../hooks/useTheme'
 import { useHomeCurrency } from '../hooks/useHomeCurrency'
@@ -100,7 +100,7 @@ function MainMenu({ open, onNavigate }: {
       key:      'cuentas'   as const,
       Icon:     CreditCard,
       label:    'Cuentas',
-      subtitle: accounts.length === 0 ? 'Sin cuentas' : `${accounts.length} cuenta${accounts.length !== 1 ? 's' : ''}`,
+      subtitle: (() => { const n = accounts.filter(a => !a.is_archived).length; return n === 0 ? 'Sin cuentas' : `${n} cuenta${n !== 1 ? 's' : ''}` })(),
       warning:  false,
     },
     {
@@ -461,6 +461,20 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
     } finally { setSavingAcct(false) }
   }
 
+  const activeAccounts   = accounts.filter(a => !a.is_archived)
+  const archivedAccounts = accounts.filter(a => a.is_archived)
+
+  const setArchived = async (acct: Account, archived: boolean) => {
+    setAcctStatus(null)
+    try {
+      await updateAccount(acct.id, { is_archived: archived })
+      await invalidateFinancialData(queryClient)
+      setAcctStatus({ type: 'success', msg: archived ? `${acct.name} archivada` : `${acct.name} reactivada` })
+    } catch (err: any) {
+      setAcctStatus({ type: 'error', msg: parseErr(err, 'No se pudo actualizar la cuenta') })
+    }
+  }
+
   const confirmDelete = async () => {
     if (!confirmDeleteId) return
     const id = confirmDeleteId
@@ -495,11 +509,11 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
           <Plus className="w-4 h-4" /> Nueva cuenta
         </button>
 
-        {accounts.length === 0 && (
+        {activeAccounts.length === 0 && (
           <p className="text-slate-500 text-xs text-center py-4">Sin cuentas registradas</p>
         )}
 
-        {accounts.map(acct => (
+        {activeAccounts.map(acct => (
           <div key={acct.id} className="bg-slate-800/50 border border-slate-700 rounded-xl p-3">
             {editingAcct === acct.id ? (
               <div className="space-y-2">
@@ -577,6 +591,15 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
+                  {acct.has_transactions && Number(acct.balance) === 0 && (
+                    <button
+                      onClick={() => setArchived(acct, true)}
+                      title="Archivar: la ocultás sin perder su historial"
+                      className="p-1.5 text-slate-500 hover:text-amber-300 transition-colors rounded-lg hover:bg-slate-700"
+                    >
+                      <Archive className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <button
                     onClick={() => setConfirmDeleteId(acct.id)}
                     disabled={deletingAcct === acct.id}
@@ -591,6 +614,36 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
             )}
           </div>
         ))}
+
+        {activeAccounts.some(a => a.has_transactions) && (
+          <p className="text-[11px] text-slate-600 px-1">
+            Una cuenta con movimientos no se puede eliminar. Si ya no la usás, dejala en saldo 0 y archivala.
+          </p>
+        )}
+
+        {archivedAccounts.length > 0 && (
+          <div className="pt-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
+              Archivadas ({archivedAccounts.length})
+            </p>
+            <div className="space-y-1.5">
+              {archivedAccounts.map(acct => (
+                <div key={acct.id} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-400 truncate">{acct.name}</p>
+                    <p className="text-[11px] text-slate-600">{acct.type} · {acct.currency}</p>
+                  </div>
+                  <button
+                    onClick={() => setArchived(acct, false)}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-slate-400 hover:text-emerald-300 hover:bg-slate-800"
+                  >
+                    <ArchiveRestore className="w-3.5 h-3.5" /> Reactivar
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <StatusMsg status={acctStatus} />
       </div>
