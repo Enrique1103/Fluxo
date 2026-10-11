@@ -1,3 +1,6 @@
+import logging
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -93,7 +96,22 @@ from app.exceptions.budget_exceptions import (
     UnauthorizedBudgetAccess,
 )
 
-app = FastAPI(title="Fluxo API", version="2.0.0")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+# En producción (ENV=production) no se publica la documentación interactiva de la API
+_IS_PROD = os.getenv("ENV", "").lower() == "production"
+app = FastAPI(
+    title="Fluxo API",
+    version="2.0.0",
+    docs_url=None if _IS_PROD else "/docs",
+    redoc_url=None if _IS_PROD else "/redoc",
+    openapi_url=None if _IS_PROD else "/openapi.json",
+)
+
+# Solo el frontend de Fluxo puede llamar a la API desde el navegador.
+# CORS_ORIGINS: lista separada por comas; por defecto, producción + desarrollo local.
+_DEFAULT_ORIGINS = "https://fluxo-sage.vercel.app,http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173"
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip()]
 
 
 @app.get("/health")
@@ -108,20 +126,35 @@ def health_check():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
+    # Las vistas previas de Vercel (fluxo-xxxx.vercel.app) también son del proyecto
+    allow_origin_regex=os.getenv("CORS_ORIGIN_REGEX", r"https://fluxo-[a-z0-9-]+\.vercel\.app"),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Captura excepciones no controladas y devuelve JSON en lugar de texto plano."""
     from fastapi.responses import JSONResponse
+    # El detalle va al log; al usuario no se le muestra nada interno
+    logging.getLogger("fluxo").exception("Error no controlado en %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Error interno del servidor: {type(exc).__name__}"},
+        content={"detail": "Error interno del servidor. Probá de nuevo en un momento."},
     )
 
 # ---------------------------------------------------------------------------

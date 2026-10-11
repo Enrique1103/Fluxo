@@ -28,6 +28,8 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 @pytest.fixture(autouse=True)
 def reset_db():
     """Recrea el schema antes de cada test y lo destruye al final."""
+    from app.core import rate_limit
+    rate_limit.clear_all()
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)

@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
@@ -10,6 +11,9 @@ from app.models.categories_models import Category
 from app.models.users_models import User
 from app.models.transactions_models import Transaction
 from app.services.user_service import _hard_delete_user, ADMIN_EMAIL
+
+# Registro de acciones del admin: queda en los logs de Render (quién, qué, cuándo)
+audit = logging.getLogger("fluxo.audit")
 
 _MONTHS_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
@@ -144,6 +148,7 @@ def toggle_active(db: Session, user_id: str) -> dict:
     db_user = _get_user(db, uid)
     db_user.is_active = not db_user.is_active
     db.commit()
+    audit.warning("admin: usuario %s %s", db_user.id, "activado" if db_user.is_active else "desactivado")
     return {"id": str(db_user.id), "is_active": db_user.is_active}
 
 
@@ -153,6 +158,7 @@ def reset_password(db: Session, user_id: str, new_password: str) -> None:
     db_user = _get_user(db, uid)
     db_user.password_hash = security.hash_password(new_password)
     db.commit()
+    audit.warning("admin: contraseña reseteada para usuario %s", db_user.id)
 
 
 def delete_user(db: Session, user_id: str) -> None:
