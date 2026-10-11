@@ -124,3 +124,27 @@ def test_recuperar_contrasena_limita_pedidos(client, registered_user, monkeypatc
     for _ in range(3):
         assert client.post("/api/v1/auth/forgot-password", json={"email": registered_user["email"]}).status_code == 202
     assert client.post("/api/v1/auth/forgot-password", json={"email": registered_user["email"]}).status_code == 429
+
+
+def test_mailer_usa_brevo_si_hay_clave(monkeypatch):
+    import json as _json
+    from app.core import mailer
+    calls = []
+
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake_urlopen(req, timeout):
+        calls.append((req.full_url, req.headers, _json.loads(req.data)))
+        return _Resp()
+
+    monkeypatch.setenv("BREVO_API_KEY", "clave-de-prueba")
+    monkeypatch.setenv("MAIL_FROM", "Fluxo <soporte@example.com>")
+    monkeypatch.setattr(mailer.urllib.request, "urlopen", fake_urlopen)
+    assert mailer.send_email("a@example.com", "Asunto", "texto", "<p>html</p>")
+    url, headers, body = calls[0]
+    assert url == "https://api.brevo.com/v3/smtp/email"
+    assert headers["Api-key"] == "clave-de-prueba"
+    assert body["sender"] == {"name": "Fluxo", "email": "soporte@example.com"}
+    assert body["to"] == [{"email": "a@example.com"}]
