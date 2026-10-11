@@ -170,8 +170,13 @@ export interface Account {
   balance: number
   credit_limit: number | null
   is_liability: boolean
+  /** Cuenta que ya no se usa: no aparece para cargar movimientos */
+  is_archived?: boolean
   has_transactions: boolean
 }
+
+/** Para selects de "cuenta": oculta las archivadas (Configuración las sigue mostrando) */
+export const withoutArchived = (accounts: Account[]): Account[] => accounts.filter(a => !a.is_archived)
 
 export const fetchAccounts = async (): Promise<Account[]> => {
   const { data } = await client.get<Account[]>('/v1/accounts')
@@ -293,7 +298,7 @@ export const deleteUserAccount = async (password: string): Promise<void> => {
 }
 
 // --- Account management ---
-export const updateAccount = async (id: string, payload: { name?: string; type?: string; currency?: string; credit_limit?: number; balance?: number }): Promise<Account> => {
+export const updateAccount = async (id: string, payload: { name?: string; type?: string; currency?: string; credit_limit?: number; balance?: number; is_archived?: boolean }): Promise<Account> => {
   const { data } = await client.patch<Account>(`/v1/accounts/${id}`, payload)
   return data
 }

@@ -9,6 +9,7 @@ from app.exceptions.account_exceptions import (
     InsufficientFunds,
     InsufficientCreditLimit,
     CreditBalanceCannotBePositive,
+    InvalidAccountUpdate,
 )
 from app.exceptions.transaction_exceptions import (
     TransactionNotFound,
@@ -100,6 +101,8 @@ def _get_account(db: Session, account_id: uuid.UUID, user_id: uuid.UUID) -> Acco
     account = account_crud.get_by_id(db, account_id)
     if not account or account.user_id != user_id:
         raise AccountNotFound("Cuenta no encontrada")
+    if account.is_archived:
+        raise InvalidAccountUpdate(f"La cuenta {account.name} está archivada. Reactivala para usarla.")
     return account
 
 

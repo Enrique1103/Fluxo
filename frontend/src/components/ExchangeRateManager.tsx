@@ -232,7 +232,7 @@ export default function ExchangeRateManager({ userCurrency }: { userCurrency: st
           No hay tasas registradas aún.
         </p>
       ) : (
-        <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:theme(colors.slate.700)_transparent]">
+        <div className="space-y-1.5 max-h-[calc(100dvh-13rem)] overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:theme(colors.slate.700)_transparent]">
           {rates.map(r => (
             <div
               key={r.id}

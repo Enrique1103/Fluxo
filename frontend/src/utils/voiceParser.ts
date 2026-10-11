@@ -1,6 +1,8 @@
 export interface ParsedVoice {
   amount: number | null
   currency: 'UYU' | 'USD' | 'EUR' | null
+  /** Moneda dicha en voz ("dólares", "pesos"), aunque la cuenta tenga otra */
+  spokenCurrency: 'UYU' | 'USD' | 'EUR' | null
   matchedAccountId: string | null
   matchedDestAccountId: string | null
   matchedConceptId: string | null
@@ -323,6 +325,7 @@ export function parseVoiceExpense(
   return {
     amount,
     currency,
+    spokenCurrency: voiceCurrency,
     matchedAccountId,
     matchedDestAccountId,
     matchedConceptId,

@@ -14,11 +14,46 @@ def slugify(text: str) -> str:
     return slug[:60]
 
 
+# Palabras que van en minúscula dentro de un nombre ("Extracción en el Abitab")
+_CONECTORES = {"a", "al", "con", "de", "del", "e", "el", "en", "la", "las", "lo", "los",
+               "o", "para", "por", "sin", "u", "un", "una", "y"}
+
+
+def _capitalizar(palabra: str, primera: bool, respetar_siglas: bool) -> str:
+    if not palabra:
+        return palabra
+    baja = palabra.lower()
+    if not primera and baja in _CONECTORES:
+        return baja
+    # Siglas cortas y códigos se respetan (STM, UTE, 4K) salvo que todo el nombre venga
+    # en mayúsculas (los conceptos viejos se guardaban así: "LUZ" → "Luz")
+    if any(ch.isdigit() for ch in palabra) or (respetar_siglas and palabra.isupper() and len(palabra) <= 3):
+        return palabra
+    return baja[0].upper() + baja[1:]
+
+
+def normalize_label(text: str) -> str:
+    """
+    Formato único para categorías y conceptos: cada palabra con mayúscula inicial,
+    conectores en minúscula y siglas cortas como están.
+    'FERIA' → 'Feria' · 'EXTRACCIÓN EN EL ABITAB' → 'Extracción en el Abitab' ·
+    'recargar STM' → 'Recargar STM' · 'uber/taxi' → 'Uber/Taxi' · 'remesas-cuba' → 'Remesas-Cuba'
+    """
+    text = re.sub(r"\s+", " ", text.strip())
+    respetar_siglas = not text.isupper()
+    out = []
+    for i, palabra in enumerate(text.split(" ")):
+        partes = re.split(r"([/-])", palabra)
+        out.append("".join(
+            p if p in "/-" and p else _capitalizar(p, i == 0 or j > 0, respetar_siglas)
+            for j, p in enumerate(partes)
+        ))
+    return " ".join(out)
+
+
 def normalize_concept(text: str) -> str:
-    """Conceptos siempre en MAYÚSCULAS: 'netflix' → 'NETFLIX'"""
-    return text.strip().upper()
+    return normalize_label(text)
 
 
 def normalize_category(text: str) -> str:
-    """Categorías en Title Case: 'alimentación' → 'Alimentación'"""
-    return text.strip().title()
+    return normalize_label(text)
