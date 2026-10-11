@@ -35,8 +35,12 @@ REGLAS_PREDEFINIDAS: dict[str, list[str]] = {
                       "MOVISTAR", "GIMNASIO", "DISNEY", "HBO", "AMAZON PRIME"],
     "Ocio":          ["RESTAURANTE", "BAR ", "CINE", "TEATRO", "BOLICHE",
                       "CLUB ", "CERVECERÍA"],
-    "Vivienda":      ["ALQUILER", "LUZ ", "AGUA ", "GAS ", "UTE", "OSE",
+    "Gastos asociados al Hogar": ["ALQUILER", "LUZ ", "AGUA ", "GAS ", "UTE", "OSE",
                       "GASTOS COMUNES", "ADMINISTRACIÓN"],
+    "Extracción de Dinero": ["CAJERO", "ATM", "EXTRACCIÓN", "EXTRACCION", "RETIRO",
+                      "ABITAB", "REDPAGOS"],
+    "Vestimenta":    ["ZARA", "TIENDA", "CALZADO", "ROPA"],
+    "Educación":     ["LIBRERÍA", "UNIVERSIDAD", "COLEGIO", "CURSO"],
     "Sin clasificar": [],
 }
 
