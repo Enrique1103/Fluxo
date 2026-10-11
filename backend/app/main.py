@@ -40,6 +40,7 @@ from app.exceptions.account_exceptions import (
     InsufficientCreditLimit,
     CreditBalanceCannotBePositive,
     AccountHasTransactions,
+    InvalidAccountUpdate,
 )
 from app.exceptions.transaction_exceptions import (
     TransactionNotFound,
@@ -191,6 +192,11 @@ async def handle_insufficient_credit(r: Request, exc: InsufficientCreditLimit):
 
 @app.exception_handler(CreditBalanceCannotBePositive)
 async def handle_credit_positive(r: Request, exc: CreditBalanceCannotBePositive):
+    return _json(_422, str(exc))
+
+
+@app.exception_handler(InvalidAccountUpdate)
+async def handle_invalid_account_update(r: Request, exc: InvalidAccountUpdate):
     return _json(_422, str(exc))
 
 

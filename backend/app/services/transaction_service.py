@@ -58,13 +58,29 @@ def _apply_income(account: Account, amount: Decimal) -> None:
 
 
 def _reverse_expense(account: Account, amount: Decimal) -> None:
-    """Undo a previous expense/source debit — no validation needed."""
+    """Undo a previous expense/source debit. Una tarjeta no puede quedar con saldo a favor."""
+    if account.type == AccountType.CREDIT and account.balance + amount > Decimal("0.00"):
+        raise CreditBalanceCannotBePositive(
+            f"No se puede: la tarjeta {account.name} quedaría con saldo a favor "
+            f"({account.balance + amount}). Probablemente ya registraste el pago de este gasto."
+        )
     account.balance += amount
 
 
 def _reverse_income(account: Account, amount: Decimal) -> None:
-    """Undo a previous income/destination credit — no validation needed."""
-    account.balance -= amount
+    """Undo a previous income/destination credit. El saldo no puede quedar negativo (ni pasar el límite)."""
+    new_balance = account.balance - amount
+    if account.type == AccountType.CREDIT:
+        if new_balance < -account.credit_limit:
+            raise InsufficientCreditLimit(
+                f"No se puede: la tarjeta {account.name} superaría su límite de crédito."
+            )
+    elif new_balance < Decimal("0.00"):
+        raise InsufficientFunds(
+            f"No se puede: el saldo de {account.name} quedaría en {new_balance}. "
+            f"Ese dinero ya se usó en otros movimientos de la cuenta."
+        )
+    account.balance = new_balance
 
 
 # ---------------------------------------------------------------------------
@@ -402,12 +418,18 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
     # Handle amount change: reverse old, apply new
     new_amount = tx_update.amount if tx_update.amount is not None else tx.amount
     if tx_update.amount is not None and tx_update.amount != tx.amount:
+        # Se aplica solo la diferencia: así se valida el saldo final y no un paso intermedio
+        delta = new_amount - tx.amount
         if tx.type == TransactionType.EXPENSE:
-            _reverse_expense(account, tx.amount)
-            _apply_expense(account, new_amount)
+            if delta > 0:
+                _apply_expense(account, delta)
+            else:
+                _reverse_expense(account, -delta)
         else:
-            _reverse_income(account, tx.amount)
-            _apply_income(account, new_amount)
+            if delta > 0:
+                _apply_income(account, delta)
+            else:
+                _reverse_income(account, -delta)
         fields["amount"] = new_amount
 
     # Handle concept change (frequency only — category is independent)
@@ -510,6 +532,12 @@ def delete(
         tx.household_id = remaining[0].household_id if remaining else None
         db.commit()
         return
+
+    if tx.instalment_plan_id is not None:
+        raise InstalmentPlanTransactionEditNotAllowed(
+            "Esta transacción es una cuota de un plan y no puede borrarse sola. "
+            "Para cancelar las cuotas restantes, cancelá el plan."
+        )
 
     account = account_crud.get_by_id(db, tx.account_id)
 
