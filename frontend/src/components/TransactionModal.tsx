@@ -653,26 +653,31 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               </p>
             )}
 
-            {/* Cambio de moneda — transferencia/extracción entre cuentas de distinta moneda */}
+            {/* Cambio de moneda: un solo bloque con lo que sale y lo que llega (reemplaza al campo Monto) */}
             {crossCurrency && (
-              <div>
-                <label className={labelClass}>
-                  Monto que llega a {destAccount!.name} ({destAccount!.currency})
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={destAmount}
-                  onChange={e => setDestAmount(e.target.value)}
-                  placeholder={estDestAmount ?? '0.00'}
-                  className={inputClass}
-                />
-                <p className="text-[11px] text-slate-500 mt-1">
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                <p className="text-xs font-medium text-amber-300 mb-2">Cambio de moneda</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      Sale de {srcAccount!.name} ({srcAccount!.currency})
+                    </label>
+                    <input type="number" min="0.01" step="0.01" value={amount}
+                      onChange={e => setAmount(e.target.value)} placeholder="0.00" className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      Llega a {destAccount!.name} ({destAccount!.currency})
+                    </label>
+                    <input type="number" min="0" step="0.01" value={destAmount}
+                      onChange={e => setDestAmount(e.target.value)} placeholder={estDestAmount ?? '0.00'} className={inputClass} />
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">
                   {parseFloat(destAmount) > 0 && parseFloat(amount) > 0
                     ? `Cambio aplicado: ${fmtRate(parseFloat(destAmount) / parseFloat(amount), srcAccount!.currency, destAccount!.currency)}`
                     : crossRate !== null
-                      ? `Si lo dejás vacío se usa tu tasa cargada: ${fmtRate(crossRate, srcAccount!.currency, destAccount!.currency)}`
+                      ? `Si dejás vacío lo que llega, se calcula con tu tasa: ${fmtRate(crossRate, srcAccount!.currency, destAccount!.currency)}`
                       : `No tenés tasa ${srcAccount!.currency}→${destAccount!.currency} cargada: indicá cuánto llegó`}
                 </p>
               </div>
@@ -854,12 +859,16 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               </div>
             )}
 
-            {/* Monto */}
-            <div>
-              <label className={labelClass}>Monto</label>
-              <input type="number" min="0.01" step="0.01" value={amount}
-                onChange={e => setAmount(e.target.value)} placeholder="0.00" className={inputClass} />
-            </div>
+            {/* Monto (en un cambio de moneda se carga arriba, en el bloque "Cambio de moneda") */}
+            {!crossCurrency && (
+              <div>
+                <label className={labelClass}>
+                  {txType === 'transfer' ? 'Monto a transferir' : 'Monto'}
+                </label>
+                <input type="number" min="0.01" step="0.01" value={amount}
+                  onChange={e => setAmount(e.target.value)} placeholder="0.00" className={inputClass} />
+              </div>
+            )}
 
             {/* Fecha */}
             <div>
