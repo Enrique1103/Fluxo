@@ -29,3 +29,5 @@ Resumen.md
 *.PDF
 *.pdf
 frontend/.vite/
+# Backups de la base (contienen datos personales)
+backend/backups/
