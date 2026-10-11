@@ -82,6 +82,23 @@ def _convert_to_base(
     return (amount * rate).quantize(Decimal("0.01")), True
 
 
+def _split(total: Decimal, weights: dict[uuid.UUID, Decimal]) -> dict[uuid.UUID, Decimal]:
+    """
+    Reparte `total` según `weights` en centavos exactos: la suma de las partes es
+    igual al total (los centavos del redondeo van a las partes con mayor resto).
+    """
+    if not weights:
+        return {}
+    weight_sum = sum(weights.values(), Decimal("0"))
+    cents = int((total * 100).quantize(Decimal("1")))
+    raw = {uid: Decimal(cents) * w / weight_sum for uid, w in weights.items()}
+    parts = {uid: int(v) for uid, v in raw.items()}  # floor (todo positivo)
+    leftover = cents - sum(parts.values())
+    for uid in sorted(raw, key=lambda u: raw[u] - parts[u], reverse=True)[:leftover]:
+        parts[uid] += 1
+    return {uid: Decimal(c) / 100 for uid, c in parts.items()}
+
+
 def _simplify_debts(balances: dict[uuid.UUID, Decimal]) -> list[tuple[uuid.UUID, uuid.UUID, Decimal]]:
     """
     Greedy debt simplification.
@@ -145,6 +162,7 @@ def get_analytics(
         .join(TransactionHousehold, TransactionHousehold.transaction_id == Transaction.id)
         .filter(
             TransactionHousehold.household_id == household_id,
+            Transaction.user_id.in_(member_ids),  # quien ya no es miembro no entra en el reparto
             Transaction.is_deleted == False,
             Transaction.date >= date_from,
             Transaction.date <= date_to,
@@ -201,25 +219,18 @@ def get_analytics(
     should_pay: dict[uuid.UUID, Decimal] = {}
 
     if household.split_type == SplitType.EQUAL:
-        n = len(member_ids)
-        per_member = (total_shared / n).quantize(Decimal("0.01")) if n > 0 else Decimal("0.00")
-        should_pay = {uid: per_member for uid in member_ids}
+        should_pay = _split(total_shared, {uid: Decimal("1") for uid in member_ids})
 
     else:  # PROPORTIONAL
         # Exclude members with no income
         eligible = {uid: inc for uid, inc in incomes.items() if inc > 0}
         if not eligible:
             # Fallback to equal if nobody has income
-            n = len(member_ids)
-            per_member = (total_shared / n).quantize(Decimal("0.01")) if n > 0 else Decimal("0.00")
-            should_pay = {uid: per_member for uid in member_ids}
+            should_pay = _split(total_shared, {uid: Decimal("1") for uid in member_ids})
         else:
-            eligible_total = sum(eligible.values(), Decimal("0.00"))
+            should_pay = _split(total_shared, eligible)
             for uid in member_ids:
-                if uid in eligible:
-                    pct = eligible[uid] / eligible_total
-                    should_pay[uid] = (total_shared * pct).quantize(Decimal("0.01"))
-                else:
+                if uid not in eligible:
                     should_pay[uid] = Decimal("0.00")
                     alerts.append(HouseholdAlert(
                         type="no_income",
@@ -251,9 +262,15 @@ def get_analytics(
     for m in active_members:
         uid = m.user_id
         inc = incomes.get(uid, Decimal("0.00"))
+        # El % del ingreso de cada uno solo se muestra si el reparto es proporcional
+        # o el hogar comparte ingresos (FULL); en "partes iguales" es dato privado.
+        shares_income = (
+            household.split_type == SplitType.PROPORTIONAL
+            or (household.analysis_level or AnalysisLevel.EXPENSES_ONLY) == AnalysisLevel.FULL
+        )
         inc_pct = (
             (inc / total_group_income * 100).quantize(Decimal("0.01"))
-            if total_group_income > 0 else Decimal("0.00")
+            if total_group_income > 0 and shares_income else Decimal("0.00")
         )
         contributions.append(MemberContribution(
             user_id=uid,
@@ -327,6 +344,7 @@ def get_analytics(
         .join(TransactionHousehold, TransactionHousehold.transaction_id == Transaction.id)
         .filter(
             TransactionHousehold.household_id == household_id,
+            Transaction.user_id.in_(member_ids),
             Transaction.is_deleted == False,
             Transaction.date >= prev_date_from,
             Transaction.date <= prev_date_to,

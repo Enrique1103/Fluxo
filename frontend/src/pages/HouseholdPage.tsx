@@ -174,10 +174,11 @@ export default function HouseholdPage() {
         (old: typeof members) => old?.filter(m => m.user_id !== userId) ?? old,
       )
     },
-    onSuccess: () => {
+    onSuccess: (_data, userId) => {
       setConfirmRemoveId(null)
       qc.invalidateQueries({ queryKey: ['household-members', household?.id] })
       qc.invalidateQueries({ queryKey: ['household-analytics', household?.id] })
+      if (userId === currentUserId) qc.invalidateQueries({ queryKey: ['households'] })  // salí del hogar
     },
     onError: () => {
       qc.invalidateQueries({ queryKey: ['household-members', household?.id] })
@@ -486,6 +487,12 @@ export default function HouseholdPage() {
                       </button>
                     </div>
                   )}
+                  {!isAdmin && currentUserId && (
+                    <button onClick={() => setConfirmRemoveId(currentUserId)}
+                      className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-400 border border-slate-700/60 hover:text-rose-400 hover:border-rose-500/40 transition-all">
+                      Salir del hogar
+                    </button>
+                  )}
                 </div>
 
                 {/* Member chips row */}
@@ -496,7 +503,7 @@ export default function HouseholdPage() {
                       const isConfirming = confirmRemoveId === m.user_id
                       return isConfirming ? (
                         <div key={m.id} className="flex items-center gap-1 px-1.5 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30">
-                          <span className="text-[10px] text-rose-400 font-semibold ml-1">¿Eliminar?</span>
+                          <span className="text-[10px] text-rose-400 font-semibold ml-1">{m.user_id === currentUserId ? '¿Salir del hogar?' : '¿Eliminar?'}</span>
                           <button onClick={() => removeMutation.mutate(m.user_id)} disabled={removeMutation.isPending}
                             className="p-1 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-all">
                             {removeMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}

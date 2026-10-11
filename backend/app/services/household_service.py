@@ -178,13 +178,16 @@ def approve_member(db: Session, user: User, household_id: uuid.UUID, target_user
 
 def remove_member(db: Session, user: User, household_id: uuid.UUID, target_user_id: uuid.UUID) -> None:
     _get_household(db, household_id)
-    _require_admin(db, household_id, user.id)
 
     if target_user_id == user.id:
-        # Admin leaving — check there's another admin
-        admin_count = household_crud.count_admins(db, household_id)
-        if admin_count <= 1:
-            raise CannotRemoveLastAdmin("No podés abandonar el hogar siendo el único admin. Asigná otro admin primero.")
+        # Cualquier miembro puede salir del hogar; el último admin no
+        me = _require_active_member(db, household_id, user.id)
+        if me.role == MemberRole.ADMIN and household_crud.count_admins(db, household_id) <= 1:
+            raise CannotRemoveLastAdmin(
+                "No podés salir del hogar siendo el único admin. Si ya no lo usan, eliminá el hogar."
+            )
+    else:
+        _require_admin(db, household_id, user.id)
 
     member = household_crud.get_member(db, household_id, target_user_id)
     if not member:
