@@ -121,6 +121,14 @@ def get_rate_for_month(
     if from_currency == to_currency:
         return Decimal("1")
 
+    # Tasa del mes exacto, en cualquier sentido (una inversa del mes gana a una directa vieja)
+    exact = exchange_rate_crud.get_for_month(db, user_id, from_currency, to_currency, year, month)
+    if exact:
+        return Decimal(str(exact.rate))
+    exact_inv = exchange_rate_crud.get_for_month(db, user_id, to_currency, from_currency, year, month)
+    if exact_inv:
+        return Decimal("1") / Decimal(str(exact_inv.rate))
+
     # Direct pair — exact month or most recent past month
     er = exchange_rate_crud.get_most_recent_for_pair_up_to(
         db, user_id, from_currency, to_currency, year, month

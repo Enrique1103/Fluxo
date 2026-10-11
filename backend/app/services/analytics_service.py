@@ -91,9 +91,11 @@ def expenses_by_category(
     date_from: date,
     date_to: date,
 ) -> dict:
+    target = str(user.currency_default)
     rows = (
-        db.query(Category.name, Transaction.amount)
+        db.query(Category.name, Transaction.amount, Transaction.date, Account.currency)
         .join(Transaction, Transaction.category_id == Category.id)
+        .join(Account, Transaction.account_id == Account.id)
         .filter(
             Transaction.user_id == user.id,
             Transaction.is_deleted == False,
@@ -111,15 +113,17 @@ def expenses_by_category(
     if not rows:
         return go.Figure().to_dict()
 
-    df = pd.DataFrame(rows, columns=["category", "amount"])
-    df["amount"] = df["amount"].astype(float)
+    df = pd.DataFrame(
+        [(cat, float(Decimal(str(amt)) * _rate(db, user.id, str(cur), target, d))) for cat, amt, d, cur in rows],
+        columns=["category", "amount"],
+    )
     grouped = df.groupby("category")["amount"].sum().reset_index()
     grouped = grouped.sort_values("amount", ascending=False)
 
     fig = go.Figure(
         go.Pie(
-            labels=grouped["category"],
-            values=grouped["amount"],
+            labels=grouped["category"].tolist(),
+            values=grouped["amount"].tolist(),
             hole=0.45,
             textinfo="label+percent",
         )
@@ -179,8 +183,8 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
 
     if not rows_ie and not rows_ext and not imported:
         fig = go.Figure()
-        fig.add_trace(go.Bar(name="Ingresos", x=month_labels, y=[0] * months))
-        fig.add_trace(go.Bar(name="Egresos", x=month_labels, y=[0] * months))
+        fig.add_trace(go.Bar(name="Ingresos", x=month_labels, y=[0] * len(month_labels)))
+        fig.add_trace(go.Bar(name="Egresos", x=month_labels, y=[0] * len(month_labels)))
         fig.update_layout(barmode="group", title="Ingresos vs Egresos")
         return fig.to_dict()
 
@@ -244,10 +248,12 @@ def top_concepts(
     date_to: date,
     limit: int = 10,
 ) -> dict:
+    target = str(user.currency_default)
     rows = (
-        db.query(Concept.name, Category.name, Transaction.amount)
+        db.query(Concept.name, Category.name, Transaction.amount, Transaction.date, Account.currency)
         .join(Transaction, Transaction.concept_id == Concept.id)
         .join(Category, Transaction.category_id == Category.id)
+        .join(Account, Transaction.account_id == Account.id)
         .filter(
             Transaction.user_id == user.id,
             Transaction.is_deleted == False,
@@ -265,8 +271,11 @@ def top_concepts(
     if not rows:
         return go.Figure().to_dict()
 
-    df = pd.DataFrame(rows, columns=["concept", "category", "amount"])
-    df["amount"] = df["amount"].astype(float)
+    df = pd.DataFrame(
+        [(con, cat, float(Decimal(str(amt)) * _rate(db, user.id, str(cur), target, d)))
+         for con, cat, amt, d, cur in rows],
+        columns=["concept", "category", "amount"],
+    )
     df["label"] = df["concept"] + " (" + df["category"] + ")"
 
     grouped = (
@@ -279,8 +288,8 @@ def top_concepts(
 
     fig = go.Figure(
         go.Bar(
-            x=grouped["amount"],
-            y=grouped["label"],
+            x=grouped["amount"].tolist(),
+            y=grouped["label"].tolist(),
             orientation="h",
             marker_color="#6366f1",
         )
@@ -304,12 +313,14 @@ def daily_net_flow(
     date_from: date,
     date_to: date,
 ) -> dict:
-    rows = (
-        db.query(Transaction.date, Transaction.type, Transaction.amount)
+    target = str(user.currency_default)
+    raw = (
+        db.query(Transaction.date, Transaction.type, Transaction.amount, Transaction.commission,
+                 Transaction.external_account_id, Account.currency)
+        .join(Account, Transaction.account_id == Account.id)
         .filter(
             Transaction.user_id == user.id,
             Transaction.is_deleted == False,
-            Transaction.type.in_([TransactionType.INCOME, TransactionType.EXPENSE]),
             Transaction.date >= date_from,
             Transaction.date <= date_to,
             or_(
@@ -319,6 +330,20 @@ def daily_net_flow(
         )
         .all()
     )
+    # (fecha, monto con signo en la moneda principal). Transferencias: solo lo que sale
+    # del patrimonio (externa = monto + comisión; interna = comisión).
+    rows = []
+    for d, typ, amt, commission, ext_id, cur in raw:
+        amt = Decimal(str(amt))
+        if typ == TransactionType.INCOME:
+            signed = amt
+        elif typ == TransactionType.EXPENSE:
+            signed = -amt
+        else:
+            signed = -(Decimal(str(commission or 0)) + (amt if ext_id is not None else Decimal("0")))
+            if signed == 0:
+                continue
+        rows.append((d, float(signed * _rate(db, user.id, str(cur), target, d))))
 
     # Full date range so days without transactions appear as 0
     all_days = pd.date_range(date_from, date_to, freq="D")
@@ -328,12 +353,7 @@ def daily_net_flow(
         fig.update_layout(title="Flujo neto diario")
         return fig.to_dict()
 
-    df = pd.DataFrame(rows, columns=["date", "type", "amount"])
-    df["amount"] = df["amount"].astype(float)
-    df["signed"] = df.apply(
-        lambda r: r["amount"] if r["type"] == TransactionType.INCOME else -r["amount"],
-        axis=1,
-    )
+    df = pd.DataFrame(rows, columns=["date", "signed"])
     df["date"] = pd.to_datetime(df["date"])
 
     daily = (
@@ -348,8 +368,8 @@ def daily_net_flow(
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=daily["date"],
-            y=daily["cumulative"],
+            x=daily["date"].dt.strftime("%Y-%m-%d").tolist(),
+            y=daily["cumulative"].tolist(),
             mode="lines+markers",
             name="Flujo acumulado",
             line={"color": "#3b82f6", "width": 2},
@@ -359,8 +379,8 @@ def daily_net_flow(
     )
     fig.add_trace(
         go.Bar(
-            x=daily["date"],
-            y=daily["net"],
+            x=daily["date"].dt.strftime("%Y-%m-%d").tolist(),
+            y=daily["net"].tolist(),
             name="Neto diario",
             marker_color=daily["net"].apply(
                 lambda v: "#22c55e" if v >= 0 else "#ef4444"
@@ -426,6 +446,15 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
         for tx, _, _, _, acc_currency, _, _ in rows
         if tx.type == TransactionType.EXPENSE
     )
+    # Igual que el resumen y el gráfico Ingresos·Gastos: lo que sale en transferencias
+    # externas y las comisiones también es gasto del mes
+    for tx, _, _, _, acc_currency, _, _ in rows:
+        if tx.type == TransactionType.TRANSFER:
+            outflow = Decimal(str(tx.commission or 0)) + (
+                Decimal(str(tx.amount)) if tx.external_account_id is not None else Decimal("0")
+            )
+            if outflow:
+                expenses += _convert(outflow, acc_currency, tx.date)
     month_first = date(year, month, 1)
     for _, cur, inc, exp in monthly_total_service.totals_by_month(db, user.id, month_first, month_first):
         income += _convert(inc, cur, month_first)
@@ -499,16 +528,18 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
                 Transaction.account_id == acc.id,
                 Transaction.is_deleted == False,
                 Transaction.date > date_to,
-                or_(
-                    Transaction.transfer_role.is_(None),
-                    Transaction.transfer_role == TransferRole.SOURCE,
-                ),
             )
             .all()
         )
+        # Lo que cambió el saldo de ESTA cuenta después del mes (incluye ambas patas
+        # de las transferencias: la que entra suma, la que sale resta monto + comisión)
         flow_after = Decimal("0")
         for tx in post_txs:
-            if tx.type == TransactionType.INCOME:
+            if tx.transfer_role == TransferRole.DESTINATION:
+                flow_after += tx.amount
+            elif tx.transfer_role == TransferRole.SOURCE:
+                flow_after -= tx.amount + (tx.commission or Decimal("0"))
+            elif tx.type == TransactionType.INCOME:
                 flow_after += tx.amount
             else:
                 flow_after -= tx.amount
