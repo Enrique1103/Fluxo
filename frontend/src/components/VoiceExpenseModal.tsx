@@ -297,7 +297,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             {/* Type toggle */}
             <div className="w-full grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-800/30 border border-slate-700/50">
               {(['income', 'expense', 'transfer'] as const).map(type => {
-                const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia / Retiro' }
+                const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia' }
                 const colors = {
                   income:   'bg-cyan-400/15 border-cyan-400/40 text-cyan-400',
                   expense:  'bg-rose-400/15 border-rose-400/40 text-rose-400',

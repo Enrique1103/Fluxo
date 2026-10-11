@@ -226,7 +226,9 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   const homeCurrency = useHomeCurrency()
   const currencyOpts = [...new Set([homeCurrency, 'USD', 'EUR'])]
 
-  const [txType, setTxType] = useState<'income' | 'expense' | 'transfer'>('expense')
+  // 'withdrawal' (Retiro) es una transferencia hacia una cuenta de efectivo: misma lógica, otra pantalla
+  const [txType, setTxType] = useState<'income' | 'expense' | 'transfer' | 'withdrawal'>('expense')
+  const isMove = txType === 'transfer' || txType === 'withdrawal'
 
   const [accountId,   setAccountId]   = useState('')
   const [conceptId,   setConceptId]   = useState('')
@@ -273,7 +275,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   const { data: categories  = [] } = useQuery({ queryKey: ['categories'],  queryFn: fetchCategories,  enabled: open })
   const { data: concepts    = [] } = useQuery({ queryKey: ['concepts'],    queryFn: fetchConcepts,    enabled: open })
   const { data: households  = [] } = useQuery({ queryKey: ['households'],  queryFn: fetchHouseholds,  enabled: open })
-  const { data: rates       = [] } = useQuery({ queryKey: ['exchange-rates'], queryFn: fetchExchangeRates, enabled: open && txType === 'transfer' })
+  const { data: rates       = [] } = useQuery({ queryKey: ['exchange-rates'], queryFn: fetchExchangeRates, enabled: open && isMove })
   // staleTime 0 + refetch al abrir: al reabrir un movimiento recién editado
   // no se deben mostrar (ni re-guardar) los valores viejos del caché.
   const { data: editTx      }      = useQuery({
@@ -316,9 +318,10 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   useEffect(() => { setDestAccountId('') }, [accountId])
   useEffect(() => { setDestAmount('') }, [accountId, destAccountId])
 
+  const destOptions  = accounts.filter(a => a.id !== accountId && (txType === 'withdrawal' ? a.type === 'cash' : a.type !== 'cash'))
   const srcAccount   = accounts.find(a => a.id === accountId)
   const destAccount  = accounts.find(a => a.id === destAccountId)
-  const crossCurrency = txType === 'transfer' && !!srcAccount && !!destAccount && srcAccount.currency !== destAccount.currency
+  const crossCurrency = isMove && !!srcAccount && !!destAccount && srcAccount.currency !== destAccount.currency
   const crossRate    = crossCurrency ? findRate(rates, srcAccount!.currency, destAccount!.currency, date) : null
   const estDestAmount = crossRate !== null && parseFloat(amount) > 0 ? (parseFloat(amount) * crossRate).toFixed(2) : null
 
@@ -372,7 +375,9 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
     if (!date) { setServerError('La fecha es requerida'); return }
     if (!isEditing) {
       if (!accountId) { setServerError('Seleccioná una cuenta'); return }
-      if (txType === 'transfer' && !destAccountId) { setServerError('Seleccioná la cuenta destino'); return }
+      if (isMove && !destAccountId) {
+        setServerError(txType === 'withdrawal' ? 'Elegí la cuenta de efectivo donde queda la plata' : 'Seleccioná la cuenta destino'); return
+      }
       if (crossCurrency && !(parseFloat(destAmount) > 0) && crossRate === null) {
         setServerError(`Indicá cuánto llegó en ${destAccount!.currency} o cargá la tasa de cambio`); return
       }
@@ -410,13 +415,13 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
           concept_id:  conceptId || null,
           category_id: categoryId,
           amount:      amt,
-          type:        txType,
+          type:        isMove ? 'transfer' : txType,
           date,
           description: description.trim() || undefined,
-          ...(txType === 'transfer' && destAccountId
+          ...(isMove && destAccountId
             ? { transfer_to_account_id: destAccountId }
             : {}),
-          ...(txType === 'transfer' && commission && parseFloat(commission) > 0
+          ...(isMove && commission && parseFloat(commission) > 0
             ? { commission: parseFloat(commission) }
             : {}),
           ...(crossCurrency && parseFloat(destAmount) > 0
@@ -456,20 +461,21 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
 
         {/* Tipo toggle — deshabilitado en modo edición */}
         <div className="flex gap-2 mb-5">
-          {(['income', 'expense', 'transfer'] as const).map(type => {
-            const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia / Retiro' }
+          {(['income', 'expense', 'transfer', 'withdrawal'] as const).map(type => {
+            const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia', withdrawal: 'Retiro' }
             const activeStyles = {
-              income:   'bg-cyan-400/15 border-cyan-400/40 text-cyan-400',
-              expense:  'bg-rose-400/15 border-rose-400/40 text-rose-400',
-              transfer: 'bg-amber-400/15 border-amber-400/40 text-amber-400',
+              income:     'bg-cyan-400/15 border-cyan-400/40 text-cyan-400',
+              expense:    'bg-rose-400/15 border-rose-400/40 text-rose-400',
+              transfer:   'bg-amber-400/15 border-amber-400/40 text-amber-400',
+              withdrawal: 'bg-lime-400/15 border-lime-400/40 text-lime-400',
             }
             const isActive = txType === type
             return (
               <button
                 key={type}
                 disabled={isEditing}
-                onClick={() => { if (!isEditing) { setTxType(type); if (type !== 'expense') { setSelectedHouseholdIds([]) } } }}
-                className={`flex-1 py-2 px-1 leading-tight rounded-xl text-sm font-semibold border transition-all ${
+                onClick={() => { if (!isEditing) { setTxType(type); setDestAccountId(''); if (type !== 'expense') { setSelectedHouseholdIds([]) } } }}
+                className={`flex-1 py-2 px-1 leading-tight rounded-xl text-xs sm:text-sm font-semibold border transition-all ${
                   isActive
                     ? activeStyles[type]
                     : isEditing
@@ -612,10 +618,10 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               </div>
             </div>
 
-            {/* Cuenta destino — solo para transferencias */}
-            {txType === 'transfer' && (
+            {/* Cuenta destino — transferencias (a otra cuenta) y retiros (a efectivo) */}
+            {isMove && (
               <div>
-                <label className={labelClass}>Cuenta destino</label>
+                <label className={labelClass}>{txType === 'withdrawal' ? 'Efectivo donde queda la plata' : 'Cuenta destino'}</label>
                 <div className="relative">
                   <button
                     onClick={() => setOpenDd(openDd === 'destAccount' ? null : 'destAccount')}
@@ -625,13 +631,20 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                     <span className="truncate">
                       {destAccountId
                         ? (() => { const a = accounts.find(a => a.id === destAccountId); return a ? `${a.name} · ${a.currency} · ${Number(a.balance).toLocaleString()}` : '—' })()
-                        : 'Seleccioná una cuenta'}
+                        : txType === 'withdrawal' ? 'Elegí tu efectivo' : 'Seleccioná una cuenta'}
                     </span>
                     <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
                   </button>
                   {openDd === 'destAccount' && (
                     <div className={ddPanel}>
-                      {accounts.filter(a => a.id !== accountId).map(a => (
+                      {destOptions.length === 0 && (
+                        <p className="px-4 py-2 text-xs text-slate-500">
+                          {txType === 'withdrawal'
+                            ? 'No tenés cuentas de efectivo. Creá una (ej: Efectivo USD) en Configuración → Cuentas.'
+                            : 'No hay otra cuenta. Para sacar efectivo usá Retiro.'}
+                        </p>
+                      )}
+                      {destOptions.map(a => (
                         <button key={a.id} onMouseDown={e => e.preventDefault()}
                           onClick={() => { setDestAccountId(a.id); setOpenDd(null) }}
                           className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${destAccountId === a.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
@@ -645,33 +658,48 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               </div>
             )}
 
-            {/* Cambio de moneda — transferencia/extracción entre cuentas de distinta moneda */}
+            {isMove && !crossCurrency && (
+              <p className="text-[11px] text-slate-500 -mt-2">
+                {destAccount
+                  ? `Las dos cuentas son en ${destAccount.currency}: llega el mismo monto.`
+                  : txType === 'withdrawal'
+                    ? 'Si sacás en otra moneda (ej: dólares desde una cuenta en pesos), te vamos a pedir cuánto recibiste.'
+                    : 'Si la cuenta destino es en otra moneda, te vamos a pedir cuánto llegó.'}
+              </p>
+            )}
+
+            {/* Cambio de moneda: un solo bloque con lo que sale y lo que llega (reemplaza al campo Monto) */}
             {crossCurrency && (
-              <div>
-                <label className={labelClass}>
-                  Monto que llega a {destAccount!.name} ({destAccount!.currency})
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={destAmount}
-                  onChange={e => setDestAmount(e.target.value)}
-                  placeholder={estDestAmount ?? '0.00'}
-                  className={inputClass}
-                />
-                <p className="text-[11px] text-slate-500 mt-1">
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                <p className="text-xs font-medium text-amber-300 mb-2">Cambio de moneda</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      Sale de {srcAccount!.name} ({srcAccount!.currency})
+                    </label>
+                    <input type="number" min="0.01" step="0.01" value={amount}
+                      onChange={e => setAmount(e.target.value)} placeholder="0.00" className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      Llega a {destAccount!.name} ({destAccount!.currency})
+                    </label>
+                    <input type="number" min="0" step="0.01" value={destAmount}
+                      onChange={e => setDestAmount(e.target.value)} placeholder={estDestAmount ?? '0.00'} className={inputClass} />
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">
                   {parseFloat(destAmount) > 0 && parseFloat(amount) > 0
                     ? `Cambio aplicado: ${fmtRate(parseFloat(destAmount) / parseFloat(amount), srcAccount!.currency, destAccount!.currency)}`
                     : crossRate !== null
-                      ? `Si lo dejás vacío se usa tu tasa cargada: ${fmtRate(crossRate, srcAccount!.currency, destAccount!.currency)}`
+                      ? `Si dejás vacío lo que llega, se calcula con tu tasa: ${fmtRate(crossRate, srcAccount!.currency, destAccount!.currency)}`
                       : `No tenés tasa ${srcAccount!.currency}→${destAccount!.currency} cargada: indicá cuánto llegó`}
                 </p>
               </div>
             )}
 
-            {/* Comisión — solo para transferencias */}
-            {txType === 'transfer' && (
+            {/* Comisión — transferencias y retiros */}
+            {isMove && (
               <div>
                 <label className={labelClass}>
                   Comisión bancaria{srcAccount ? ` (${srcAccount.currency}, se descuenta de ${srcAccount.name})` : ''}{' '}
@@ -846,12 +874,16 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               </div>
             )}
 
-            {/* Monto */}
-            <div>
-              <label className={labelClass}>Monto</label>
-              <input type="number" min="0.01" step="0.01" value={amount}
-                onChange={e => setAmount(e.target.value)} placeholder="0.00" className={inputClass} />
-            </div>
+            {/* Monto (en un cambio de moneda se carga arriba, en el bloque "Cambio de moneda") */}
+            {!crossCurrency && (
+              <div>
+                <label className={labelClass}>
+                  {txType === 'transfer' ? 'Monto a transferir' : txType === 'withdrawal' ? 'Monto que sacás' : 'Monto'}
+                </label>
+                <input type="number" min="0.01" step="0.01" value={amount}
+                  onChange={e => setAmount(e.target.value)} placeholder="0.00" className={inputClass} />
+              </div>
+            )}
 
             {/* Fecha */}
             <div>

@@ -27,6 +27,8 @@ class MonthlyTx(BaseModel):
     account_name: str
     description: str | None
     transfer_dest_name: str | None = None
+    # Retiro = transferencia cuyo destino es una cuenta de efectivo
+    is_withdrawal: bool = False
     metodo_pago: str | None = None
     instalment_plan_id: str | None = None
 

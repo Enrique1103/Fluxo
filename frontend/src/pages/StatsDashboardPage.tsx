@@ -106,12 +106,13 @@ function TxTable({
   categoryFilter?: string | null
 }) {
   const queryClient = useQueryClient()
-  const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all')
+  const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'transfer' | 'withdrawal'>('all')
   const [methodFilter, setMethodFilter] = useState<PaymentMethod | 'all'>('all')
   const [search, setSearch] = useState('')
   const [internalCategory, setInternalCategory] = useState<string | null>(categoryFilter ?? null)
   const [amountFilter, setAmountFilter] = useState('')
-  const [openDropdown, setOpenDropdown] = useState<'tipo' | 'categoria' | 'metodo' | null>(null)
+  const [openDropdown, setOpenDropdown] = useState<'tipo' | 'categoria' | 'metodo' | 'cuenta' | null>(null)
+  const [accountFilter, setAccountFilter] = useState<string | null>(null)
   const [deletingId,   setDeletingId]   = useState<string | null>(null)
   const [confirmTx,    setConfirmTx]    = useState<MonthlyBreakdown['transactions'][number] | null>(null)
   const [cuotaConfirm, setCuotaConfirm] = useState<{ txId: string; planId: string } | null>(null)
@@ -129,6 +130,16 @@ function TxTable({
   }
 
   useEffect(() => { setInternalCategory(categoryFilter ?? null) }, [categoryFilter])
+
+  // Cuentas que aparecen en el mes (origen o destino de una transferencia)
+  const availableAccounts = useMemo(() => {
+    const accs = new Set<string>()
+    transactions.forEach(t => {
+      if (t.account_name) accs.add(t.account_name)
+      if (t.type === 'transfer' && t.transfer_dest_name) accs.add(t.transfer_dest_name)
+    })
+    return Array.from(accs).sort()
+  }, [transactions])
 
   const availableCategories = useMemo(() => {
     const cats = new Set<string>()
@@ -180,12 +191,20 @@ function TxTable({
   }
 
   const filtered = useMemo(() => {
-    let result = filter === 'all' ? transactions : transactions.filter(t => t.type === filter)
+    // Retiro = transferencia hacia una cuenta de efectivo
+    let result = filter === 'all' ? transactions
+      : filter === 'withdrawal' ? transactions.filter(t => t.type === 'transfer' && t.is_withdrawal)
+      : filter === 'transfer' ? transactions.filter(t => t.type === 'transfer' && !t.is_withdrawal)
+      : transactions.filter(t => t.type === filter)
     if (methodFilter !== 'all') {
       result = result.filter(t => t.metodo_pago === methodFilter)
     }
     if (internalCategory) {
       result = result.filter(t => t.category_name === internalCategory)
+    }
+    if (accountFilter) {
+      // Una transferencia cuenta para la cuenta que envía y para la que recibe
+      result = result.filter(t => t.account_name === accountFilter || t.transfer_dest_name === accountFilter)
     }
     if (amountFilter.trim()) {
       result = result.filter(t => String(Math.round(t.amount)).includes(amountFilter.trim()))
@@ -199,7 +218,7 @@ function TxTable({
       )
     }
     return result
-  }, [transactions, filter, methodFilter, internalCategory, amountFilter, search])
+  }, [transactions, filter, methodFilter, internalCategory, accountFilter, amountFilter, search])
 
   // Summary totals by payment method (expenses only)
   const expenseTotals = useMemo(() => {
@@ -226,17 +245,19 @@ function TxTable({
     { value: 'all',      label: 'Todos',           activeClass: 'bg-slate-700 border-slate-600 text-slate-200' },
     { value: 'income',   label: 'Ingresos',         activeClass: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400' },
     { value: 'expense',  label: 'Gastos',           activeClass: 'bg-rose-500/15 border-rose-500/30 text-rose-400' },
-    { value: 'transfer', label: 'Transferencias',   activeClass: 'bg-amber-500/15 border-amber-500/30 text-amber-400' },
+    { value: 'transfer', label: 'Transferencias', activeClass: 'bg-amber-500/15 border-amber-500/30 text-amber-400' },
+    { value: 'withdrawal', label: 'Retiros',     activeClass: 'bg-lime-500/15 border-lime-500/30 text-lime-400' },
   ] as const
 
   const selectedTypeLabel = TYPE_OPTIONS.find(o => o.value === filter)?.label ?? 'Todos'
   const selectedTypeActive = TYPE_OPTIONS.find(o => o.value === filter)?.activeClass ?? ''
 
-  const hasActiveFilters = filter !== 'all' || internalCategory || methodFilter !== 'all' || search.trim() || amountFilter.trim()
+  const hasActiveFilters = filter !== 'all' || internalCategory || accountFilter || methodFilter !== 'all' || search.trim() || amountFilter.trim()
 
   const clearAll = () => {
     setFilter('all')
     setInternalCategory(null)
+    setAccountFilter(null)
     setMethodFilter('all')
     setSearch('')
     setAmountFilter('')
@@ -328,6 +349,42 @@ function TxTable({
             </div>
           )}
         </div>
+
+        {/* Cuenta */}
+        {availableAccounts.length > 1 && (
+          <div className="relative">
+            <button
+              onClick={() => setOpenDropdown(openDropdown === 'cuenta' ? null : 'cuenta')}
+              onBlur={closeDropdown}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                accountFilter
+                  ? 'bg-sky-500/20 border-sky-500/30 text-sky-400'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              Cuenta
+              {accountFilter && <span className="opacity-75 max-w-[120px] truncate">· {accountFilter}</span>}
+              <ChevronDown className="w-3 h-3 ml-0.5 opacity-60" />
+            </button>
+            {openDropdown === 'cuenta' && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-xl min-w-[180px] py-1 overflow-hidden">
+                {[null, ...availableAccounts].map(acc => (
+                  <button
+                    key={acc ?? '__all'}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => { setAccountFilter(acc); setOpenDropdown(null) }}
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 flex items-center justify-between ${
+                      accountFilter === acc ? 'font-semibold text-sky-300' : 'text-slate-400'
+                    }`}
+                  >
+                    <span className="truncate">{acc ?? 'Todas'}</span>
+                    {accountFilter === acc && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Método de Pago */}
         {hasExpenses && (
@@ -454,6 +511,11 @@ function TxTable({
                           ? `→ ${tx.transfer_dest_name}`
                           : tx.category_name}
                       </p>
+                      {tx.is_withdrawal && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-lime-500/15 text-lime-400 border border-lime-500/20 shrink-0">
+                          RETIRO
+                        </span>
+                      )}
                       {tx.instalment_plan_id && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/20 shrink-0">
                           CUOTA

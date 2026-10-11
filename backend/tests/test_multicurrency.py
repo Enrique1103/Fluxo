@@ -125,3 +125,17 @@ def test_destination_amount_ignored_for_same_currency(mixed, debit_account):
                          "destination_amount": "5"}, headers=h)
     assert r.status_code == 201, r.text
     assert _bal(c, h, debit_account["id"]) == 51000
+
+
+def test_withdrawal_flag_in_monthly_breakdown(mixed):
+    """Transferencia hacia una cuenta de efectivo = retiro (se marca en el historial)."""
+    c, h, uyu, usd, cid, cat = mixed
+    deb = c.post(f"{BASE}/accounts", json={"name": "Banco", "type": "debit", "currency": "UYU", "balance": "5000"}, headers=h).json()
+    c.post(TX, json={"account_id": deb["id"], "concept_id": cid, "category_id": cat, "amount": "4100",
+                     "type": "transfer", "date": str(TODAY), "transfer_to_account_id": usd,
+                     "destination_amount": "100"}, headers=h)
+    c.post(TX, json={"account_id": uyu, "concept_id": cid, "category_id": cat, "amount": "100",
+                     "type": "transfer", "date": str(TODAY), "transfer_to_account_id": deb["id"]}, headers=h)
+    bd = c.get(f"{BASE}/analytics/monthly-breakdown", params={"year": TODAY.year, "month": TODAY.month}, headers=h).json()
+    flags = {t["transfer_dest_name"]: t["is_withdrawal"] for t in bd["transactions"] if t["type"] == "transfer"}
+    assert flags == {"USD": True, "Banco": False}
