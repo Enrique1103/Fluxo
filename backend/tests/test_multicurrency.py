@@ -139,3 +139,25 @@ def test_withdrawal_flag_in_monthly_breakdown(mixed):
     bd = c.get(f"{BASE}/analytics/monthly-breakdown", params={"year": TODAY.year, "month": TODAY.month}, headers=h).json()
     flags = {t["transfer_dest_name"]: t["is_withdrawal"] for t in bd["transactions"] if t["type"] == "transfer"}
     assert flags == {"USD": True, "Banco": False}
+
+
+def test_rate_rule_exact_average_prev_next(authed):
+    """Mes con tasa → esa; sin tasa → promedio de la anterior y la siguiente; solo una → esa."""
+    from app.services import exchange_rate_service
+    c, h = authed
+    for y, m, r in ((2026, 3, "38"), (2026, 6, "42")):
+        c.post(f"{BASE}/exchange-rates", json={"from_currency": "USD", "to_currency": "UYU", "rate": r, "year": y, "month": m}, headers=h)
+    # inversa en agosto: 1 UYU = 0.025 USD → 40
+    c.post(f"{BASE}/exchange-rates", json={"from_currency": "UYU", "to_currency": "USD", "rate": "0.025", "year": 2026, "month": 8}, headers=h)
+    from app.models.users_models import User
+    from tests.conftest import TestingSessionLocal
+    db = TestingSessionLocal()
+    uid = db.query(User).first().id
+    rate = lambda y, m: float(exchange_rate_service.get_rate_nearest(db, uid, "USD", "UYU", y, m))
+    assert rate(2026, 3) == 38            # exacta
+    assert rate(2026, 4) == 40            # promedio 38 y 42
+    assert rate(2026, 7) == 41            # promedio 42 y 40 (inversa)
+    assert rate(2026, 1) == 38            # sin anterior → la siguiente
+    assert rate(2026, 12) == 40           # sin siguiente → la anterior
+    assert abs(float(exchange_rate_service.get_rate_nearest(db, uid, "UYU", "USD", 2026, 4)) - 1/40) < 1e-9
+    db.close()

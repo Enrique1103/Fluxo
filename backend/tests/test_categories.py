@@ -62,10 +62,10 @@ class TestUpdateCategory:
         c, h = authed
         r = c.post(f"{BASE}/categories", json={"name": "Deporte"}, headers=h)
         cat_id = r.json()["id"]
-        r2 = c.patch(f"{BASE}/categories/{cat_id}", json={"name": "Deporte Y Fitness"}, headers=h)
+        r2 = c.patch(f"{BASE}/categories/{cat_id}", json={"name": "Deporte y Fitness"}, headers=h)
         assert r2.status_code == 200
         body = r2.json()
-        assert body["name"] == "Deporte Y Fitness"
+        assert body["name"] == "Deporte y Fitness"
         # slug debe actualizarse
         assert "deporte" in body["slug"]
 

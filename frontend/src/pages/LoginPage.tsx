@@ -203,7 +203,6 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="text-center mb-8 animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-          <img src="/favicon.png" alt="Fluxo" className="inline-block w-14 h-14 rounded-2xl mb-4 glow-emerald-sm" />
           <h1 className="text-[42px] font-black tracking-tighter leading-none mb-2">
             <span className="text-white">Fl</span>
             <span className="text-gradient-emerald">uxo</span>

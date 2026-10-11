@@ -91,6 +91,11 @@ def update(db: Session, user: User, account_id: uuid.UUID, update_data: AccountU
             raise InvalidAccountUpdate("El saldo no puede ser negativo")
         account.credit_limit = None
 
+    if update_data.is_archived and new_balance != 0:
+        raise InvalidAccountUpdate(
+            f"Para archivar la cuenta su saldo tiene que ser 0 (hoy tiene {new_balance})"
+        )
+
     account_crud.update(db, account, update_data)
     db.commit()
     db.refresh(account)

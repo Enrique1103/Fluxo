@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Mic, X, Home, AlertCircle, Loader2, RotateCcw, CreditCard, ChevronDown } from 'lucide-react'
 import { parseVoiceExpense, type VoiceAccount } from '../utils/voiceParser'
-import { fetchAccounts, fetchCategories, fetchConcepts, createTransaction, createInstalmentPlan } from '../api/dashboard'
+import { fetchAccounts, withoutArchived, fetchCategories, fetchConcepts, fetchExchangeRates, createTransaction, createInstalmentPlan } from '../api/dashboard'
+import { findRate, fmtRate } from '../utils/rates'
+import { norm } from '../utils/voiceParser'
 import { fetchHouseholds } from '../api/households'
 import { invalidateFinancialData } from '../lib/queryClient'
 import type { Account, Category, Concept } from '../api/dashboard'
@@ -33,15 +35,20 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const homeCurrency = useHomeCurrency()
   const currencyOpts = [...new Set([homeCurrency, 'USD', 'EUR'])]
 
-  const { data: accounts   = [], isLoading: loadingAccounts  } = useQuery({ queryKey: ['accounts'],   queryFn: fetchAccounts,   enabled: open })
+  const { data: accounts   = [], isLoading: loadingAccounts  } = useQuery({ queryKey: ['accounts'],   queryFn: fetchAccounts,   enabled: open, select: withoutArchived })
   const { data: categories = []                              } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories, enabled: open })
   const { data: concepts   = [], isLoading: loadingConcepts  } = useQuery({ queryKey: ['concepts'],   queryFn: fetchConcepts,   enabled: open })
   const { data: households = []                              } = useQuery({ queryKey: ['households'], queryFn: fetchHouseholds, enabled: open })
+  const { data: rates      = []                              } = useQuery({ queryKey: ['exchange-rates'], queryFn: fetchExchangeRates, enabled: open })
 
   const dataReady = !loadingAccounts && !loadingConcepts
 
   const [phase,       setPhase]       = useState<Phase>('listening')
-  const [txType,      setTxType]      = useState<'income' | 'expense' | 'transfer'>('expense')
+  // 'withdrawal' (Retiro): sacar efectivo de una cuenta; se guarda como transferencia hacia el efectivo
+  const [txType,      setTxType]      = useState<'income' | 'expense' | 'transfer' | 'withdrawal'>('expense')
+  const txTypeRef = useRef(txType)
+  useEffect(() => { txTypeRef.current = txType }, [txType])
+  const isMove = txType === 'transfer' || txType === 'withdrawal'
   const [listening,   setListening]   = useState(false)
   const [interim,     setInterim]     = useState('')
   const [speechError, setSpeechError] = useState('')
@@ -60,6 +67,8 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const [destAccountId,    setDestAccountId]    = useState('')
 
   const [commission,  setCommission]  = useState('')
+  // Retiro con cambio de moneda: el otro monto (lo que sale o lo que llega, según la moneda dicha)
+  const [otherAmount, setOtherAmount] = useState('')
   const [enCuotas,    setEnCuotas]    = useState(false)
   const [nCuotas,     setNCuotas]     = useState('2')
 
@@ -74,6 +83,8 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const lastInterimRef = useRef('')
   const appliedRef     = useRef(false)
 
+  const categoriesRef = useRef<Category[]>([])
+  useEffect(() => { categoriesRef.current = categories as Category[] }, [categories])
   const accountsRef = useRef<Account[]>([])
   const conceptsRef = useRef<Concept[]>([])
   useEffect(() => { accountsRef.current = accounts as Account[] }, [accounts])
@@ -93,7 +104,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       setAmount(''); setCurrency(homeCurrency); setConceptId(''); setCategoryId('')
       setAccountId(''); setDestAccountId(''); setDescription(''); setIsHousehold(false)
       setRawText(''); setUnmatchedAccount(null); setUnmatchedConcept(null)
-      setCommission('')
+      setCommission(''); setOtherAmount('')
       setEnCuotas(false); setNCuotas('2')
       setSubmitting(false); setSubmitError('')
       setOpenDd(null)
@@ -191,12 +202,48 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
 
     if (parsed.matchedDestAccountId) setDestAccountId(parsed.matchedDestAccountId)
     setCommission(parsed.commission !== null ? String(parsed.commission) : '')
+    setOtherAmount('')
+
+    // Retiro: "saqué / retiré / extraje 100 dólares de Prex (con comisión de 60)"
+    const saysWithdrawal = /\b(saque|retire|extraje|extraccion|retiro|cajero)\b/.test(norm(transcript))
+    if (saysWithdrawal || txTypeRef.current === 'withdrawal') {
+      setTxType('withdrawal')
+      const all = latestAccounts as Account[]
+      const isCash = (id: string | null) => !!id && all.find(a => a.id === id)?.type === 'cash'
+      // El parser asigna "efectivo" como cuenta: en un retiro el efectivo es el destino
+      let src = isCash(parsed.matchedAccountId) ? parsed.matchedDestAccountId : parsed.matchedAccountId
+      if (!src || isCash(src)) src = all.find(a => a.type !== 'cash')?.id ?? null
+      const cash = all.filter(a => a.type === 'cash')
+      const spoken = parsed.spokenCurrency
+      // El monto dicho está en la moneda dicha (ej: "100 dólares" desde una cuenta en pesos)
+      if (spoken) setCurrency(spoken)
+      const dest = (isCash(parsed.matchedDestAccountId) ? parsed.matchedDestAccountId : null)
+        ?? (isCash(parsed.matchedAccountId) ? parsed.matchedAccountId : null)
+        ?? (spoken ? cash.find(a => a.currency?.toUpperCase() === spoken)?.id : null)
+        ?? cash.find(a => a.currency === all.find(x => x.id === src)?.currency)?.id
+        ?? cash[0]?.id ?? ''
+      if (src) setAccountId(src)
+      setDestAccountId(dest)
+      setUnmatchedAccount(null)
+      // Concepto/categoría: el lugar si se dijo (Abitab, Redpagos…) o Extracción de Dinero
+      const cats = categoriesRef.current
+      const extr = cats.find(c => norm(c.name).includes('extraccion'))
+      if (extr) setCategoryId(extr.id)
+    }
 
     setPhase('review')
   }
 
   const selectedAccount = (accounts as Account[]).find(a => a.id === accountId)
   const isCredit = selectedAccount?.type === 'credit'
+  const destAccount = (accounts as Account[]).find(a => a.id === destAccountId)
+  const crossCurrency = isMove && !!selectedAccount && !!destAccount && selectedAccount.currency !== destAccount.currency
+  // El monto dicho puede estar en la moneda que sale (pesos) o en la que llega (dólares)
+  const amountIsDest = crossCurrency && currency === destAccount!.currency
+  const crossRate = crossCurrency ? findRate(rates, selectedAccount!.currency, destAccount!.currency, today()) : null
+  const estOther = crossRate !== null && parseFloat(amount) > 0
+    ? (amountIsDest ? parseFloat(amount) / crossRate : parseFloat(amount) * crossRate).toFixed(2)
+    : null
 
   function derivedMetodoPago(): 'efectivo' | 'tarjeta_credito' | 'tarjeta_debito' | 'transferencia_bancaria' | 'billetera_digital' | 'otro' {
     if (!selectedAccount) return 'otro'
@@ -210,8 +257,10 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     if (!amount || parseFloat(amount) <= 0) { setSubmitError('El monto debe ser mayor a 0'); return }
     if (!accountId) { setSubmitError('Seleccioná una cuenta'); return }
 
-    if (txType === 'transfer') {
-      if (!destAccountId) { setSubmitError('Seleccioná la cuenta destino'); return }
+    if (isMove) {
+      if (!destAccountId) {
+        setSubmitError(txType === 'withdrawal' ? 'Elegí el efectivo donde queda la plata' : 'Seleccioná la cuenta destino'); return
+      }
     } else {
       if (!categoryId) { setSubmitError('Seleccioná una categoría'); return }
     }
@@ -223,12 +272,34 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
 
     let resolvedConceptId  = conceptId
     let resolvedCategoryId = categoryId
-    if (txType === 'transfer') {
+    if (isMove) {
       const transferConcept = (concepts as Concept[]).find(c => c.name.toLowerCase() === 'transferencia')
       const sinClasifCat    = (categories as Category[]).find(c => c.name.toLowerCase() === 'sin clasificar')
-      resolvedConceptId  = transferConcept?.id ?? (concepts as Concept[])[0]?.id ?? ''
-      resolvedCategoryId = sinClasifCat?.id    ?? (categories as Category[])[0]?.id ?? ''
-      if (!resolvedConceptId || !resolvedCategoryId) { setSubmitError('No se encontraron datos necesarios para la transferencia'); return }
+      const extrCat         = (categories as Category[]).find(c => norm(c.name).includes('extraccion'))
+      if (txType === 'withdrawal') {
+        // Retiro: el concepto dicho (Abitab, Cajero…) si lo hay; categoría Extracción de Dinero
+        resolvedConceptId  = conceptId || ''
+        resolvedCategoryId = categoryId || extrCat?.id || transferConcept?.category_id || sinClasifCat?.id || (categories as Category[])[0]?.id || ''
+      } else {
+        resolvedConceptId  = transferConcept?.id ?? (concepts as Concept[])[0]?.id ?? ''
+        // La categoría del concepto Transferencia (ej: Transacciones); si no, Sin clasificar
+        resolvedCategoryId = transferConcept?.category_id ?? sinClasifCat?.id ?? (categories as Category[])[0]?.id ?? ''
+      }
+      if (!resolvedCategoryId) { setSubmitError('No se encontraron datos necesarios para la transferencia'); return }
+    }
+
+    // Retiro en otra moneda: amount = lo que sale de la cuenta; destination_amount = lo que llega
+    let sourceAmount = parseFloat(amount)
+    let destinationAmount: number | undefined
+    if (crossCurrency) {
+      const other = parseFloat(otherAmount) > 0 ? parseFloat(otherAmount) : (estOther ? parseFloat(estOther) : NaN)
+      if (amountIsDest) {
+        if (isNaN(other)) { setSubmitError(`Indicá cuánto salió de ${selectedAccount!.name} (${selectedAccount!.currency})`); return }
+        destinationAmount = parseFloat(amount)
+        sourceAmount = other
+      } else if (parseFloat(otherAmount) > 0) {
+        destinationAmount = parseFloat(otherAmount)
+      }
     }
 
     setSubmitting(true); setSubmitError('')
@@ -249,13 +320,14 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
           account_id:   accountId,
           concept_id:   resolvedConceptId || null,
           category_id:  resolvedCategoryId,
-          amount:       parseFloat(amount),
-          type:         txType,
+          amount:       sourceAmount,
+          type:         isMove ? 'transfer' : txType,
           date:         today(),
           description:  description.trim() || undefined,
           ...(txType === 'expense' ? { metodo_pago: derivedMetodoPago() } : {}),
-          ...(txType === 'transfer' && destAccountId ? { transfer_to_account_id: destAccountId } : {}),
-          ...(txType === 'transfer' && commission && parseFloat(commission) > 0 ? { commission: parseFloat(commission) } : {}),
+          ...(isMove && destAccountId ? { transfer_to_account_id: destAccountId } : {}),
+          ...(isMove && commission && parseFloat(commission) > 0 ? { commission: parseFloat(commission) } : {}),
+          ...(destinationAmount ? { destination_amount: destinationAmount } : {}),
           ...(txType === 'expense' && isHousehold && householdId ? { household_id: householdId } : {}),
         })
       }
@@ -282,7 +354,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             <Mic size={18} className="text-emerald-400" />
             <span className="font-semibold text-sm text-white">
               {phase === 'listening'
-                ? txType === 'income' ? 'Di tu ingreso' : txType === 'transfer' ? 'Di tu transferencia' : 'Di tu gasto'
+                ? txType === 'income' ? 'Di tu ingreso' : txType === 'transfer' ? 'Di tu transferencia' : txType === 'withdrawal' ? 'Di tu retiro' : 'Di tu gasto'
                 : 'Fluxo entendió'}
             </span>
           </div>
@@ -296,12 +368,13 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
           <div className="px-5 pb-6 flex flex-col items-center gap-5">
             {/* Type toggle */}
             <div className="w-full grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-800/30 border border-slate-700/50">
-              {(['income', 'expense', 'transfer'] as const).map(type => {
-                const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia' }
+              {(['income', 'expense', 'transfer', 'withdrawal'] as const).map(type => {
+                const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia', withdrawal: 'Retiro' }
                 const colors = {
                   income:   'bg-cyan-400/15 border-cyan-400/40 text-cyan-400',
                   expense:  'bg-rose-400/15 border-rose-400/40 text-rose-400',
                   transfer: 'bg-amber-400/15 border-amber-400/40 text-amber-400',
+                  withdrawal: 'bg-lime-400/15 border-lime-400/40 text-lime-400',
                 }
                 const active = txType === type
                 return (
@@ -334,6 +407,15 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   "cobré <span className="text-emerald-400">[monto]</span> por{' '}
                   <span className="text-sky-400">[concepto]</span> en{' '}
                   <span className="text-violet-400">[cuenta]</span>"
+                </p>
+              )}
+              {txType === 'withdrawal' && (
+                <p className="text-slate-300 text-sm">
+                  "saqué <span className="text-emerald-400">[monto]</span>{' '}
+                  <span className="text-lime-400">(en dólares)</span> de{' '}
+                  <span className="text-violet-400">[cuenta]</span>{' '}
+                  <span className="text-sky-400">(en Abitab)</span>{' '}
+                  <span className="text-slate-500">con comisión de [monto]</span>"
                 </p>
               )}
               {txType === 'transfer' && (
@@ -538,7 +620,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             {/* Source account */}
             <div>
               <label className="text-xs text-slate-400 mb-1 block">
-                {txType === 'transfer' ? 'Cuenta origen' : 'Cuenta'}
+                {txType === 'transfer' ? 'Cuenta origen' : txType === 'withdrawal' ? 'Sacás de' : 'Cuenta'}
               </label>
               {unmatchedAccount && (
                 <div className="flex items-center gap-1.5 text-amber-400 text-xs mb-1">
@@ -576,10 +658,10 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
               </div>
             </div>
 
-            {/* Dest account — only for transfers */}
-            {txType === 'transfer' && (
+            {/* Dest account — transferencias (otra cuenta) y retiros (efectivo) */}
+            {isMove && (
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Cuenta destino</label>
+                <label className="text-xs text-slate-400 mb-1 block">{txType === 'withdrawal' ? 'Efectivo donde queda la plata' : 'Cuenta destino'}</label>
                 <div className="relative">
                   <button
                     onClick={() => setOpenDd(openDd === 'destAccount' ? null : 'destAccount')}
@@ -595,7 +677,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   </button>
                   {openDd === 'destAccount' && (
                     <div className={ddPanel}>
-                      {(accounts as Account[]).filter(a => a.id !== accountId).map(a => (
+                      {(accounts as Account[]).filter(a => a.id !== accountId && (txType !== 'withdrawal' || a.type === 'cash')).map(a => (
                         <button
                           key={a.id}
                           onMouseDown={e => e.preventDefault()}
@@ -612,11 +694,40 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
               </div>
             )}
 
-            {/* Comisión — solo para transferencias */}
-            {txType === 'transfer' && (
+            {/* Cambio de moneda: el monto dicho es de un lado; acá va el del otro */}
+            {crossCurrency && (
+              <div className="rounded-xl border border-lime-500/20 bg-lime-500/5 p-3">
+                <label className="text-xs text-slate-400 mb-1 block">
+                  {amountIsDest
+                    ? `Cuánto salió de ${selectedAccount!.name} (${selectedAccount!.currency})`
+                    : `Cuánto llegó a ${destAccount!.name} (${destAccount!.currency})`}
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={otherAmount}
+                  onChange={e => setOtherAmount(e.target.value)}
+                  placeholder={estOther ?? '0'}
+                  className={inputCls}
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {parseFloat(otherAmount) > 0 && parseFloat(amount) > 0
+                    ? `Cambio aplicado: ${fmtRate(
+                        amountIsDest ? parseFloat(amount) / parseFloat(otherAmount) : parseFloat(otherAmount) / parseFloat(amount),
+                        selectedAccount!.currency, destAccount!.currency)}`
+                    : crossRate !== null
+                      ? `Si lo dejás vacío se calcula con tu tasa: ${fmtRate(crossRate, selectedAccount!.currency, destAccount!.currency)}`
+                      : 'No tenés tasa cargada para este cambio: completalo'}
+                </p>
+              </div>
+            )}
+
+            {/* Comisión — transferencias y retiros */}
+            {isMove && (
               <div>
                 <label className="text-xs text-slate-400 mb-1 block">
-                  Comisión bancaria <span className="text-slate-600">(opcional)</span>
+                  Comisión bancaria{selectedAccount ? ` (${selectedAccount.currency}, se descuenta de ${selectedAccount.name})` : ''}{' '}
+                  <span className="text-slate-600">(opcional)</span>
                 </label>
                 <input
                   type="number"
@@ -669,7 +780,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 maxLength={100}
-                placeholder={txType === 'income' ? 'Descripción del ingreso' : txType === 'transfer' ? 'Descripción de la transferencia' : 'Descripción del gasto'}
+                placeholder={txType === 'income' ? 'Descripción del ingreso' : txType === 'transfer' ? 'Descripción de la transferencia' : txType === 'withdrawal' ? 'Descripción del retiro' : 'Descripción del gasto'}
                 className={inputCls}
               />
             </div>
@@ -745,7 +856,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
               >
                 {submitting
                   ? <Loader2 size={16} className="animate-spin" />
-                  : txType === 'income' ? 'Registrar ingreso' : txType === 'transfer' ? 'Transferir' : 'Confirmar gasto'
+                  : txType === 'income' ? 'Registrar ingreso' : txType === 'transfer' ? 'Transferir' : txType === 'withdrawal' ? 'Registrar retiro' : 'Confirmar gasto'
                 }
               </button>
             </div>

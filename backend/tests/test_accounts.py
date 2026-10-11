@@ -124,3 +124,26 @@ class TestDeleteAccount:
         c, h = authed
         r = c.delete(f"{BASE}/accounts/{cash_account['id']}", headers=h)
         assert r.status_code == 204
+
+
+class TestArchiveAccount:
+    def test_archive_requires_zero_balance(self, authed, cash_account):
+        c, h = authed
+        r = c.patch(f"{BASE}/accounts/{cash_account['id']}", json={"is_archived": True}, headers=h)
+        assert r.status_code == 422
+
+    def test_archive_hides_and_blocks_new_movements(self, authed, seeds):
+        c, h = authed
+        cid, cat = seeds
+        acc = c.post(f"{BASE}/accounts", json={"name": "Vieja", "type": "cash", "currency": "UYU", "balance": "0"}, headers=h).json()
+        r = c.patch(f"{BASE}/accounts/{acc['id']}", json={"is_archived": True}, headers=h)
+        assert r.status_code == 200 and r.json()["is_archived"] is True
+        # sigue en la lista de cuentas (para poder reactivarla) pero no en el resumen
+        assert any(a["id"] == acc["id"] and a["is_archived"] for a in c.get(f"{BASE}/accounts", headers=h).json())
+        assert all(a["id"] != acc["id"] for a in c.get(f"{BASE}/summary", headers=h).json()["accounts"])
+        r = c.post(f"{BASE}/transactions", json={"account_id": acc["id"], "concept_id": cid, "category_id": cat,
+                                                 "amount": "10", "type": "income", "date": "2026-10-01"}, headers=h)
+        assert r.status_code == 422
+        # reactivar
+        r = c.patch(f"{BASE}/accounts/{acc['id']}", json={"is_archived": False}, headers=h)
+        assert r.json()["is_archived"] is False

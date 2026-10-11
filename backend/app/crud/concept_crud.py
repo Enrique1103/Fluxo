@@ -1,4 +1,5 @@
 import uuid
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.concepts_models import Concept
 from app.models.transactions_models import Transaction
@@ -11,8 +12,9 @@ def get_by_id(db: Session, concept_id: uuid.UUID) -> Concept | None:
 def get_by_name_and_user(
     db: Session, name: str, user_id: uuid.UUID
 ) -> Concept | None:
+    # Sin distinguir mayúsculas: "FERIA" y "Feria" son el mismo concepto
     return db.query(Concept).filter(
-        Concept.name == name,
+        func.lower(Concept.name) == name.lower(),
         Concept.user_id == user_id,
     ).first()
 

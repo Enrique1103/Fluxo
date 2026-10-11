@@ -54,6 +54,8 @@ def update(db: Session, db_account: Account, update_data: AccountUpdate) -> Acco
         db_account.credit_limit = update_data.credit_limit
     if update_data.balance is not None:
         db_account.balance = update_data.balance
+    if update_data.is_archived is not None:
+        db_account.is_archived = update_data.is_archived
     db.flush()
     return db_account
 

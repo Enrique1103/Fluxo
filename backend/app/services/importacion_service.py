@@ -35,8 +35,12 @@ REGLAS_PREDEFINIDAS: dict[str, list[str]] = {
                       "MOVISTAR", "GIMNASIO", "DISNEY", "HBO", "AMAZON PRIME"],
     "Ocio":          ["RESTAURANTE", "BAR ", "CINE", "TEATRO", "BOLICHE",
                       "CLUB ", "CERVECERÍA"],
-    "Vivienda":      ["ALQUILER", "LUZ ", "AGUA ", "GAS ", "UTE", "OSE",
+    "Gastos asociados al Hogar": ["ALQUILER", "LUZ ", "AGUA ", "GAS ", "UTE", "OSE",
                       "GASTOS COMUNES", "ADMINISTRACIÓN"],
+    "Extracción de Dinero": ["CAJERO", "ATM", "EXTRACCIÓN", "EXTRACCION", "RETIRO",
+                      "ABITAB", "REDPAGOS"],
+    "Vestimenta":    ["ZARA", "TIENDA", "CALZADO", "ROPA"],
+    "Educación":     ["LIBRERÍA", "UNIVERSIDAD", "COLEGIO", "CURSO"],
     "Sin clasificar": [],
 }
 
@@ -1823,7 +1827,8 @@ class ImportacionService:
         return categoria
 
     def _resolver_concepto(self, nombre: str, concepto_cache: dict):
-        nombre = nombre[:100]
+        from app.core.utils import normalize_concept
+        nombre = normalize_concept(nombre)[:100]
         if nombre in concepto_cache:
             return concepto_cache[nombre]
         concepto = concept_crud.get_by_name_and_user(self.db, nombre, self.user_id)

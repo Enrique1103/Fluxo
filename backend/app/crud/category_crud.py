@@ -1,4 +1,5 @@
 import uuid
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.categories_models import Category
 
@@ -9,7 +10,7 @@ def get_by_id(db: Session, category_id: uuid.UUID) -> Category | None:
 
 def get_by_name_and_user(db: Session, name: str, user_id: uuid.UUID) -> Category | None:
     return db.query(Category).filter(
-        Category.name == name,
+        func.lower(Category.name) == name.lower(),
         Category.user_id == user_id,
     ).first()
 

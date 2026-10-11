@@ -33,6 +33,9 @@ class Account(Base):
     )
     credit_limit: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Archivada: cuenta que ya no se usa (saldo 0). No aparece para cargar movimientos
+    # ni en "Estado de cuentas", pero su historial queda intacto. Se puede reactivar.
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     @property

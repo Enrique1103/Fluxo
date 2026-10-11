@@ -40,6 +40,7 @@ class AccountUpdate(BaseModel):
     currency: str | None = Field(None, pattern=_CURRENCY_PATTERN)
     credit_limit: Decimal | None = Field(None, gt=0)
     balance: Decimal | None = None
+    is_archived: bool | None = None
 
 
 # --- Respuesta al frontend ---
@@ -52,6 +53,7 @@ class AccountResponse(BaseModel):
     balance: Decimal
     credit_limit: Decimal | None
     is_liability: bool
+    is_archived: bool = False
     has_transactions: bool = False
 
     model_config = {"from_attributes": True}

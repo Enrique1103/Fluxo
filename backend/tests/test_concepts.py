@@ -4,7 +4,7 @@ from tests.conftest import BASE
 
 
 class TestCreateConcept:
-    def test_create_normalizes_to_uppercase(self, authed):
+    def test_create_normalizes_name_format(self, authed):
         c, h = authed
         r = c.post(f"{BASE}/concepts", json={"name": "netflix"}, headers=h)
         # "netflix" ya existe en el seed — debería dar 409
@@ -15,7 +15,7 @@ class TestCreateConcept:
         c, h = authed
         r = c.post(f"{BASE}/concepts", json={"name": "mi concepto unico xyz"}, headers=h)
         assert r.status_code == 201
-        assert r.json()["name"] == "MI CONCEPTO UNICO XYZ"
+        assert r.json()["name"] == "Mi Concepto Unico Xyz"
 
     def test_duplicate_concept_409(self, authed):
         c, h = authed
@@ -64,20 +64,20 @@ class TestGetConcepts:
         assert concepts, "No hay conceptos"
         assert "is_system" in concepts[0]
         # Los conceptos del sistema deben tener is_system=True
-        system_names = {"TRANSFERENCIA", "AJUSTE DE SALDO", "PAGO DE TARJETA"}
+        system_names = {"Transferencia", "Ajuste de Saldo", "Pago de Tarjeta"}
         sys_concepts = [x for x in concepts if x["name"] in system_names]
         assert sys_concepts, "Deben existir conceptos del sistema"
         assert all(x["is_system"] is True for x in sys_concepts)
 
 
 class TestUpdateConcept:
-    def test_update_normalizes_uppercase(self, authed):
+    def test_update_normalizes_name_format(self, authed):
         c, h = authed
         r = c.post(f"{BASE}/concepts", json={"name": "concepto test"}, headers=h)
         cid = r.json()["id"]
         r2 = c.patch(f"{BASE}/concepts/{cid}", json={"name": "concepto actualizado"}, headers=h)
         assert r2.status_code == 200
-        assert r2.json()["name"] == "CONCEPTO ACTUALIZADO"
+        assert r2.json()["name"] == "Concepto Actualizado"
 
     def test_cannot_update_system_concept(self, authed):
         """Los conceptos del sistema no pueden renombrarse."""
@@ -85,7 +85,7 @@ class TestUpdateConcept:
         concepts = c.get(f"{BASE}/concepts", headers=h).json()
         # Buscar concepto del sistema — como is_system no viene en la respuesta,
         # usamos nombres conocidos del seed
-        system_names = {"TRANSFERENCIA", "AJUSTE DE SALDO", "PAGO DE TARJETA"}
+        system_names = {"Transferencia", "Ajuste de Saldo", "Pago de Tarjeta"}
         sys_concept = next((x for x in concepts if x["name"] in system_names), None)
         if not sys_concept:
             pytest.skip("No se encontró concepto del sistema conocido")
@@ -106,7 +106,7 @@ class TestDeleteConcept:
     def test_cannot_delete_system_concept(self, authed):
         c, h = authed
         concepts = c.get(f"{BASE}/concepts", headers=h).json()
-        system_names = {"TRANSFERENCIA", "AJUSTE DE SALDO", "PAGO DE TARJETA"}
+        system_names = {"Transferencia", "Ajuste de Saldo", "Pago de Tarjeta"}
         sys_concept = next((x for x in concepts if x["name"] in system_names), None)
         if not sys_concept:
             pytest.skip("No se encontró concepto del sistema")
