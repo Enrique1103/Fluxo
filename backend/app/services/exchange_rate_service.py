@@ -78,9 +78,9 @@ def check_current_month(db: Session, user: User) -> ExchangeRateCheck:
     accounts = account_crud.get_all_by_user(db, user.id)
 
     foreign_currencies = {
-        a.currency.value
+        str(a.currency)
         for a in accounts
-        if a.currency.value != str(user.currency_default)
+        if str(a.currency) != str(user.currency_default)
     }
 
     missing_pairs: list[str] = []

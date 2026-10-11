@@ -4,7 +4,8 @@ from datetime import date as PyDate
 from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
 
-from app.crud import household_crud, exchange_rate_crud
+from app.crud import household_crud
+from app.services import exchange_rate_service
 from app.exceptions.household_exceptions import HouseholdNotFound, UnauthorizedHouseholdAccess
 from app.models.household_models import MemberStatus, SplitType, AnalysisLevel
 from app.models.transactions_models import Transaction, TransactionHousehold, TransactionType
@@ -25,26 +26,39 @@ def _get_user_name(db: Session, user_id: uuid.UUID) -> str:
     return user.name if user else str(user_id)
 
 
-def _get_incomes(db: Session, user_id: uuid.UUID, year: int, month: int) -> Decimal:
-    """Sum of income transactions for a user in a given month."""
+def _get_incomes(
+    db: Session, user_id: uuid.UUID, year: int, month: int, base_currency: str,
+) -> tuple[Decimal, set[str]]:
+    """
+    Ingresos del usuario en el mes, convertidos a la moneda base del hogar.
+    Excluye patas de transferencias. Devuelve (total, monedas sin tasa).
+    """
     from datetime import date
-    date_from = date(year, month, 1)
     import calendar
-    last_day = calendar.monthrange(year, month)[1]
-    date_to = date(year, month, last_day)
+    date_from = date(year, month, 1)
+    date_to = date(year, month, calendar.monthrange(year, month)[1])
 
     rows = (
         db.query(Transaction)
+        .options(joinedload(Transaction.account))
         .filter(
             Transaction.user_id == user_id,
             Transaction.type == TransactionType.INCOME,
+            Transaction.transfer_role.is_(None),
             Transaction.is_deleted == False,
             Transaction.date >= date_from,
             Transaction.date <= date_to,
         )
         .all()
     )
-    return sum((tx.amount for tx in rows), Decimal("0.00"))
+    total, missing = Decimal("0.00"), set()
+    for tx in rows:
+        cur = tx.account.currency if tx.account else base_currency
+        converted, ok = _convert_to_base(db, tx.amount, cur, base_currency, user_id, tx.date)
+        if not ok:
+            missing.add(cur)
+        total += converted
+    return total, missing
 
 
 def _convert_to_base(
@@ -53,17 +67,19 @@ def _convert_to_base(
     from_currency: str,
     base_currency: str,
     user_id: uuid.UUID,
+    on_date: PyDate | None = None,
 ) -> tuple[Decimal, bool]:
     """
-    Returns (converted_amount, ok).
-    ok=False means the rate was missing.
+    Returns (converted_amount, ok). ok=False means the rate was missing.
+    Usa la tasa del mes del movimiento (o la más cercana), en cualquier sentido del par.
     """
     if from_currency == base_currency:
         return amount, True
-    rate = exchange_rate_crud.get_latest(db, user_id, from_currency, base_currency)
-    if not rate:
+    d = on_date or PyDate.today()
+    rate = exchange_rate_service.get_rate_nearest(db, user_id, from_currency, base_currency, d.year, d.month)
+    if rate is None:
         return amount, False
-    return (amount * rate.rate).quantize(Decimal("0.01")), True
+    return (amount * rate).quantize(Decimal("0.01")), True
 
 
 def _simplify_debts(balances: dict[uuid.UUID, Decimal]) -> list[tuple[uuid.UUID, uuid.UUID, Decimal]]:
@@ -145,7 +161,7 @@ def get_analytics(
     for tx in shared_txs:
         # Determine currency from account
         account_currency = tx.account.currency if tx.account else base_currency
-        converted, ok = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id)
+        converted, ok = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id, tx.date)
         if not ok:
             missing_currencies.add(account_currency)
         if tx.user_id in expenses_paid:
@@ -164,18 +180,19 @@ def get_analytics(
             description=tx.description,
         ))
 
+    # ── Incomes per member ───────────────────────────────────────────────────
+    incomes: dict[uuid.UUID, Decimal] = {}
+    for uid in member_ids:
+        inc, inc_missing = _get_incomes(db, uid, year, month, base_currency)
+        incomes[uid] = inc
+        missing_currencies |= inc_missing
+
     for cur in missing_currencies:
         alerts.append(HouseholdAlert(
             type="missing_rate",
             message=f"Falta la tasa {cur}/{base_currency}. El cálculo de liquidación puede ser incompleto.",
             currency=cur,
         ))
-
-    # ── Incomes per member ───────────────────────────────────────────────────
-    incomes: dict[uuid.UUID, Decimal] = {}
-    for uid in member_ids:
-        inc = _get_incomes(db, uid, year, month)
-        incomes[uid] = inc
 
     total_group_income = sum(incomes.values(), Decimal("0.00"))
     total_shared = sum(expenses_paid.values(), Decimal("0.00"))
@@ -252,7 +269,7 @@ def get_analytics(
     for tx in shared_txs:
         cat_name = tx.category.name if tx.category else "Sin categoría"
         account_currency = tx.account.currency if tx.account else base_currency
-        converted, _ = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id)
+        converted, _ = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id, tx.date)
         category_totals[cat_name] = category_totals.get(cat_name, Decimal("0.00")) + converted
 
     expense_by_category = [
@@ -276,7 +293,7 @@ def get_analytics(
     for tx in shared_txs:
         name = tx.concept.name if tx.concept else "Sin concepto"
         account_currency = tx.account.currency if tx.account else base_currency
-        converted, _ = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id)
+        converted, _ = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id, tx.date)
         concept_totals[name] = concept_totals.get(name, Decimal("0.00")) + converted
         concept_counts[name] = concept_counts.get(name, 0) + 1
 
@@ -295,7 +312,7 @@ def get_analytics(
     for tx in shared_txs:
         day = tx.date.day
         account_currency = tx.account.currency if tx.account else base_currency
-        converted, _ = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id)
+        converted, _ = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id, tx.date)
         expenses_by_day[day] = (expenses_by_day.get(day, Decimal("0.00")) + converted).quantize(Decimal("0.01"))
 
     # ── F01: Previous month total ────────────────────────────────────────────
@@ -319,7 +336,7 @@ def get_analytics(
     prev_month_total = Decimal("0.00")
     for tx in prev_txs:
         account_currency = tx.account.currency if tx.account else base_currency
-        converted, _ = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id)
+        converted, _ = _convert_to_base(db, tx.amount, account_currency, base_currency, tx.user_id, tx.date)
         prev_month_total += converted
     prev_month_total = prev_month_total.quantize(Decimal("0.01"))
 

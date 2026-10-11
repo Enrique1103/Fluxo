@@ -236,3 +236,47 @@ class TestHouseholdAnalyticsF03:
         assert body["analysis_level"] == "full"
         assert body["member_incomes"] is not None
         assert body["net_savings"] is not None
+
+
+class TestProportionalSplit:
+    """Reparto proporcional: los ingresos de cada miembro se convierten a la moneda del hogar."""
+
+    def _seed(self, c, h):
+        concepts = c.get(f"{BASE}/concepts", headers=h).json()
+        return concepts[0]["id"], concepts[0]["category_id"]
+
+    def test_proportional_converts_usd_income(self, authed):
+        c, h1 = authed
+        hh = c.post(HH, json={"name": "Prop", "base_currency": "UYU", "split_type": "proportional",
+                              "analysis_level": "full"}, headers=h1).json()
+        code = c.post(f"{HH}/{hh['id']}/invite", headers=h1).json()["code"]
+        h2 = _register_and_login(c)
+        m2 = c.post(f"{HH}/join", json={"code": code}, headers=h2).json()
+        c.post(f"{HH}/{hh['id']}/members/{m2['user_id']}/approve", headers=h1)
+
+        # Usuario 1: ingreso 30.000 UYU y paga un gasto del hogar de 4.000 UYU
+        acc1 = c.post(f"{BASE}/accounts", json={"name": "U1", "type": "cash", "currency": "UYU", "balance": "0"}, headers=h1).json()
+        cid1, cat1 = self._seed(c, h1)
+        today = str(TODAY)
+        c.post(f"{BASE}/transactions", json={"account_id": acc1["id"], "concept_id": cid1, "category_id": cat1,
+                                             "amount": "30000", "type": "income", "date": today}, headers=h1)
+        r = c.post(f"{BASE}/transactions", json={"account_id": acc1["id"], "concept_id": cid1, "category_id": cat1,
+                                                 "amount": "4000", "type": "expense", "date": today,
+                                                 "household_ids": [hh["id"]]}, headers=h1)
+        assert r.status_code == 201, r.text
+
+        # Usuario 2: ingreso 250 USD (= 10.000 UYU a 40)
+        c.post(f"{BASE}/exchange-rates", json={"from_currency": "USD", "to_currency": "UYU", "rate": "40",
+                                               "year": TODAY.year, "month": TODAY.month}, headers=h2)
+        acc2 = c.post(f"{BASE}/accounts", json={"name": "U2", "type": "cash", "currency": "USD", "balance": "0"}, headers=h2).json()
+        cid2, cat2 = self._seed(c, h2)
+        r = c.post(f"{BASE}/transactions", json={"account_id": acc2["id"], "concept_id": cid2, "category_id": cat2,
+                                                 "amount": "250", "type": "income", "date": today}, headers=h2)
+        assert r.status_code == 201, r.text
+
+        body = c.get(f"{HH}/{hh['id']}/analytics", params={"year": TODAY.year, "month": TODAY.month}, headers=h1).json()
+        by_user = {m["user_id"]: m for m in body["members"]}
+        # 30.000 vs 10.000 → 75% / 25% de los 4.000
+        assert float(by_user[m2["user_id"]]["should_pay"]) == 1000.0
+        assert float(body["total_group_income"]) == 40000.0
+        assert not [a for a in body["alerts"] if a["type"] == "missing_rate"]

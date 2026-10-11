@@ -1912,40 +1912,45 @@ class ImportacionService:
         except ValueError:
             metodo = PaymentMethod.OTRO
 
-        shared_transfer_id = uuid.uuid4()
-
-        # Pata SOURCE: dinero sale de source_account
-        _aplicar_gasto(source_account, monto)
-        self.db.add(Transaction(
+        # Igual que una transferencia creada a mano (transaction_service.create):
+        # tipo TRANSFER en las dos patas y cada una apunta a la otra con transfer_id.
+        # Así no se cuenta como gasto/ingreso y al borrarla se revierten ambas cuentas.
+        source_tx = Transaction(
+            id=uuid.uuid4(),
             user_id=self.user_id,
             account_id=source_account.id,
             category_id=categoria.id,
             concept_id=concepto.id,
             amount=monto,
-            type=TransactionType.EXPENSE,
+            type=TransactionType.TRANSFER,
             date=fecha,
             description=(mov.get("descripcion") or "")[:100] or None,
             metodo_pago=metodo,
-            transfer_id=shared_transfer_id,
             transfer_role=TransferRole.SOURCE,
             import_hash=mov.get("import_hash"),
-        ))
-
-        # Pata DESTINATION: dinero llega a dest_account
-        _aplicar_ingreso(dest_account, monto)
-        self.db.add(Transaction(
+        )
+        dest_tx = Transaction(
+            id=uuid.uuid4(),
             user_id=self.user_id,
             account_id=dest_account.id,
             category_id=categoria.id,
             concept_id=concepto.id,
             amount=monto,
-            type=TransactionType.INCOME,
+            type=TransactionType.TRANSFER,
             date=fecha,
             description=(mov.get("descripcion") or "")[:100] or None,
             metodo_pago=metodo,
-            transfer_id=shared_transfer_id,
             transfer_role=TransferRole.DESTINATION,
             import_hash=None,  # solo la fuente tiene hash de deduplicación
-        ))
+        )
+        _aplicar_gasto(source_account, monto)
+        _aplicar_ingreso(dest_account, monto)
+        # transfer_id es FK a transactions.id: primero existen ambas filas, después se enlazan
+        dest_tx.transfer_id = source_tx.id
+        self.db.add(source_tx)
+        self.db.flush()
+        self.db.add(dest_tx)
+        self.db.flush()
+        source_tx.transfer_id = dest_tx.id
 
         concepto.frequency_score += 1

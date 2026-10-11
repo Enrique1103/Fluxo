@@ -124,6 +124,8 @@ def _check_exchange_rate_for_date(
     for fc in sorted(foreign_currencies):
         rate = exchange_rate_crud.get_for_month(
             db, user.id, fc, str(user.currency_default), today.year, today.month
+        ) or exchange_rate_crud.get_for_month(  # también vale el par inverso (ej: UYU→USD)
+            db, user.id, str(user.currency_default), fc, today.year, today.month
         )
         if not rate:
             missing.append(f"{fc}→{user.currency_default}")

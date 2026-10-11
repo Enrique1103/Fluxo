@@ -164,6 +164,37 @@ class TestConfirmar:
         assert all(t["household_ids"] == [] for t in c.get(f"{BASE}/transactions", headers=h).json())
 
 
+    def test_transferencia_zcuentas_es_transferencia(self, authed, uyu_account, debit_account):
+        """Una transferencia de Zcuentas no cuenta como gasto y al borrarla se revierten las dos cuentas."""
+        c, h = authed
+        mov = {
+            "fecha": "2026-04-03", "concepto": "", "monto": -1000.0, "moneda": "UYU",
+            "estado": "validado", "import_hash": "zc-test-1",
+            "metadata": {"tipo_zcuentas": "Transferencia", "cuenta_fluxo_id": uyu_account["id"],
+                         "transfer_dest_account_id": debit_account["id"]},
+        }
+        r = c.post(f"{IMP}/confirmar", json={"movimientos": [mov], "cuenta_id": None,
+                                              "banco": "zcuentas", "nombre_archivo": "z.xlsx"}, headers=h)
+        assert r.json()["importados"] == 1
+        bal = lambda acc: float(c.get(f"{BASE}/accounts/{acc['id']}", headers=h).json()["balance"])
+        uyu_before, deb_before = 20000.0, 50000.0
+        assert bal(uyu_account) == uyu_before - 1000
+        assert bal(debit_account) == deb_before + 1000
+
+        txs = c.get(f"{BASE}/transactions", headers=h).json()  # el listado muestra solo la pata origen
+        assert [t["type"] for t in txs] == ["transfer"]
+        src = txs[0]
+        dst = c.get(f"{BASE}/transactions/{src['transfer_id']}", headers=h).json()
+        assert dst["transfer_role"] == "destination" and dst["transfer_id"] == src["id"]
+
+        fig = c.get(f"{BASE}/analytics/income-vs-expenses", params={"months": 12, "currency": "UYU"}, headers=h).json()
+        assert all(v == 0 for tr in fig["data"] for v in tr["y"])
+
+        assert c.delete(f"{BASE}/transactions/{src['id']}", headers=h).status_code == 204
+        assert bal(uyu_account) == uyu_before
+        assert bal(debit_account) == deb_before
+
+
 class TestHistorial:
     def test_historial_vacio(self, authed):
         c, h = authed
