@@ -16,9 +16,9 @@ export default function MobileNav() {
   return (
     <>
       {/* Espacio para que la barra no tape el final de la página */}
-      <div className="h-20 sm:hidden" aria-hidden />
+      <div className="h-[calc(5rem+env(safe-area-inset-bottom))] sm:hidden" aria-hidden />
       <nav
-        className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 backdrop-blur border-t border-slate-800/80 grid grid-cols-4"
+        className="mobile-nav sm:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 backdrop-blur border-t border-slate-800/80 grid grid-cols-4"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {TABS.map(({ path, label, icon: Icon }) => {

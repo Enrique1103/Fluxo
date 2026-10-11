@@ -3,7 +3,7 @@
   "short_name": "Fluxo",
   "description": "Finanzas personales inteligentes",
   "id": "/",
-  "theme_color": "#3730a3",
+  "theme_color": "#020817",
   "background_color": "#020817",
   "display": "standalone",
   "display_override": [

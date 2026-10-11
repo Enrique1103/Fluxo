@@ -30,6 +30,14 @@
   body {
     margin: 0;
     background: #020817;
+    /* App instalada: que el contenido no quede debajo de la hora, la batería o el notch */
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    /* Sin "rebote" ni recarga al tirar la pantalla hacia abajo, y sin el recuadro gris al tocar */
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
@@ -225,4 +233,16 @@ html.light ::-webkit-scrollbar-thumb {
   input, select, textarea {
     font-size: 16px;
   }
+}
+
+/* Barra de abajo del celular en modo claro */
+html.light .mobile-nav {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-top-color: #e2e8f0;
+}
+html.light .mobile-nav button:not([aria-current]) {
+  color: #64748b;
+}
+html.light .mobile-nav button[aria-current] {
+  color: #059669;
 }
