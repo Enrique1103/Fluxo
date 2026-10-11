@@ -90,7 +90,7 @@ INITIAL_USER_CATEGORIES = [
         "icon": "file-text",
         "color": "#64748B",
         "is_system": False,
-        "concepts": ['Documentos', 'Escribano', 'Legalizaciones', 'Multas'],
+        "concepts": ['Escribano', 'Legalizaciones'],
     },
     {
         "name": "Transporte",
