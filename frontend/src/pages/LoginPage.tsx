@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, forwardRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Mail, Lock, User, ArrowRight, Eye, EyeOff, TrendingUp } from 'lucide-react'
+import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -203,13 +203,10 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="text-center mb-8 animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4 glow-emerald-sm"
-            style={{ background: 'linear-gradient(135deg, rgba(52,211,153,0.15), rgba(34,211,238,0.1))', border: '1px solid rgba(52,211,153,0.2)' }}>
-            <TrendingUp size={26} className="text-emerald-400" />
-          </div>
+          <img src="/favicon.png" alt="Fluxo" className="inline-block w-14 h-14 rounded-2xl mb-4 glow-emerald-sm" />
           <h1 className="text-[42px] font-black tracking-tighter leading-none mb-2">
             <span className="text-white">Fl</span>
-            <span className="text-gradient-emerald">ujo</span>
+            <span className="text-gradient-emerald">uxo</span>
           </h1>
           <p className="text-slate-500 text-xs tracking-[0.2em] uppercase font-medium">
             Domina tu flujo · Atrae abundancia
@@ -289,7 +286,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-slate-600 text-xs mt-6 animate-fade-in" style={{ animationDelay: '0.5s' }}>
-          Tus datos están protegidos con cifrado de extremo a extremo
+          Conexión segura · tu contraseña se guarda cifrada
         </p>
       </div>
     </div>
