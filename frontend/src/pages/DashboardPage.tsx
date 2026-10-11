@@ -629,7 +629,7 @@ export default function DashboardPage() {
           {/* Gráfica mensual */}
           <div id="fluxo-export-chart" className="bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm">
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-sm font-medium text-slate-400">Ingresos · Gastos · Ahorro</h2>
+              <h2 className="text-sm font-medium text-slate-400">Ingresos · Gastos · Ahorro <span className="text-slate-500 font-normal">· en {currency}</span></h2>
               <span className="text-[10px] text-slate-600 uppercase hidden sm:inline">mové el cursor para ver detalle</span>
             </div>
             {chartLoading ? (

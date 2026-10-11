@@ -146,6 +146,27 @@ def get_rate_for_month(
     return None
 
 
+def _closest(db: Session, user_id: uuid.UUID, frm: str, to: str, year: int, month: int, before: bool):
+    """(clave_mes, tasa frm→to) de la tasa más cercana antes/después del mes, en cualquier sentido del par."""
+    if before:
+        y, m = (year - 1, 12) if month == 1 else (year, month - 1)
+        direct = exchange_rate_crud.get_most_recent_for_pair_up_to(db, user_id, frm, to, y, m)
+        inverse = exchange_rate_crud.get_most_recent_for_pair_up_to(db, user_id, to, frm, y, m)
+    else:
+        y, m = (year + 1, 1) if month == 12 else (year, month + 1)
+        direct = exchange_rate_crud.get_earliest_for_pair_from(db, user_id, frm, to, y, m)
+        inverse = exchange_rate_crud.get_earliest_for_pair_from(db, user_id, to, frm, y, m)
+    options = []
+    if direct:
+        options.append((direct.year * 12 + direct.month, Decimal(str(direct.rate))))
+    if inverse:
+        options.append((inverse.year * 12 + inverse.month, Decimal("1") / Decimal(str(inverse.rate))))
+    if not options:
+        return None
+    # la más cercana al mes pedido
+    return max(options) if before else min(options)
+
+
 def get_rate_nearest(
     db: Session,
     user_id: uuid.UUID,
@@ -155,23 +176,31 @@ def get_rate_nearest(
     month: int,
 ) -> Decimal | None:
     """
-    Igual que get_rate_for_month, pero si no hay ninguna tasa hasta ese mes
-    usa la primera tasa cargada después (ej: movimientos de meses anteriores
-    a la primera tasa que cargó el usuario). None solo si el par no tiene
-    ninguna tasa cargada.
+    Tasa para convertir montos de un mes:
+      1. la tasa de ese mes (en cualquier sentido del par);
+      2. si no hay, el promedio entre la tasa anterior más cercana y la siguiente más cercana;
+      3. si solo hay una de las dos, esa.
+    None solo si el par no tiene ninguna tasa cargada.
     """
-    rate = get_rate_for_month(db, user_id, from_currency, to_currency, year, month)
-    if rate is not None:
-        return rate
+    if from_currency == to_currency:
+        return Decimal("1")
+    exact = exchange_rate_crud.get_for_month(db, user_id, from_currency, to_currency, year, month)
+    if exact:
+        return Decimal(str(exact.rate))
+    exact_inv = exchange_rate_crud.get_for_month(db, user_id, to_currency, from_currency, year, month)
+    if exact_inv:
+        return Decimal("1") / Decimal(str(exact_inv.rate))
 
-    er = exchange_rate_crud.get_earliest_for_pair_from(
-        db, user_id, from_currency, to_currency, year, month
-    )
-    if er:
-        return Decimal(str(er.rate))
-    er_inv = exchange_rate_crud.get_earliest_for_pair_from(
-        db, user_id, to_currency, from_currency, year, month
-    )
-    if er_inv:
-        return Decimal("1") / Decimal(str(er_inv.rate))
+    prev = _closest(db, user_id, from_currency, to_currency, year, month, before=True)
+    nxt = _closest(db, user_id, from_currency, to_currency, year, month, before=False)
+    if prev and nxt:
+        # El promedio se hace en el sentido "1 USD = 40 UYU" (tasa > 1) para que
+        # UYU→USD sea exactamente la inversa de USD→UYU
+        if prev[1] < 1:
+            return Decimal("1") / ((Decimal("1") / prev[1] + Decimal("1") / nxt[1]) / 2)
+        return (prev[1] + nxt[1]) / 2
+    if prev:
+        return prev[1]
+    if nxt:
+        return nxt[1]
     return None
