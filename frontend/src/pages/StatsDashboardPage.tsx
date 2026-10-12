@@ -484,11 +484,57 @@ function TxTable({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 320 }}>
+      <div className="overflow-x-auto overflow-y-auto max-h-[460px] sm:max-h-[320px]">
         {filtered.length === 0 ? (
           <p className="text-slate-600 text-sm text-center py-8">Sin movimientos</p>
         ) : (
-          <table className="w-full text-xs">
+          <>
+          {/* Celular: lista de tarjetas (la tabla no entra a lo ancho) */}
+          <ul className="sm:hidden divide-y divide-slate-800/60 pr-2">
+            {filtered.map((tx) => (
+              <li key={tx.id} className="flex items-center gap-3 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <p className="text-sm text-slate-200 font-medium truncate">
+                      {tx.type === 'transfer' && tx.transfer_dest_name ? `→ ${tx.transfer_dest_name}` : tx.category_name}
+                    </p>
+                    {tx.is_withdrawal && (
+                      <span className="px-1.5 py-px rounded text-[10px] font-semibold bg-lime-500/15 text-lime-400 border border-lime-500/20 shrink-0">RETIRO</span>
+                    )}
+                    {tx.instalment_plan_id && (
+                      <span className="px-1.5 py-px rounded text-[10px] font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/20 shrink-0">CUOTA</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 truncate">
+                    {[fmtDate(tx.date), tx.concept_name, tx.account_name].filter(Boolean).join(' · ')}
+                  </p>
+                  {tx.description && <p className="text-xs text-slate-600 truncate">{tx.description}</p>}
+                </div>
+                <div className="flex flex-col items-end shrink-0">
+                  <span className={`text-sm font-semibold tabular-nums ${
+                    tx.type === 'income' ? 'text-cyan-400' : tx.type === 'transfer' ? 'text-amber-400' : 'text-rose-400'
+                  }`}>
+                    {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '→' : '-'}{fmtMoney(tx.amount, currency, privacy)}
+                  </span>
+                  <div className="flex items-center gap-0.5 -mr-1.5">
+                    {onEdit && (
+                      <button onClick={() => onEdit(tx.id)} aria-label="Editar"
+                        className="p-1.5 text-slate-500 active:text-emerald-400">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button onClick={() => askDelete(tx)} disabled={deletingId === tx.id} aria-label="Eliminar"
+                        className="p-1.5 text-slate-500 active:text-red-400 disabled:opacity-40">
+                        {deletingId === tx.id ? <span className="text-xs">…</span> : <X className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <table className="hidden sm:table w-full text-xs">
             <thead>
               <tr className="text-slate-600 uppercase text-sm">
                 <th className="text-left pb-2 pl-1">Fecha</th>
@@ -564,6 +610,7 @@ function TxTable({
               ))}
             </tbody>
           </table>
+          </>
         )}
       </div>
 
@@ -741,8 +788,8 @@ export default function StatsDashboardPage() {
       </nav>
 
       {/* HEADER */}
-      <header className="relative z-20 flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800/50 backdrop-blur-md">
-        <div className="flex items-center gap-4">
+      <header className="relative z-20 flex flex-col sm:flex-row justify-between items-stretch sm:items-center mb-4 sm:mb-6 gap-4 sm:bg-slate-900/50 sm:p-4 sm:rounded-2xl sm:border border-slate-800/50 sm:backdrop-blur-md">
+        <div className="hidden sm:flex items-center gap-4">
           <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-violet-500 rounded-xl flex items-center justify-center">
             <BarChart2 className="text-white w-5 h-5" />
           </div>
@@ -751,9 +798,9 @@ export default function StatsDashboardPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto sm:flex-wrap">
           {/* Month + Year selector */}
-          <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5">
+          <div className="flex flex-1 sm:flex-none min-w-0 items-center justify-between gap-1 bg-slate-950 border border-slate-800 rounded-xl px-1.5 sm:px-2 py-1.5">
             <button onClick={() => { setOpenHeaderDd(null); prevMonth() }} className="p-1 text-slate-400 hover:text-slate-200 transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -762,9 +809,11 @@ export default function StatsDashboardPage() {
               <button
                 onClick={() => setOpenHeaderDd(openHeaderDd === 'fecha' ? null : 'fecha')}
                 onBlur={closeHeaderDd}
-                className="flex items-center gap-1 text-sm font-semibold text-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
+                className="flex items-center gap-1 text-sm font-semibold text-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap"
               >
-                {MONTH_NAMES[month - 1]} {year}
+                {/* En el celular el mes va abreviado para que entre en la fila */}
+                <span className="sm:hidden">{MONTH_NAMES[month - 1].slice(0, 3)} {year}</span>
+                <span className="hidden sm:inline">{MONTH_NAMES[month - 1]} {year}</span>
                 <ChevronDown className="w-3 h-3 opacity-50" />
               </button>
               {openHeaderDd === 'fecha' && (
@@ -795,9 +844,9 @@ export default function StatsDashboardPage() {
             <button
               onClick={() => setOpenHeaderDd(openHeaderDd === 'moneda' ? null : 'moneda')}
               onBlur={closeHeaderDd}
-              className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"
+              className="flex items-center gap-1.5 sm:gap-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 sm:px-3 py-2"
             >
-              <DollarSign className="w-4 h-4 text-emerald-500" />
+              <DollarSign className="hidden sm:block w-4 h-4 text-emerald-500" />
               <span className="text-sm font-medium text-slate-300">{currency}</span>
               <ChevronDown className="w-3 h-3 text-slate-500" />
             </button>
@@ -835,7 +884,7 @@ export default function StatsDashboardPage() {
       </header>
 
       {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4 sm:mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1 mb-4 sm:mb-6">
         {([
           { label: 'Ingresos',             value: income,   prevValue: prevBreakdown?.income,   color: 'text-cyan-400',    icon: TrendingUp,   border: 'border-cyan-500/25',    bg: 'bg-cyan-500/10',     higherIsBetter: true  },
           { label: 'Gastos',               value: expenses, prevValue: prevBreakdown?.expenses, color: 'text-rose-400',    icon: TrendingDown, border: 'border-rose-500/25',    bg: 'bg-rose-500/10',     higherIsBetter: false },
@@ -855,15 +904,15 @@ export default function StatsDashboardPage() {
           const deltaUp   = delta != null && delta > 0
           const deltaGood = delta != null && (higherIsBetter ? deltaUp : !deltaUp)
           return (
-            <div key={label} className={`relative bg-slate-900/40 border ${border} rounded-2xl p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-3`}>
+            <div key={label} className={`relative bg-slate-900/40 border ${border} rounded-2xl p-3 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2 sm:gap-3 min-w-0`}>
               {/* Fondo decorativo suave */}
               <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full ${bg} opacity-40 blur-2xl pointer-events-none`} />
 
               {/* Icon + label */}
               <div className="flex items-start justify-between gap-2">
                 <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider sm:tracking-widest min-w-0">{label}</p>
-                <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center shrink-0`}>
-                  <Icon className={`w-4 h-4 ${color}`} />
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 ${bg} rounded-lg flex items-center justify-center shrink-0`}>
+                  <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${color}`} />
                 </div>
               </div>
 
@@ -871,21 +920,21 @@ export default function StatsDashboardPage() {
               {isLoading ? (
                 <div className="h-9 w-28 bg-slate-800 animate-pulse rounded-lg" />
               ) : (
-                <p className={`text-3xl font-bold tabular-nums leading-none ${color}`}>
+                <p className={`text-xl sm:text-3xl font-bold tabular-nums leading-tight truncate ${color}`}>
                   {extra ?? fmtMoney(value!, currency, privacy)}
                 </p>
               )}
 
               {/* Delta */}
               {!privacy && delta != null && Math.abs(delta) >= 0.5 ? (
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${deltaGood ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                  <span className={`text-[11px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full ${deltaGood ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
                     {deltaUp ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
                   </span>
                   <span className="text-[10px] text-slate-500">vs {MONTH_NAMES[prevMonthNum - 1]}</span>
                 </div>
               ) : (
-                <div className="h-5" />
+                <div className="hidden sm:block h-5" />
               )}
             </div>
           )
@@ -1126,7 +1175,7 @@ export default function StatsDashboardPage() {
         <button
           onClick={() => setVoiceOpen(true)}
           title="Registrar con voz"
-          className="fixed bottom-[10.5rem] sm:bottom-24 right-7 z-30 w-11 h-11 bg-slate-800 hover:bg-slate-700 border border-slate-600 hover:border-emerald-500/50 text-emerald-400 rounded-2xl shadow-lg flex items-center justify-center transition-all active:scale-95 hover:scale-105"
+          className="fixed bottom-[calc(10.5rem+env(safe-area-inset-bottom))] sm:bottom-24 right-7 z-30 w-11 h-11 bg-slate-800 hover:bg-slate-700 border border-slate-600 hover:border-emerald-500/50 text-emerald-400 rounded-2xl shadow-lg flex items-center justify-center transition-all active:scale-95 hover:scale-105"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
         </button>

@@ -491,8 +491,8 @@ function MonthlyChart({
   return (
     <div className="w-full mt-2 select-none">
       {/* Legend + zoom controls */}
-      <div className="flex items-center justify-between mb-3" style={{ paddingLeft: YAXIS_W, paddingRight: YAXIS_R_W }}>
-        <div className="flex gap-5 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 sm:pl-[var(--yaxis-l)] sm:pr-[var(--yaxis-r)]" style={{ '--yaxis-l': `${YAXIS_W}px`, '--yaxis-r': `${YAXIS_R_W}px` } as React.CSSProperties}>
+        <div className="flex gap-x-4 gap-y-1 sm:gap-5 flex-wrap">
           {([
             { color: ING_COLOR, label: 'Ingresos' },
             { color: GAS_COLOR, label: 'Gastos'   },
@@ -505,14 +505,14 @@ function MonthlyChart({
           ))}
         </div>
         {/* Zoom buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 self-end sm:self-auto">
           <button
             onClick={() => setColW(w => Math.max(COL_W_MIN, w - COL_W_STEP))}
             disabled={colW <= COL_W_MIN}
             className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-sm font-bold leading-none"
             title="Reducir ancho"
           >−</button>
-          <span className="text-xs text-slate-600 w-5 text-center select-none">{colW}</span>
+          <span className="hidden sm:inline text-xs text-slate-600 w-5 text-center select-none">{colW}</span>
           <button
             onClick={() => setColW(w => Math.min(COL_W_MAX, w + COL_W_STEP))}
             disabled={colW >= COL_W_MAX}
@@ -522,7 +522,7 @@ function MonthlyChart({
           <div className="w-px h-4 bg-slate-700 mx-1" />
           <button
             onClick={() => setFitY(f => !f)}
-            className={`px-2 h-6 rounded-lg text-[11px] font-medium transition-all ${
+            className={`px-2 h-6 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all ${
               fitY
                 ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                 : 'text-slate-500 hover:text-slate-300 border border-slate-700/50'

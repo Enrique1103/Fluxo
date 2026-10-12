@@ -52,7 +52,8 @@ export function parseMonth(raw: string): { year: number; month: number } | null 
 export default function MonthlyTotalsImport() {
   const qc = useQueryClient()
   const homeCurrency = useHomeCurrency()
-  const { data: accounts = [] } = useQuery({ queryKey: ['accounts'], queryFn: fetchAccounts })
+  // isSuccess: el aviso de "no tenés cuentas" solo después de cargarlas (si no, aparece y desaparece)
+  const { data: accounts = [], isSuccess: accountsLoaded } = useQuery({ queryKey: ['accounts'], queryFn: fetchAccounts })
   const { data: saved = [], isLoading } = useQuery({ queryKey: ['monthly-totals'], queryFn: fetchMonthlyTotals })
   const currencies = useMemo(
     () => [...new Set([homeCurrency, ...accounts.map(a => a.currency), 'USD'])],
@@ -136,7 +137,7 @@ export default function MonthlyTotalsImport() {
           los meses aparecen en tus gráficos y desde acá seguís registrando día a día.
         </p>
 
-        {accounts.length === 0 && (
+        {accountsLoaded && accounts.length === 0 && (
           <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
             Todavía no tenés cuentas. Los totales se pueden cargar igual y el gráfico de ingresos y gastos
             se ve bien, pero el patrimonio de esos meses se calcula hacia atrás desde tu saldo actual:

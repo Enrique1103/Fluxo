@@ -1,9 +1,9 @@
 {
   "name": "Fluxo — Finanzas Personales",
   "short_name": "Fluxo",
-  "description": "Finanzas personales inteligentes",
+  "description": "Tus finanzas personales y del hogar, claras y en un solo lugar",
   "id": "/",
-  "theme_color": "#3730a3",
+  "theme_color": "#020817",
   "background_color": "#020817",
   "display": "standalone",
   "display_override": [
@@ -43,5 +43,40 @@
   "categories": [
     "finance",
     "productivity"
+  ],
+  "shortcuts": [
+    {
+      "name": "Registrar movimiento",
+      "short_name": "Nuevo",
+      "url": "/?nuevo=movimiento",
+      "icons": [
+        {
+          "src": "/pwa-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Registrar por voz",
+      "short_name": "Voz",
+      "url": "/?nuevo=voz",
+      "icons": [
+        {
+          "src": "/pwa-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Análisis mensual",
+      "short_name": "Mensual",
+      "url": "/stats",
+      "icons": [
+        {
+          "src": "/pwa-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }

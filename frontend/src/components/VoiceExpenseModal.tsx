@@ -346,7 +346,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl z-10 flex flex-col max-h-[92vh] bg-slate-900 border border-slate-800/60">
+      <div className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl z-10 flex flex-col max-h-[92dvh] bg-slate-900 border border-slate-800/60">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">

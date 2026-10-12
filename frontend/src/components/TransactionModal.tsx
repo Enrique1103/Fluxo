@@ -253,7 +253,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   const [creatingAcct, setCreatingAcct] = useState(false)
   const [acctError,    setAcctError]    = useState<string | null>(null)
 
-  const { data: accounts    = [] } = useQuery({ queryKey: ['accounts'],    queryFn: fetchAccounts,    enabled: open, select: withoutArchived })
+  const { data: accounts    = [], isSuccess: accountsLoaded } = useQuery({ queryKey: ['accounts'],    queryFn: fetchAccounts,    enabled: open, select: withoutArchived })
   const { data: categories  = [] } = useQuery({ queryKey: ['categories'],  queryFn: fetchCategories,  enabled: open })
   const { data: concepts    = [] } = useQuery({ queryKey: ['concepts'],    queryFn: fetchConcepts,    enabled: open })
   const { data: households  = [] } = useQuery({ queryKey: ['households'],  queryFn: fetchHouseholds,  enabled: open })
@@ -424,11 +424,12 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
 
   if (!open) return null
 
-  const noAccounts = accounts.length === 0
+  // Solo después de cargar: si no, el aviso de "no tenés cuentas" aparece un instante y desaparece
+  const noAccounts = accountsLoaded && accounts.length === 0
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:theme(colors.slate.700)_transparent]">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="sheet bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl max-h-[92dvh] sm:max-h-[90dvh] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:theme(colors.slate.700)_transparent]">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
