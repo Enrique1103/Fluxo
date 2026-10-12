@@ -190,6 +190,34 @@ html.light .text-slate-400 { color: #475569 !important; }
 html.light .text-slate-500 { color: #475569 !important; }
 html.light .text-slate-600 { color: #64748b !important; }
 html.light .text-slate-700 { color: #64748b !important; }
+
+/* Modo claro: los textos de color claro (amarillo, lima, pasteles) no se leen sobre blanco */
+html.light .text-amber-200:not(.force-dark *) { color: #92400e !important; }
+html.light .text-amber-300:not(.force-dark *) { color: #92400e !important; }
+html.light .text-amber-400:not(.force-dark *) { color: #b45309 !important; }
+html.light .text-yellow-200:not(.force-dark *) { color: #854d0e !important; }
+html.light .text-yellow-300:not(.force-dark *) { color: #854d0e !important; }
+html.light .text-yellow-400:not(.force-dark *) { color: #a16207 !important; }
+html.light .text-lime-300:not(.force-dark *) { color: #3f6212 !important; }
+html.light .text-lime-400:not(.force-dark *) { color: #4d7c0f !important; }
+html.light .text-emerald-200:not(.force-dark *) { color: #065f46 !important; }
+html.light .text-emerald-300:not(.force-dark *) { color: #047857 !important; }
+html.light .text-cyan-200:not(.force-dark *) { color: #155e75 !important; }
+html.light .text-cyan-300:not(.force-dark *) { color: #0e7490 !important; }
+html.light .text-rose-200:not(.force-dark *) { color: #9f1239 !important; }
+html.light .text-rose-300:not(.force-dark *) { color: #be123c !important; }
+html.light .text-red-200:not(.force-dark *) { color: #991b1b !important; }
+html.light .text-red-300:not(.force-dark *) { color: #b91c1c !important; }
+html.light .text-indigo-200:not(.force-dark *) { color: #3730a3 !important; }
+html.light .text-indigo-300:not(.force-dark *) { color: #4338ca !important; }
+html.light .text-violet-200:not(.force-dark *) { color: #5b21b6 !important; }
+html.light .text-violet-300:not(.force-dark *) { color: #6d28d9 !important; }
+html.light .text-blue-300:not(.force-dark *) { color: #1d4ed8 !important; }
+html.light .text-sky-300:not(.force-dark *) { color: #0369a1 !important; }
+html.light .text-orange-300:not(.force-dark *) { color: #c2410c !important; }
+html.light .text-orange-400:not(.force-dark *) { color: #c2410c !important; }
+html.light .text-cyan-400:not(.force-dark *) { color: #0891b2 !important; }
+html.light .text-emerald-400:not(.force-dark *) { color: #059669 !important; }
 /* Borders */
 html.light .border-slate-900 { border-color: #e2e8f0 !important; }
 html.light .border-slate-800 { border-color: #cbd5e1 !important; }
