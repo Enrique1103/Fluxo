@@ -242,15 +242,14 @@ html.light ::-webkit-scrollbar-thumb {
 
 /* Barra de abajo del celular en modo claro */
 html.light .mobile-nav {
-  background-color: rgba(255, 255, 255, 0.95);
-  border-top-color: #e2e8f0;
+  background-color: rgba(255, 255, 255, 0.88);
+  border-top-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06);
 }
-html.light .mobile-nav button:not([aria-current]) {
-  color: #64748b;
-}
-html.light .mobile-nav button[aria-current] {
-  color: #059669;
-}
+html.light .mobile-nav button:not([aria-current]) .nav-pill { color: #64748b; }
+html.light .mobile-nav button:not([aria-current]) .nav-label { color: #64748b; }
+html.light .mobile-nav button[aria-current] .nav-pill { color: #059669; background-color: rgba(16, 185, 129, 0.12); }
+html.light .mobile-nav button[aria-current] .nav-label { color: #059669; }
 
 /* Celular: las ventanas de carga suben desde abajo como en una app nativa */
 @media (max-width: 639px) {

@@ -1,5 +1,5 @@
 // Cambiar la versión invalida los assets cacheados en los celulares
-const CACHE = 'fluxo-v6'
+const CACHE = 'fluxo-v7'
 
 const SHELL = [
   '/',

@@ -134,7 +134,7 @@ function MainMenu({ open, onNavigate }: {
   ]
 
   return (
-    <div className="px-6 py-6 space-y-6">
+    <div className="px-4 sm:px-6 py-5 sm:py-6 space-y-6">
       {/* User card */}
       <div className="flex items-center gap-4 bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
         <div className="w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shrink-0">
@@ -282,7 +282,7 @@ function PerfilSection({ open }: { open: boolean }) {
     : '?'
 
   return (
-    <div className="px-6 py-6 space-y-8">
+    <div className="px-4 sm:px-6 py-5 sm:py-6 space-y-8">
 
       {/* Avatar */}
       <div className="flex items-center gap-4">
@@ -501,7 +501,7 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
         onCancel={() => setConfirmDeleteId(null)}
       />
 
-      <div className="px-6 py-6 space-y-3">
+      <div className="px-4 sm:px-6 py-5 sm:py-6 space-y-3">
         <button
           onClick={onNewAcct}
           className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-slate-700 hover:border-emerald-500/50 text-slate-500 hover:text-emerald-400 rounded-xl text-sm transition-all"
@@ -656,7 +656,7 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
 function TasasSection({ open }: { open: boolean }) {
   const { data: me } = useQuery({ queryKey: ['me'], queryFn: fetchMe, enabled: open })
   return (
-    <div className="px-6 py-6">
+    <div className="px-4 sm:px-6 py-5 sm:py-6">
       <ExchangeRateManager userCurrency={me?.currency_default ?? 'UYU'} />
     </div>
   )
@@ -710,7 +710,7 @@ function MetasSection({ open, onNewGoal, onEditGoal }: {
         onCancel={() => setConfirmDeleteId(null)}
       />
 
-      <div className="px-6 py-6 space-y-3">
+      <div className="px-4 sm:px-6 py-5 sm:py-6 space-y-3">
         <button
           onClick={onNewGoal}
           disabled={finGoals.length >= 3}
@@ -781,7 +781,7 @@ function MainFooter({ onDeleteAccount, onLogout }: {
   }
 
   return (
-    <div className="px-6 py-5 border-t border-slate-800 shrink-0 space-y-2">
+    <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-5 border-t border-slate-800 shrink-0 space-y-1">
       <button
         onClick={handleLogout}
         disabled={loggingOut}
@@ -792,10 +792,10 @@ function MainFooter({ onDeleteAccount, onLogout }: {
       </button>
       <button
         onClick={onDeleteAccount}
-        className="w-full py-3 rounded-xl text-sm font-bold border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-all flex items-center justify-center gap-2"
+        className="w-full py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-red-400 transition-colors flex items-center justify-center gap-1.5"
       >
-        <Trash2 className="w-4 h-4" />
-        Eliminar cuenta
+        <Trash2 className="w-3.5 h-3.5" />
+        Eliminar mi cuenta
       </button>
     </div>
   )
@@ -825,7 +825,7 @@ function DeleteAccountSection() {
   }
 
   return (
-    <div className="px-6 py-6 space-y-5">
+    <div className="px-4 sm:px-6 py-5 sm:py-6 space-y-5">
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
         <p className="text-sm text-red-300 leading-relaxed">
           Esta acción es <span className="font-bold">irreversible</span>. Se eliminarán permanentemente tu cuenta, transacciones, cuentas bancarias, metas y todos tus datos.
@@ -896,6 +896,16 @@ export default function SettingsDrawer({ open, onClose, initialSection }: Props)
     }
   }, [open, initialSection])
 
+  // Con el panel abierto: la página de atrás no se mueve, y Escape lo cierra
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey) }
+  }, [open, onClose])
+
   const sectionTitle: Record<NonNullable<Section>, string> = {
     perfil:           'Perfil',
     cuentas:          'Cuentas',
@@ -915,10 +925,14 @@ export default function SettingsDrawer({ open, onClose, initialSection }: Props)
       />
 
       {/* Drawer panel */}
-      <div className={`fixed top-[calc(0.75rem+env(safe-area-inset-top))] bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-3 right-3 sm:left-auto z-50 sm:w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl flex flex-col overflow-hidden shadow-2xl transition-transform duration-300 ease-in-out ${open ? 'translate-x-0' : 'translate-x-[calc(100%+12px)]'}`}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Configuración"
+        className={`fixed inset-0 sm:inset-auto sm:top-3 sm:right-3 sm:bottom-3 z-50 w-full sm:max-w-sm bg-slate-900 sm:border border-slate-800 sm:rounded-2xl flex flex-col overflow-hidden shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${open ? 'translate-x-0' : 'translate-x-full sm:translate-x-[calc(100%+12px)]'}`}>
 
         {/* Header — fixed */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800 shrink-0">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 pb-4 sm:pb-5 pt-[calc(1rem+env(safe-area-inset-top))] sm:pt-5 border-b border-slate-800 shrink-0">
           {section !== null ? (
             <button
               onClick={() => setSection(null)}
@@ -928,11 +942,12 @@ export default function SettingsDrawer({ open, onClose, initialSection }: Props)
               <span className="text-base font-semibold text-white">{sectionTitle[section]}</span>
             </button>
           ) : (
-            <h2 className="text-base font-semibold text-white">Configuración</h2>
+            <h2 className="text-lg sm:text-base font-semibold text-white">Configuración</h2>
           )}
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800"
+            aria-label="Cerrar"
+            className="p-2 -mr-1 text-slate-400 hover:text-white transition-colors rounded-full bg-slate-800/60 sm:bg-transparent hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
           </button>
@@ -944,7 +959,7 @@ export default function SettingsDrawer({ open, onClose, initialSection }: Props)
           {section === 'perfil'  && <PerfilSection open={open} />}
           {section === 'cuentas' && <CuentasSection open={open} onNewAcct={() => setAcctModalOpen(true)} />}
           {section === 'etiquetas' && (
-            <div className="px-6 py-6">
+            <div className="px-4 sm:px-6 py-5 sm:py-6">
               <EtiquetasContent />
             </div>
           )}
