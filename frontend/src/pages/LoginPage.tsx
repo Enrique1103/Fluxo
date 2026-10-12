@@ -290,7 +290,7 @@ export default function LoginPage() {
 
         {/* Form card */}
         <div
-          className="card-glass rounded-3xl p-8 animate-fade-in-up"
+          className="card-glass rounded-3xl p-6 sm:p-8 animate-fade-in-up"
           style={{
             animationDelay: '0.25s',
             boxShadow: '0 25px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
@@ -397,7 +397,7 @@ const Field = forwardRef<HTMLInputElement, FieldProps>(({ icon, error, suffix, .
       </span>
       <input
         ref={ref}
-        className="flex-1 bg-transparent text-white placeholder-slate-600 text-sm outline-none"
+        className="flex-1 min-w-0 w-full bg-transparent text-white placeholder-slate-600 text-sm outline-none"
         {...props}
       />
       {suffix}
@@ -414,7 +414,8 @@ const Field = forwardRef<HTMLInputElement, FieldProps>(({ icon, error, suffix, .
 function EyeToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) {
   return (
     <button type="button" onClick={onToggle}
-      className="text-slate-600 hover:text-slate-300 transition-colors shrink-0">
+      aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+      className="-m-2 p-2 flex items-center justify-center text-slate-500 hover:text-slate-300 transition-colors shrink-0">
       {show ? <EyeOff size={15} /> : <Eye size={15} />}
     </button>
   )

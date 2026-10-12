@@ -674,13 +674,13 @@ export default function DashboardPage() {
         {/* ═══════════════════════════════════════════════════════════════ */}
         <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm">
           {/* Header */}
-          <div className="flex items-start justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-500/20 rounded-lg">
+          <div className="flex items-start justify-between gap-3 mb-5">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="hidden sm:block p-2 bg-indigo-500/20 rounded-lg">
                 <TrendingUp className="w-5 h-5 text-indigo-400" />
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-white">Metas Financieras</h2>
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-semibold text-white whitespace-nowrap">Metas Financieras</h2>
                 {!summaryLoading && (() => {
                   const freeFlow   = Number(summary?.net_this_month ?? 0)
                   const totalAlloc = finGoals.reduce((s, g) => s + Number(g.allocation_pct), 0)

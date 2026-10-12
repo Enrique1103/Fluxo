@@ -46,6 +46,11 @@
     min-height: 100vh;
   }
 
+  /* Un campo dentro de una fila no empuja a sus vecinos fuera de lugar (ej: el ojo de la contraseña) */
+  input, select, textarea {
+    min-width: 0;
+  }
+
   /* Fix browser autofill white background */
   input:-webkit-autofill,
   input:-webkit-autofill:hover,

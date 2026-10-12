@@ -811,7 +811,9 @@ export default function StatsDashboardPage() {
                 onBlur={closeHeaderDd}
                 className="flex items-center gap-1 text-sm font-semibold text-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap"
               >
-                {MONTH_NAMES[month - 1]} {year}
+                {/* En el celular el mes va abreviado para que entre en la fila */}
+                <span className="sm:hidden">{MONTH_NAMES[month - 1].slice(0, 3)} {year}</span>
+                <span className="hidden sm:inline">{MONTH_NAMES[month - 1]} {year}</span>
                 <ChevronDown className="w-3 h-3 opacity-50" />
               </button>
               {openHeaderDd === 'fecha' && (
@@ -902,15 +904,15 @@ export default function StatsDashboardPage() {
           const deltaUp   = delta != null && delta > 0
           const deltaGood = delta != null && (higherIsBetter ? deltaUp : !deltaUp)
           return (
-            <div key={label} className={`relative bg-slate-900/40 border ${border} rounded-2xl p-3.5 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2.5 sm:gap-3`}>
+            <div key={label} className={`relative bg-slate-900/40 border ${border} rounded-2xl p-3 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2 sm:gap-3 min-w-0`}>
               {/* Fondo decorativo suave */}
               <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full ${bg} opacity-40 blur-2xl pointer-events-none`} />
 
               {/* Icon + label */}
               <div className="flex items-start justify-between gap-2">
                 <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider sm:tracking-widest min-w-0">{label}</p>
-                <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center shrink-0`}>
-                  <Icon className={`w-4 h-4 ${color}`} />
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 ${bg} rounded-lg flex items-center justify-center shrink-0`}>
+                  <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${color}`} />
                 </div>
               </div>
 
@@ -918,21 +920,21 @@ export default function StatsDashboardPage() {
               {isLoading ? (
                 <div className="h-9 w-28 bg-slate-800 animate-pulse rounded-lg" />
               ) : (
-                <p className={`text-[26px] sm:text-3xl font-bold tabular-nums leading-none ${color}`}>
+                <p className={`text-xl sm:text-3xl font-bold tabular-nums leading-tight truncate ${color}`}>
                   {extra ?? fmtMoney(value!, currency, privacy)}
                 </p>
               )}
 
               {/* Delta */}
               {!privacy && delta != null && Math.abs(delta) >= 0.5 ? (
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${deltaGood ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                  <span className={`text-[11px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full ${deltaGood ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
                     {deltaUp ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
                   </span>
                   <span className="text-[10px] text-slate-500">vs {MONTH_NAMES[prevMonthNum - 1]}</span>
                 </div>
               ) : (
-                <div className="h-5" />
+                <div className="hidden sm:block h-5" />
               )}
             </div>
           )

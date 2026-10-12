@@ -29,45 +29,45 @@ export default function HouseholdKPICards({
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
 
       {/* Gastos del mes */}
-      <div className="relative bg-slate-900/40 border border-rose-500/25 rounded-2xl p-3.5 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2.5 sm:gap-3">
+      <div className="relative bg-slate-900/40 border border-rose-500/25 rounded-2xl p-3 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2 sm:gap-3 min-w-0">
         <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-rose-500/10 opacity-40 blur-2xl pointer-events-none" />
         <div className="flex items-start justify-between gap-2">
           <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider sm:tracking-widest min-w-0">Gastos del mes</p>
-          <div className="w-8 h-8 bg-rose-500/10 rounded-lg flex items-center justify-center shrink-0">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-rose-500/10 rounded-lg flex items-center justify-center shrink-0">
             <TrendingDown className="w-4 h-4 text-rose-400" />
           </div>
         </div>
         {isLoading ? (
           <div className="h-9 w-28 bg-slate-800 animate-pulse rounded-lg" />
         ) : (
-          <p className="text-[26px] sm:text-3xl font-bold tabular-nums leading-none text-rose-400">
+          <p className="text-xl sm:text-3xl font-bold tabular-nums leading-tight truncate text-rose-400">
             {fmt(totalShared, currency, privacy)}
           </p>
         )}
-        <div className="h-5" />
+        <div className="hidden sm:block h-5" />
       </div>
 
       {/* Gasto Diario Promedio */}
-      <div className="relative bg-slate-900/40 border border-amber-500/25 rounded-2xl p-3.5 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2.5 sm:gap-3">
+      <div className="relative bg-slate-900/40 border border-amber-500/25 rounded-2xl p-3 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2 sm:gap-3 min-w-0">
         <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-amber-500/10 opacity-40 blur-2xl pointer-events-none" />
         <div className="flex items-start justify-between gap-2">
           <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider sm:tracking-widest min-w-0">Gasto Diario Promedio</p>
-          <div className="w-8 h-8 bg-amber-500/10 rounded-lg flex items-center justify-center shrink-0">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-amber-500/10 rounded-lg flex items-center justify-center shrink-0">
             <Calendar className="w-4 h-4 text-amber-400" />
           </div>
         </div>
         {isLoading ? (
           <div className="h-9 w-28 bg-slate-800 animate-pulse rounded-lg" />
         ) : (
-          <p className="text-[26px] sm:text-3xl font-bold tabular-nums leading-none text-amber-400">
+          <p className="text-xl sm:text-3xl font-bold tabular-nums leading-tight truncate text-amber-400">
             {privacy ? '••••' : `${fmtNum(dailyAverage)}/día`}
           </p>
         )}
-        <div className="h-5" />
+        <div className="hidden sm:block h-5" />
       </div>
 
       {/* vs Mes Anterior */}
-      <div className={`relative bg-slate-900/40 border rounded-2xl p-3.5 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2.5 sm:gap-3 ${
+      <div className={`relative bg-slate-900/40 border rounded-2xl p-3 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2 sm:gap-3 min-w-0 ${
         isUp ? 'border-rose-500/25' : isDown ? 'border-emerald-500/25' : 'border-slate-700/40'
       }`}>
         <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full opacity-40 blur-2xl pointer-events-none ${
@@ -75,7 +75,7 @@ export default function HouseholdKPICards({
         }`} />
         <div className="flex items-start justify-between gap-2">
           <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider sm:tracking-widest min-w-0">vs Mes Anterior</p>
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+          <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0 ${
             isUp ? 'bg-rose-500/10' : isDown ? 'bg-emerald-500/10' : 'bg-slate-800'
           }`}>
             {isUp
@@ -89,15 +89,15 @@ export default function HouseholdKPICards({
         {isLoading ? (
           <div className="h-9 w-28 bg-slate-800 animate-pulse rounded-lg" />
         ) : hasDelta ? (
-          <p className={`text-[26px] sm:text-3xl font-bold tabular-nums leading-none ${
+          <p className={`text-xl sm:text-3xl font-bold tabular-nums leading-tight truncate ${
             isUp ? 'text-rose-400' : isDown ? 'text-emerald-400' : 'text-slate-400'
           }`}>
             {privacy ? '**%' : `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`}
           </p>
         ) : (
-          <p className="text-[26px] sm:text-3xl font-bold tabular-nums leading-none text-slate-600">—</p>
+          <p className="text-xl sm:text-3xl font-bold tabular-nums leading-tight truncate text-slate-600">—</p>
         )}
-        <div className="h-5" />
+        <div className="hidden sm:block h-5" />
       </div>
 
     </div>

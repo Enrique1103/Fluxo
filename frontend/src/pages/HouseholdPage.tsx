@@ -258,7 +258,9 @@ export default function HouseholdPage() {
                 onBlur={closeDropdown}
                 className="flex items-center gap-1 text-sm font-semibold text-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap"
               >
-                {MONTH_NAMES[month - 1]} {year}
+                {/* En el celular el mes va abreviado para que entre en la fila */}
+                <span className="sm:hidden">{MONTH_NAMES[month - 1].slice(0, 3)} {year}</span>
+                <span className="hidden sm:inline">{MONTH_NAMES[month - 1]} {year}</span>
                 <ChevronDown className="w-3 h-3 opacity-50" />
               </button>
               {openDropdown === 'fecha' && (
@@ -418,7 +420,7 @@ export default function HouseholdPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4 mb-3">
                   <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                     {/* Icon badge */}
-                    <div className="w-11 h-11 bg-gradient-to-br from-indigo-400 to-violet-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/25">
+                    <div className="hidden sm:flex w-11 h-11 bg-gradient-to-br from-indigo-400 to-violet-500 rounded-2xl items-center justify-center shrink-0 shadow-lg shadow-indigo-500/25">
                       <Home className="w-5 h-5 text-white" />
                     </div>
                     <div className="min-w-0">
@@ -477,9 +479,10 @@ export default function HouseholdPage() {
                       <button
                         onClick={() => inviteMutation.mutate()}
                         disabled={inviteMutation.isPending}
+                        aria-label="Invitar al hogar"
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 rounded-xl text-xs font-semibold hover:bg-indigo-500/25 transition-all">
                         {inviteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                        Invitar
+                        <span className="hidden min-[400px]:inline">Invitar</span>
                       </button>
                       <button onClick={() => setShowEdit(true)}
                         className="p-1.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent hover:border-slate-700/50 transition-all">
@@ -644,30 +647,30 @@ export default function HouseholdPage() {
                             const deltaUp   = delta != null && delta > 0
                             const deltaGood = delta != null && (better ? deltaUp : !deltaUp)
                             return (
-                              <div key={label} className={`relative bg-slate-900/40 border ${border} rounded-2xl p-3.5 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2.5 sm:gap-3`}>
+                              <div key={label} className={`relative bg-slate-900/40 border ${border} rounded-2xl p-3 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2 sm:gap-3 min-w-0`}>
                                 <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full ${bg} opacity-40 blur-2xl pointer-events-none`} />
                                 <div className="flex items-start justify-between gap-2">
                                   <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider sm:tracking-widest min-w-0">{label}</p>
-                                  <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center shrink-0`}>
-                                    <Icon className={`w-4 h-4 ${color}`} />
+                                  <div className={`w-7 h-7 sm:w-8 sm:h-8 ${bg} rounded-lg flex items-center justify-center shrink-0`}>
+                                    <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${color}`} />
                                   </div>
                                 </div>
                                 {breakdownLoading ? (
                                   <div className="h-9 w-28 bg-slate-800 animate-pulse rounded-lg" />
                                 ) : (
-                                  <p className={`text-[26px] sm:text-3xl font-bold tabular-nums leading-none ${color}`}>
+                                  <p className={`text-xl sm:text-3xl font-bold tabular-nums leading-tight truncate ${color}`}>
                                     {extra ?? fmtMoney(value!, currency, privacy)}
                                   </p>
                                 )}
                                 {!privacy && delta != null && Math.abs(delta) >= 0.5 ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${deltaGood ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                    <span className={`text-[11px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full ${deltaGood ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
                                       {deltaUp ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
                                     </span>
                                     <span className="text-[10px] text-slate-500">vs {MONTH_NAMES[prevMonthNum - 1]}</span>
                                   </div>
                                 ) : (
-                                  <div className="h-5" />
+                                  <div className="hidden sm:block h-5" />
                                 )}
                               </div>
                             )
