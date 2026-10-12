@@ -1,7 +1,7 @@
 ﻿import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import useTheme from '../hooks/useTheme'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Settings, Eye, EyeOff,
   Activity, DollarSign, ChevronDown,
@@ -65,6 +65,16 @@ export default function DashboardPage() {
   const [editGoal,         setEditGoal]         = useState<FinGoal | undefined>(undefined)
   const [txModalOpen,      setTxModalOpen]      = useState(false)
   const [voiceOpen,        setVoiceOpen]        = useState(false)
+
+  // Accesos directos del ícono de la app instalada (mantener apretado el ícono): ?nuevo=movimiento | voz
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const nuevo = searchParams.get('nuevo')
+    if (!nuevo) return
+    if (nuevo === 'voz') setVoiceOpen(true)
+    else setTxModalOpen(true)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
   const [confirmDeleteGoalId, setConfirmDeleteGoalId] = useState<string | null>(null)
   const [deletingGoalId,   setDeletingGoalId]   = useState<string | null>(null)
   const [monthsAhead,   setMonthsAhead]   = useState(24)
@@ -329,20 +339,18 @@ export default function DashboardPage() {
       </nav>
 
       {/* HEADER */}
-      <header className="relative z-20 flex flex-col md:flex-row justify-between items-start md:items-center mb-4 sm:mb-8 gap-3 bg-slate-900/50 p-4 rounded-2xl border border-slate-800/50 backdrop-blur-md">
-        <div className="flex items-center gap-4">
-          <img
-            src={isLight ? '/favicon-light.png' : '/favicon.png'}
-            alt="Fluxo"
-            className="w-10 h-10 object-contain shrink-0"
-          />
+      <header className="relative z-20 flex flex-row justify-between items-center mb-4 sm:mb-8 gap-3 sm:bg-slate-900/50 px-1 py-1 sm:p-4 sm:rounded-2xl sm:border border-slate-800/50 sm:backdrop-blur-md">
+        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+          {/* Logo en texto, igual que la pantalla de inicio (el ícono violeta no combinaba con el verde) */}
           <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">Fluxo</h1>
-            <p className="text-xs text-slate-400 uppercase tracking-widest font-medium">Inteligencia Financiera</p>
+            <h1 className="text-2xl font-black tracking-tighter leading-none">
+              <span className="text-white">Fl</span><span className="text-emerald-400">uxo</span>
+            </h1>
+            <p className="hidden sm:block text-xs text-slate-400 uppercase tracking-widest font-medium">Inteligencia Financiera</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <button onClick={() => { setPrivacyMode(p => { localStorage.setItem('privacy', String(!p)); return !p }) }}
             className="p-2 text-slate-400 hover:text-emerald-400 bg-slate-950 border border-slate-800 rounded-lg transition-colors">
             {privacyMode ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -352,9 +360,9 @@ export default function DashboardPage() {
             <button
               onClick={() => setOpenCurrencyDd(v => !v)}
               onBlur={closeCurrencyDd}
-              className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"
+              className="flex items-center gap-1.5 sm:gap-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 sm:px-3 py-2"
             >
-              <DollarSign className="w-4 h-4 text-emerald-500" />
+              <DollarSign className="hidden sm:block w-4 h-4 text-emerald-500" />
               <span className="text-sm font-medium text-slate-300">{currency}</span>
               <ChevronDown className="w-3 h-3 text-slate-500" />
             </button>

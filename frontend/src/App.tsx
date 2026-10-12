@@ -13,6 +13,18 @@ const ImportacionPage    = lazy(() => import('./pages/ImportacionPage'))
 const HouseholdPage      = lazy(() => import('./pages/HouseholdPage'))
 const AdminPage          = lazy(() => import('./pages/AdminPage'))
 
+/** Pantalla de carga con la marca (mientras se descarga cada pantalla) */
+function SplashScreen() {
+  return (
+    <div className="min-h-dvh flex flex-col items-center justify-center gap-5 bg-[#020817]">
+      <h1 className="text-4xl font-black tracking-tighter leading-none">
+        <span className="text-white">Fl</span><span className="text-emerald-400">uxo</span>
+      </h1>
+      <span className="w-6 h-6 border-2 border-emerald-400/25 border-t-emerald-400 rounded-full animate-spin" />
+    </div>
+  )
+}
+
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token)
   const isAdmin = useAuthStore((s) => s.isAdmin)
@@ -34,7 +46,7 @@ export default function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <Suspense fallback={<div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>Cargando…</div>}>
+          <Suspense fallback={<SplashScreen />}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/reset-password" element={<LoginPage />} />

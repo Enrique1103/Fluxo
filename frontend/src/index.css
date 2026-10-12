@@ -246,3 +246,32 @@ html.light .mobile-nav button:not([aria-current]) {
 html.light .mobile-nav button[aria-current] {
   color: #059669;
 }
+
+/* Celular: las ventanas de carga suben desde abajo como en una app nativa */
+@media (max-width: 639px) {
+  .sheet {
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+    border-bottom-width: 0;
+    animation: sheetIn 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .sheet::before {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.35);
+    margin: -0.5rem auto 0.75rem;
+  }
+}
+@keyframes sheetIn {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* Toques: sin zoom por doble toque en botones y sin seleccionar texto de la interfaz */
+button, a, [role="button"] {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}

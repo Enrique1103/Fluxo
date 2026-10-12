@@ -237,8 +237,8 @@ export default function HouseholdPage() {
       </nav>
 
       {/* ── Header card ──────────────────────────────────────────────────── */}
-      <header className="relative z-20 flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 p-4 rounded-2xl border backdrop-blur-md bg-slate-900/50 border-slate-800/50">
-        <div className="flex items-center gap-3">
+      <header className="relative z-20 flex flex-col sm:flex-row justify-between items-stretch sm:items-center mb-4 gap-3 sm:p-4 sm:rounded-2xl sm:border sm:backdrop-blur-md sm:bg-slate-900/50 border-slate-800/50">
+        <div className="hidden sm:flex items-center gap-3">
           <div className="w-9 h-9 bg-gradient-to-br from-indigo-400 to-violet-500 rounded-xl flex items-center justify-center shrink-0">
             <Home className="text-white w-4 h-4" />
           </div>
@@ -246,9 +246,9 @@ export default function HouseholdPage() {
             Finanzas del Hogar · {MONTH_NAMES[month - 1]} {year}
           </h1>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto sm:flex-wrap">
           {/* Month + Year selector */}
-          <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5">
+          <div className="flex flex-1 sm:flex-none min-w-0 items-center justify-between gap-1 bg-slate-950 border border-slate-800 rounded-xl px-1.5 sm:px-2 py-1.5">
             <button onClick={() => { setOpenDropdown(null); prevMonth() }} className="p-1 text-slate-400 hover:text-slate-200 transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -256,7 +256,7 @@ export default function HouseholdPage() {
               <button
                 onClick={() => setOpenDropdown(openDropdown === 'fecha' ? null : 'fecha')}
                 onBlur={closeDropdown}
-                className="flex items-center gap-1 text-sm font-semibold text-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
+                className="flex items-center gap-1 text-sm font-semibold text-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap"
               >
                 {MONTH_NAMES[month - 1]} {year}
                 <ChevronDown className="w-3 h-3 opacity-50" />
@@ -290,9 +290,9 @@ export default function HouseholdPage() {
             <button
               onClick={() => setOpenDropdown(openDropdown === 'moneda' ? null : 'moneda')}
               onBlur={closeDropdown}
-              className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"
+              className="flex items-center gap-1.5 sm:gap-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 sm:px-3 py-2"
             >
-              <DollarSign className="w-4 h-4 text-emerald-500" />
+              <DollarSign className="hidden sm:block w-4 h-4 text-emerald-500" />
               <span className="text-sm font-medium text-slate-300">{currency}</span>
               <ChevronDown className="w-3 h-3 text-slate-500" />
             </button>
@@ -523,7 +523,7 @@ export default function HouseholdPage() {
                           {m.role === 'admin' && <Crown className="w-3 h-3 text-amber-400 shrink-0" />}
                           {isAdmin && m.role !== 'admin' && (
                             <button onClick={() => setConfirmRemoveId(m.user_id)}
-                              className="ml-0.5 p-0.5 rounded text-slate-700 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all">
+                              className="ml-0.5 p-0.5 rounded text-slate-600 sm:text-slate-700 hover:text-rose-400 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
                               <X className="w-3 h-3" />
                             </button>
                           )}
@@ -637,14 +637,14 @@ export default function HouseholdPage() {
                         { label: 'Gasto Diario Promedio', value: null, prev: undefined,               color: 'text-amber-400',   icon: Calendar,     border: 'border-amber-500/25',   bg: 'bg-amber-500/10',   better: false, extra: privacy ? '••••' : `${fmtMoney(daily, currency, false)}/día` },
                       ]
                       return (
-                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1">
                           {cards.map(({ label, value, prev, color, icon: Icon, border, bg, better, extra }) => {
                             const delta = value != null && prev != null && prev !== 0
                               ? ((value - prev) / Math.abs(prev)) * 100 : null
                             const deltaUp   = delta != null && delta > 0
                             const deltaGood = delta != null && (better ? deltaUp : !deltaUp)
                             return (
-                              <div key={label} className={`relative bg-slate-900/40 border ${border} rounded-2xl p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-3`}>
+                              <div key={label} className={`relative bg-slate-900/40 border ${border} rounded-2xl p-3.5 sm:p-4 backdrop-blur-sm overflow-hidden flex flex-col gap-2.5 sm:gap-3`}>
                                 <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full ${bg} opacity-40 blur-2xl pointer-events-none`} />
                                 <div className="flex items-start justify-between gap-2">
                                   <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider sm:tracking-widest min-w-0">{label}</p>
@@ -655,7 +655,7 @@ export default function HouseholdPage() {
                                 {breakdownLoading ? (
                                   <div className="h-9 w-28 bg-slate-800 animate-pulse rounded-lg" />
                                 ) : (
-                                  <p className={`text-3xl font-bold tabular-nums leading-none ${color}`}>
+                                  <p className={`text-[26px] sm:text-3xl font-bold tabular-nums leading-none ${color}`}>
                                     {extra ?? fmtMoney(value!, currency, privacy)}
                                   </p>
                                 )}
@@ -1032,8 +1032,8 @@ export default function HouseholdPage() {
                               <table className="w-full text-xs">
                                 <thead className="sticky top-0 bg-slate-900 z-10">
                                   <tr className="text-slate-600 uppercase text-[11px]">
-                                    <th className="text-left pb-2 pt-1 pl-4">Fecha</th>
-                                    <th className="text-left pb-2 pt-1">Tipo</th>
+                                    <th className="text-left pb-2 pt-1 pl-4 hidden sm:table-cell">Fecha</th>
+                                    <th className="text-left pb-2 pt-1 pl-4 sm:pl-0">Tipo</th>
                                     <th className="text-left pb-2 pt-1">Categoría · Concepto</th>
                                     <th className="text-left pb-2 pt-1 hidden sm:table-cell">Miembro</th>
                                     <th className="text-right pb-2 pt-1 pr-4">Monto</th>
@@ -1045,8 +1045,8 @@ export default function HouseholdPage() {
                                     const isIncome = tx.type === 'income'
                                     return (
                                       <tr key={tx.transaction_id} className="hover:bg-slate-800/30 transition-colors">
-                                        <td className="py-2 pl-4 text-slate-500 whitespace-nowrap">{tx.date}</td>
-                                        <td className="py-2">
+                                        <td className="py-2 pl-4 text-slate-500 whitespace-nowrap hidden sm:table-cell">{tx.date}</td>
+                                        <td className="py-2 pl-4 sm:pl-0">
                                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isIncome ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
                                             {isIncome ? 'Ingreso' : 'Gasto'}
                                           </span>
@@ -1054,6 +1054,7 @@ export default function HouseholdPage() {
                                         <td className="py-2">
                                           <p className="text-slate-300 font-medium leading-tight">{tx.category_name}</p>
                                           <p className="text-slate-600 leading-tight">{tx.concept_name}</p>
+                                          <p className="sm:hidden text-slate-600 leading-tight">{tx.date} · {tx.user_name}</p>
                                         </td>
                                         <td className="py-2 hidden sm:table-cell">
                                           <div className="flex items-center gap-1.5">
@@ -1387,8 +1388,8 @@ export default function HouseholdPage() {
                               <table className="w-full text-xs">
                                 <thead className="sticky top-0 bg-slate-900 z-10">
                                   <tr className="text-slate-600 uppercase text-[11px]">
-                                    <th className="text-left pb-2 pt-1 pl-4">Fecha</th>
-                                    <th className="text-left pb-2 pt-1">Categoría · Concepto</th>
+                                    <th className="text-left pb-2 pt-1 pl-4 hidden sm:table-cell">Fecha</th>
+                                    <th className="text-left pb-2 pt-1 pl-4 sm:pl-0">Categoría · Concepto</th>
                                     <th className="text-left pb-2 pt-1 hidden lg:table-cell">Descripción</th>
                                     <th className="text-left pb-2 pt-1 hidden sm:table-cell">Miembro</th>
                                     <th className="text-left pb-2 pt-1 hidden md:table-cell">Cuenta</th>
@@ -1401,10 +1402,11 @@ export default function HouseholdPage() {
                                     const pal = avatarPalette(e.paid_by_user_name)
                                     return (
                                       <tr key={e.transaction_id} className="group hover:bg-slate-800/30 transition-colors">
-                                        <td className="py-2 pl-4 text-slate-500 whitespace-nowrap">{e.date}</td>
-                                        <td className="py-2">
+                                        <td className="py-2 pl-4 text-slate-500 whitespace-nowrap hidden sm:table-cell">{e.date}</td>
+                                        <td className="py-2 pl-4 sm:pl-0">
                                           <p className="text-slate-300 font-medium leading-tight">{e.category_name}</p>
                                           <p className="text-slate-600 leading-tight">{e.concept_name}</p>
+                                          <p className="sm:hidden text-slate-600 leading-tight">{e.date} · {e.paid_by_user_name}</p>
                                         </td>
                                         <td className="py-2 text-slate-500 hidden lg:table-cell max-w-[180px] truncate">{e.description}</td>
                                         <td className="py-2 hidden sm:table-cell">
@@ -1423,7 +1425,7 @@ export default function HouseholdPage() {
                                           <button
                                             onClick={() => setFlagTx(e)}
                                             title="Marcar transacción"
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg text-slate-600 hover:text-amber-400 hover:bg-amber-500/10"
+                                            className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1.5 sm:p-1 rounded-lg text-slate-500 sm:text-slate-600 hover:text-amber-400 hover:bg-amber-500/10"
                                           >
                                             <Flag className="w-3 h-3" />
                                           </button>

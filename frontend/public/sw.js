@@ -1,5 +1,5 @@
-// v3: ícono de app instalada — cambiar la versión invalida los assets cacheados
-const CACHE = 'fluxo-v5'
+// Cambiar la versión invalida los assets cacheados en los celulares
+const CACHE = 'fluxo-v6'
 
 const SHELL = [
   '/',
