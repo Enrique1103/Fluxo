@@ -412,7 +412,7 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
   const queryClient  = useQueryClient()
   const homeCurrency = useHomeCurrency()
   const currencyOpts = [...new Set([homeCurrency, 'USD', 'EUR'])]
-  const { data: accounts = [] } = useQuery({
+  const { data: accounts = [], isSuccess: accountsLoaded } = useQuery({
     queryKey: ['accounts'],
     queryFn:  fetchAccounts,
     enabled:  open,
@@ -509,7 +509,7 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
           <Plus className="w-4 h-4" /> Nueva cuenta
         </button>
 
-        {activeAccounts.length === 0 && (
+        {accountsLoaded && activeAccounts.length === 0 && (
           <p className="text-slate-500 text-xs text-center py-4">Sin cuentas registradas</p>
         )}
 
