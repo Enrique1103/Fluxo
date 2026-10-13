@@ -170,6 +170,10 @@ html.light .bg-slate-900\/50,
 html.light .bg-slate-900\/60,
 html.light .bg-slate-900\/70,
 html.light .bg-slate-900\/95 { background-color: rgba(255,255,255,0.97) !important; }
+/* Versiones que solo aplican en pantalla grande (ej: el encabezado, que en el celular no es tarjeta) */
+@media (min-width: 640px) {
+  html.light .sm\:bg-slate-900\/50 { background-color: rgba(255,255,255,0.97) !important; }
+}
 html.light .bg-slate-800\/50,
 html.light .bg-slate-800\/60,
 html.light .bg-slate-800\/80 { background-color: rgba(226,232,240,0.9) !important; }
