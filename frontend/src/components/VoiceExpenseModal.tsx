@@ -346,7 +346,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl z-10 flex flex-col max-h-[92dvh] bg-slate-900 border border-slate-800/60">
+      <div className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl z-10 flex flex-col max-h-[92dvh] bg-slate-900 border border-slate-800/60 pb-[env(safe-area-inset-bottom)] sm:pb-0">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
@@ -367,7 +367,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
         {phase === 'listening' && (
           <div className="px-5 pb-6 flex flex-col items-center gap-5">
             {/* Type toggle */}
-            <div className="w-full grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-800/30 border border-slate-700/50">
+            <div className="w-full grid grid-cols-4 gap-1 p-1 rounded-xl bg-slate-800/30 border border-slate-700/50">
               {(['income', 'expense', 'transfer', 'withdrawal'] as const).map(type => {
                 const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia', withdrawal: 'Retiro' }
                 const colors = {
@@ -381,7 +381,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   <button
                     key={type}
                     onClick={() => setTxType(type)}
-                    className={`py-2 rounded-lg text-xs font-medium border transition-all ${
+                    className={`min-w-0 py-2 px-0.5 rounded-lg text-[11px] min-[380px]:text-xs font-medium tracking-tight border truncate transition-all ${
                       active ? colors[type] : 'border-transparent text-slate-500 hover:text-slate-300'
                     }`}
                   >
