@@ -349,13 +349,9 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   useEffect(() => { setDestAmount('') }, [accountId, destAccountId])
 
   const srcAccount   = accounts.find(a => a.id === accountId)
-  // Una sola Transferencia: cualquier cuenta puede ser destino. Según el tipo de cuenta se ve si es
-  // un retiro (banco/billetera → efectivo) o una carga (efectivo → banco/billetera)
+  // Una sola Transferencia: cualquier cuenta puede ser destino
   const destOptions  = accounts.filter(a => a.id !== accountId)
   const destAccount  = accounts.find(a => a.id === destAccountId)
-  const moveKind     = !isMove || !srcAccount || !destAccount ? null
-    : srcAccount.type !== 'cash' && destAccount.type === 'cash' ? 'Retiro'
-    : srcAccount.type === 'cash' && destAccount.type !== 'cash' ? 'Carga' : null
   const crossCurrency = isMove && !!srcAccount && !!destAccount && srcAccount.currency !== destAccount.currency
   const crossRate    = crossCurrency ? findRate(rates, srcAccount!.currency, destAccount!.currency, date) : null
   const estDestAmount = crossRate !== null && parseFloat(amount) > 0 ? (parseFloat(amount) * crossRate).toFixed(2) : null
@@ -686,14 +682,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
             {/* Cuenta destino — transferencias (a otra cuenta) y retiros (a efectivo) */}
             {isMove && (
               <div>
-                <label className={labelClass}>
-                  Cuenta destino
-                  {moveKind && (
-                    <span className="ml-2 px-1.5 py-px rounded text-[10px] font-semibold bg-lime-500/15 text-lime-400 border border-lime-500/20">
-                      {moveKind === 'Retiro' ? 'RETIRO de efectivo' : 'CARGA de efectivo'}
-                    </span>
-                  )}
-                </label>
+                <label className={labelClass}>Cuenta destino</label>
                 <div className="relative">
                   <button
                     onClick={() => setOpenDd(openDd === 'destAccount' ? null : 'destAccount')}
