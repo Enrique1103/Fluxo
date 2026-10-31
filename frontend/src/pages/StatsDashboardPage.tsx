@@ -1060,7 +1060,8 @@ export default function StatsDashboardPage() {
                   onCategoryClick={setSelectedCategory}
                   mode={donutMode}
                 />
-                <div className="flex-1 min-w-0 min-h-0 overflow-y-auto space-y-2 w-full pb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+                {/* self-stretch: toma el alto de la card (500px en escritorio) y scrollea adentro en vez de salirse */}
+                <div className="flex-1 min-w-0 min-h-0 overflow-y-auto space-y-2 w-full pb-2 pr-1 sm:self-stretch max-h-[420px] lg:max-h-none" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
                   {cats.map((cat: CategoryStat, i: number) => {
                     const pct    = total > 0 ? (cat.total / total) * 100 : 0
                     const sem    = donutMode === 'expense' ? semColor(cat.total / (breakdown.income || 1) * 100) : { badge: 'bg-emerald-500/15 text-emerald-400', bar: '#10b981' }

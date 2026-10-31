@@ -788,7 +788,7 @@ export default function HouseholdPage() {
                                   selectedCategory={null}
                                   mode={personalDonutMode}
                                 />
-                                <div className="flex-1 min-w-0 min-h-0 overflow-y-auto space-y-2 w-full pb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+                                <div className="flex-1 min-w-0 min-h-0 overflow-y-auto space-y-2 w-full pb-2 pr-1 sm:self-stretch max-h-[420px] lg:max-h-none" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
                                   {items.map((item, i) => {
                                     const pct = total > 0 ? (item.total / total) * 100 : 0
                                     return (
@@ -878,7 +878,7 @@ export default function HouseholdPage() {
                                 onCategoryClick={setDonutSelected}
                                 mode="expense"
                               />
-                              <div className="flex-1 min-w-0 min-h-0 overflow-y-auto space-y-2 w-full pb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+                              <div className="flex-1 min-w-0 min-h-0 overflow-y-auto space-y-2 w-full pb-2 pr-1 sm:self-stretch max-h-[420px] lg:max-h-none" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
                                 {items.map((item, i) => {
                                   const pct = total > 0 ? (item.total / total) * 100 : 0
                                   return (
