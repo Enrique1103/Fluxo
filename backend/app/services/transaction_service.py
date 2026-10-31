@@ -321,6 +321,8 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         metodo_pago=tx_in.metodo_pago if tx_in.type == TransactionType.EXPENSE else PaymentMethod.OTRO,
         household_id=resolved_ids[0] if resolved_ids else None,
     )
+    if tx_in.type == TransactionType.INCOME and concept.is_refund:
+        db_tx.is_refund = True
 
     # Insertar en tabla junction (F04)
     for hh_id in resolved_ids:
@@ -432,6 +434,8 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
         concept_crud.increment_frequency(db, new_concept)
         fields["concept_id"] = new_concept.id
         fields["category_id"] = new_concept.category_id
+        if tx.type == TransactionType.INCOME:
+            fields["is_refund"] = bool(new_concept.is_refund)
 
     # description se puede vaciar enviando null explícitamente
     if "description" in tx_update.model_fields_set:

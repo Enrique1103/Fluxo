@@ -14,14 +14,15 @@ from app.exceptions.household_exceptions import (
     HouseholdNotFound, UnauthorizedHouseholdAccess, NotHouseholdAdmin,
     AlreadyHouseholdMember, MemberNotFound, InviteNotFound,
     InviteExpired, InviteAlreadyUsed, CannotRemoveLastAdmin,
+    SettlementNotAllowed, SettlementNotFound,
 )
 from app.models.users_models import User
 from app.schemas.household_schema import (
     HouseholdCreate, HouseholdUpdate, HouseholdResponse,
     MemberResponse, InviteResponse, JoinRequest,
-    HouseholdAnalyticsResponse,
+    HouseholdAnalyticsResponse, SettlementPayIn, SettlementConfirmIn,
 )
-from app.services import household_service, household_analytics_service
+from app.services import household_service, household_analytics_service, household_settlement_service
 
 router = APIRouter(prefix="/households", tags=["Households"])
 
@@ -91,6 +92,8 @@ def _handle(exc: Exception) -> HTTPException:
         InviteExpired:               (410, str),
         InviteAlreadyUsed:           (409, str),
         CannotRemoveLastAdmin:       (422, str),
+        SettlementNotAllowed:        (422, str),
+        SettlementNotFound:          (404, str),
     }
     for exc_type, (code, _) in mapping.items():
         if isinstance(exc, exc_type):
@@ -255,5 +258,40 @@ def get_analytics(
         return household_analytics_service.get_analytics(
             db, current_user, household_id, year, month
         )
+    except Exception as e:
+        _handle(e)
+
+
+# ---------------------------------------------------------------------------
+# Balanceo del mes: registrar el pago y confirmar que llegó
+# ---------------------------------------------------------------------------
+
+@router.post("/{household_id}/settlements", status_code=status.HTTP_201_CREATED)
+def pay_settlement(
+    household_id: uuid.UUID,
+    data: SettlementPayIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """El que debe registra el pago (elige de qué cuenta sale). El monto lo calcula Hogar."""
+    try:
+        s = household_settlement_service.pay(db, current_user, household_id, data)
+        return {"id": str(s.id), "amount": str(s.amount), "currency": s.currency}
+    except Exception as e:
+        _handle(e)
+
+
+@router.post("/{household_id}/settlements/{settlement_id}/confirm")
+def confirm_settlement(
+    household_id: uuid.UUID,
+    settlement_id: uuid.UUID,
+    data: SettlementConfirmIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """El que cobra confirma a qué cuenta entró la plata."""
+    try:
+        s = household_settlement_service.confirm(db, current_user, household_id, settlement_id, data)
+        return {"id": str(s.id), "confirmed": True}
     except Exception as e:
         _handle(e)

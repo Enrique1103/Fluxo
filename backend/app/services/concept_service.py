@@ -42,7 +42,9 @@ def create(db: Session, user: User, concept_in: ConceptCreate) -> Concept:
         raise ConceptAlreadyExists("Ya existe un concepto con ese nombre")
 
     category = _get_owned_category(db, concept_in.category_id, user.id)
-    db_concept = concept_crud.create(db, user_id=user.id, name=name, category_id=category.id)
+    db_concept = concept_crud.create(
+        db, user_id=user.id, name=name, category_id=category.id, is_refund=concept_in.is_refund,
+    )
     db.commit()
     db.refresh(db_concept)
     return db_concept
@@ -89,8 +91,17 @@ def update(db: Session, user: User, concept_id: uuid.UUID, concept_update: Conce
         move_to = _get_owned_category(db, concept_update.category_id, user.id).id
         fields["category_id"] = move_to
 
+    if concept_update.is_refund is not None and concept_update.is_refund != concept.is_refund:
+        fields["is_refund"] = concept_update.is_refund
+
     if fields:
         concept_crud.update(db, concept, fields)
+        if "is_refund" in fields:
+            # Los ingresos ya cargados con este concepto pasan a contar (o dejan de contar) como reintegro
+            from app.models.transactions_models import Transaction, TransactionType
+            db.query(Transaction).filter(
+                Transaction.concept_id == concept.id, Transaction.type == TransactionType.INCOME,
+            ).update({"is_refund": fields["is_refund"]}, synchronize_session=False)
         if move_to is not None:
             # La categoría de un movimiento sale de su concepto: si el concepto
             # cambia de categoría, sus movimientos (y planes de cuotas) también.
@@ -169,6 +180,14 @@ def resolve_for_transaction(
 
 def check_type(concept: Concept, tx_type: str) -> None:
     tx_type = getattr(tx_type, "value", tx_type)
+    if concept.is_refund:
+        # Un reintegro es plata que vuelve: solo se carga como ingreso
+        if tx_type != "income":
+            raise ConceptTypeMismatch(
+                f"{concept.name} es un reintegro: se carga como ingreso (resta del gasto de "
+                f"{concept.category.name})."
+            )
+        return
     allowed = TX_TYPE_TO_KINDS.get(tx_type)
     kind = concept.category.kind if concept.category else "any"
     if allowed and kind not in allowed:

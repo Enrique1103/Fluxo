@@ -96,6 +96,8 @@ class Transaction(Base):
         UUID(as_uuid=True), ForeignKey("households.id", ondelete="SET NULL"), nullable=True
     )
     commission: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True, default=None)
+    # Copia de concept.is_refund (solo ingresos): resta del gasto en vez de sumar ingreso
+    is_refund: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     import_hash: Mapped[str | None] = mapped_column(String(16), nullable=True, default=None)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

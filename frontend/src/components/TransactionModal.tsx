@@ -843,6 +843,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                     <span className="w-2 h-2 rounded-full" style={{ background: selectedCategory.color ?? '#64748b' }} />
                     {selectedCategory.name}
                   </span>
+                  {selectedConcept?.is_refund && <span className="text-emerald-400">· reintegro, resta del gasto</span>}
                 </p>
               )}
               {showNewConcept && (

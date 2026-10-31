@@ -110,6 +110,7 @@ class TransactionResponse(BaseModel):
     external_account_id: uuid.UUID | None = None
     commission: Decimal | None = None
     metodo_pago: PaymentMethod
+    is_refund: bool = False
     instalment_plan_id: uuid.UUID | None = None
     household_id: uuid.UUID | None = None
     household_ids: list[uuid.UUID] = Field(default_factory=list)

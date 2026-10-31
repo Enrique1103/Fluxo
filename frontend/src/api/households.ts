@@ -54,6 +54,21 @@ export interface SettlementItem {
   currency: string
 }
 
+/** Pago registrado del balanceo del mes */
+export interface SettlementPayment {
+  id: string
+  from_user_id: string
+  from_user_name: string
+  to_user_id: string
+  to_user_name: string
+  amount: number
+  currency: string
+  paid_date: string
+  comment: string | null
+  /** El que cobra ya indicó a qué cuenta entró */
+  confirmed: boolean
+}
+
 export interface SharedExpense {
   transaction_id: string
   date: string
@@ -115,6 +130,7 @@ export interface HouseholdAnalytics {
   members: MemberContribution[]
   shared_expenses: SharedExpense[]
   settlement: SettlementItem[]
+  settlement_payments?: SettlementPayment[]
   alerts: HouseholdAlert[]
   expense_by_category: CategoryBreakdown[]
   total_shared: number
@@ -196,4 +212,19 @@ export const fetchHouseholdAnalytics = async (
     { params: { year, month } },
   )
   return data
+}
+
+// --- Balanceo del mes ---
+/** El que debe registra el pago: el monto lo calcula Hogar; se le carga el gasto "Balanceo del Hogar" */
+export const paySettlement = async (householdId: string, payload: {
+  year: number; month: number; to_user_id: string; account_id: string; date: string; comment?: string
+}): Promise<void> => {
+  await client.post(`/v1/households/${householdId}/settlements`, payload)
+}
+
+/** El que cobra confirma a qué cuenta entró: se le carga el reintegro "Reintegro del Hogar" */
+export const confirmSettlement = async (householdId: string, settlementId: string, payload: {
+  account_id: string; date?: string
+}): Promise<void> => {
+  await client.post(`/v1/households/${householdId}/settlements/${settlementId}/confirm`, payload)
 }

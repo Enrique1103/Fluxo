@@ -1,7 +1,8 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date as PyDate, datetime, timezone
+from decimal import Decimal
 from enum import Enum
-from sqlalchemy import String, Boolean, DateTime, ForeignKey
+from sqlalchemy import String, Boolean, Date, DateTime, ForeignKey, Integer, Numeric
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -123,3 +124,39 @@ class HouseholdInvite(Base):
     household        = relationship("Household", back_populates="invites")
     created_by_user  = relationship("User", foreign_keys=[created_by])
     used_by_user     = relationship("User", foreign_keys=[used_by])
+
+
+class HouseholdSettlement(Base):
+    """
+    Pago del balanceo de un mes del hogar: "Luis le pagó a Papá $3.500".
+    El que paga elige la cuenta de donde sale (se le carga un gasto "Balanceo del Hogar")
+    y el que cobra confirma a qué cuenta entró (se le carga el ingreso "Reintegro del
+    Hogar", que resta de su gasto). Mientras el gasto del que paga no esté borrado,
+    el pago cuenta en la liquidación de ese mes.
+    """
+    __tablename__ = "household_settlements"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    household_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("households.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    from_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    to_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    paid_date: Mapped[PyDate] = mapped_column(Date, nullable=False)
+    comment: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    payer_tx_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True
+    )
+    receiver_tx_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    payer_tx    = relationship("Transaction", foreign_keys=[payer_tx_id])
+    receiver_tx = relationship("Transaction", foreign_keys=[receiver_tx_id])
