@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.api.dependeces import get_current_user
 from app.models.users_models import User
-from app.schemas.budget_schema import BudgetCreate, BudgetUpdate, BudgetResponse
+from app.schemas.budget_schema import BudgetCreate, BudgetUpdate, BudgetResponse, BudgetBulkSave
 from app.services import budget_service
 
 router = APIRouter(prefix="/budgets", tags=["budgets"])
@@ -17,6 +17,15 @@ def create_budget(
     current_user: User = Depends(get_current_user),
 ):
     return budget_service.create(db, current_user.id, payload)
+
+
+@router.post("/bulk", response_model=list[BudgetResponse])
+def save_budgets_bulk(
+    payload: BudgetBulkSave,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return budget_service.save_bulk(db, current_user.id, payload)
 
 
 @router.get("", response_model=list[BudgetResponse])

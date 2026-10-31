@@ -5,6 +5,9 @@ export interface Budget {
   user_id: string
   category_id: string
   category_name: string
+  /** null = presupuesto de toda la categoría (suma todos sus conceptos) */
+  concept_id: string | null
+  concept_name: string | null
   month: number
   year: number
   max_amount: number
@@ -14,6 +17,7 @@ export interface Budget {
 
 export interface BudgetCreate {
   category_id: string
+  concept_id?: string | null
   month: number
   year: number
   max_amount: number
@@ -41,4 +45,17 @@ export const updateBudget = async (id: string, max_amount: number): Promise<Budg
 
 export const deleteBudget = async (id: string): Promise<void> => {
   await client.delete(`/v1/budgets/${id}`)
+}
+
+export interface BudgetBulkItem {
+  category_id: string
+  concept_id: string | null
+  max_amount: number
+  currency: string
+}
+
+/** Guarda varios presupuestos en un mes (ej: copia editada de otro mes). Los que ya existen se actualizan. */
+export const saveBudgetsBulk = async (month: number, year: number, items: BudgetBulkItem[]): Promise<Budget[]> => {
+  const { data } = await client.post<Budget[]>('/v1/budgets/bulk', { month, year, items })
+  return data
 }
