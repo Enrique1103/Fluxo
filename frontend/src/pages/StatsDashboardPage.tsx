@@ -106,7 +106,7 @@ function TxTable({
   categoryFilter?: string | null
 }) {
   const queryClient = useQueryClient()
-  const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'transfer' | 'withdrawal'>('all')
+  const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all')
   const [methodFilter, setMethodFilter] = useState<PaymentMethod | 'all'>('all')
   const [search, setSearch] = useState('')
   const [internalCategory, setInternalCategory] = useState<string | null>(categoryFilter ?? null)
@@ -191,10 +191,7 @@ function TxTable({
   }
 
   const filtered = useMemo(() => {
-    // Retiro = transferencia hacia una cuenta de efectivo
     let result = filter === 'all' ? transactions
-      : filter === 'withdrawal' ? transactions.filter(t => t.type === 'transfer' && (t.is_withdrawal || t.is_deposit))
-      : filter === 'transfer' ? transactions.filter(t => t.type === 'transfer' && !t.is_withdrawal && !t.is_deposit)
       : transactions.filter(t => t.type === filter)
     if (methodFilter !== 'all') {
       result = result.filter(t => t.metodo_pago === methodFilter)
@@ -246,7 +243,6 @@ function TxTable({
     { value: 'income',   label: 'Ingresos',         activeClass: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400' },
     { value: 'expense',  label: 'Gastos',           activeClass: 'bg-rose-500/15 border-rose-500/30 text-rose-400' },
     { value: 'transfer', label: 'Transferencias', activeClass: 'bg-amber-500/15 border-amber-500/30 text-amber-400' },
-    { value: 'withdrawal', label: 'Retiros / Cargas',     activeClass: 'bg-lime-500/15 border-lime-500/30 text-lime-400' },
   ] as const
 
   const selectedTypeLabel = TYPE_OPTIONS.find(o => o.value === filter)?.label ?? 'Todos'
@@ -496,17 +492,15 @@ function TxTable({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <p className="text-sm text-slate-200 font-medium truncate">
-                      {tx.type === 'transfer' && tx.transfer_dest_name ? `→ ${tx.transfer_dest_name}` : tx.category_name}
+                      {tx.concept_name || tx.category_name}
                     </p>
-                    {(tx.is_withdrawal || tx.is_deposit) && (
-                      <span className="px-1.5 py-px rounded text-[10px] font-semibold bg-lime-500/15 text-lime-400 border border-lime-500/20 shrink-0">{tx.is_deposit ? 'CARGA' : 'RETIRO'}</span>
-                    )}
                     {tx.instalment_plan_id && (
                       <span className="px-1.5 py-px rounded text-[10px] font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/20 shrink-0">CUOTA</span>
                     )}
                   </div>
                   <p className="text-xs text-slate-500 truncate">
-                    {[fmtDate(tx.date), tx.concept_name, tx.account_name].filter(Boolean).join(' · ')}
+                    {[tx.type === 'transfer' && tx.transfer_dest_name ? `→ ${tx.transfer_dest_name}` : tx.category_name,
+                      fmtDate(tx.date), tx.account_name].filter(Boolean).join(' · ')}
                   </p>
                   {tx.description && <p className="text-xs text-slate-600 truncate">{tx.description}</p>}
                 </div>
@@ -538,7 +532,7 @@ function TxTable({
             <thead>
               <tr className="text-slate-600 uppercase text-sm">
                 <th className="text-left pb-2 pl-1">Fecha</th>
-                <th className="text-left pb-2">Categoría · Concepto</th>
+                <th className="text-left pb-2">Concepto · Categoría</th>
                 <th className="text-left pb-2 hidden lg:table-cell">Descripción</th>
                 <th className="text-left pb-2 hidden sm:table-cell">Cuenta</th>
                 <th className="text-left pb-2 hidden md:table-cell">Método</th>
@@ -552,23 +546,18 @@ function TxTable({
                   <td className="py-2 pl-1 text-slate-500 whitespace-nowrap">{fmtDate(tx.date)}</td>
                   <td className="py-2">
                     <div className="flex items-center gap-1.5 leading-tight">
-                      <p className="text-slate-300 font-medium">
-                        {tx.type === 'transfer' && tx.transfer_dest_name
-                          ? `→ ${tx.transfer_dest_name}`
-                          : tx.category_name}
+                      <p className="text-sm text-slate-200 font-medium">
+                        {tx.concept_name || tx.category_name}
                       </p>
-                      {(tx.is_withdrawal || tx.is_deposit) && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-lime-500/15 text-lime-400 border border-lime-500/20 shrink-0">
-                          {tx.is_deposit ? 'CARGA' : 'RETIRO'}
-                        </span>
-                      )}
                       {tx.instalment_plan_id && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/20 shrink-0">
                           CUOTA
                         </span>
                       )}
                     </div>
-                    <p className="text-slate-600">{tx.concept_name}</p>
+                    <p className="text-slate-500">
+                      {tx.type === 'transfer' && tx.transfer_dest_name ? `→ ${tx.transfer_dest_name}` : tx.category_name}
+                    </p>
                   </td>
                   <td className="py-2 text-slate-500 hidden lg:table-cell max-w-[180px] truncate">{tx.description}</td>
                   <td className="py-2 text-slate-500 hidden sm:table-cell">{tx.account_name}</td>

@@ -1041,7 +1041,7 @@ export default function HouseholdPage() {
                                   <tr className="text-slate-600 uppercase text-[11px]">
                                     <th className="text-left pb-2 pt-1 pl-4 hidden sm:table-cell">Fecha</th>
                                     <th className="text-left pb-2 pt-1 pl-4 sm:pl-0">Tipo</th>
-                                    <th className="text-left pb-2 pt-1">Categoría · Concepto</th>
+                                    <th className="text-left pb-2 pt-1">Concepto · Categoría</th>
                                     <th className="text-left pb-2 pt-1 hidden sm:table-cell">Miembro</th>
                                     <th className="text-right pb-2 pt-1 pr-4">Monto</th>
                                   </tr>
@@ -1059,8 +1059,8 @@ export default function HouseholdPage() {
                                           </span>
                                         </td>
                                         <td className="py-2">
-                                          <p className="text-slate-300 font-medium leading-tight">{tx.category_name}</p>
-                                          <p className="text-slate-600 leading-tight">{tx.concept_name}</p>
+                                          <p className="text-sm text-slate-200 font-medium leading-tight">{tx.concept_name || tx.category_name}</p>
+                                          <p className="text-slate-500 leading-tight">{tx.category_name}</p>
                                           <p className="sm:hidden text-slate-600 leading-tight">{tx.date} · {tx.user_name}</p>
                                         </td>
                                         <td className="py-2 hidden sm:table-cell">
@@ -1439,7 +1439,7 @@ export default function HouseholdPage() {
                                 <thead className="sticky top-0 bg-slate-900 z-10">
                                   <tr className="text-slate-600 uppercase text-[11px]">
                                     <th className="text-left pb-2 pt-1 pl-4 hidden sm:table-cell">Fecha</th>
-                                    <th className="text-left pb-2 pt-1 pl-4 sm:pl-0">Categoría · Concepto</th>
+                                    <th className="text-left pb-2 pt-1 pl-4 sm:pl-0">Concepto · Categoría</th>
                                     <th className="text-left pb-2 pt-1 hidden lg:table-cell">Descripción</th>
                                     <th className="text-left pb-2 pt-1 hidden sm:table-cell">Miembro</th>
                                     <th className="text-left pb-2 pt-1 hidden md:table-cell">Cuenta</th>
@@ -1454,8 +1454,8 @@ export default function HouseholdPage() {
                                       <tr key={e.transaction_id} className="group hover:bg-slate-800/30 transition-colors">
                                         <td className="py-2 pl-4 text-slate-500 whitespace-nowrap hidden sm:table-cell">{e.date}</td>
                                         <td className="py-2 pl-4 sm:pl-0">
-                                          <p className="text-slate-300 font-medium leading-tight">{e.category_name}</p>
-                                          <p className="text-slate-600 leading-tight">{e.concept_name}</p>
+                                          <p className="text-sm text-slate-200 font-medium leading-tight">{e.concept_name || e.category_name}</p>
+                                          <p className="text-slate-500 leading-tight">{e.category_name}</p>
                                           <p className="sm:hidden text-slate-600 leading-tight">{e.date} · {e.paid_by_user_name}</p>
                                         </td>
                                         <td className="py-2 text-slate-500 hidden lg:table-cell max-w-[180px] truncate">{e.description}</td>
