@@ -339,3 +339,22 @@ def test_vacation_expenses_marked_extraordinary(authed, cash_account, seeds):
     ive = _ive(c, h)
     assert ive["Egresos"] == 1000.0
     assert ive["Extraordinarios"] == 800.0
+
+
+def test_category_with_two_kinds(authed, cash_account):
+    """Una categoría puede servir para dos tipos (ej: gastos e ingresos): sus conceptos se
+    ofrecen en ambos y se rechazan en el tercero."""
+    c, h = authed
+    r = c.post(f"{BASE}/categories", json={"name": "Changas", "kind": "income,expense"}, headers=h)
+    assert r.status_code == 201, r.text
+    assert r.json()["kind"] == "expense,income"
+    con = c.post(f"{BASE}/concepts", json={"name": "Uber Trabajo", "category_id": r.json()["id"]}, headers=h).json()
+    ids = lambda t: {x["id"] for x in c.get(f"{BASE}/concepts", params={"type": t}, headers=h).json()}
+    assert con["id"] in ids("expense") and con["id"] in ids("income")
+    assert con["id"] not in ids("transfer")
+    _tx(c, h, cash_account["id"], con["id"], None, 100, "income")
+    _tx(c, h, cash_account["id"], con["id"], None, 50, "expense")
+    # los tres tipos se guardan como "any"
+    r2 = c.patch(f"{BASE}/categories/{r.json()['id']}", json={"kind": "expense,income,transfer"}, headers=h)
+    assert r2.json()["kind"] == "any"
+    assert c.post(f"{BASE}/categories", json={"name": "Mala", "kind": "otra"}, headers=h).status_code == 422

@@ -16,13 +16,14 @@ import {
   createConcept,
   fetchExchangeRates,
   conceptsForType,
-  CATEGORY_KIND_LABELS,
+  kindAllows,
   type Account,
   type Category,
   type CategoryKind,
   type PaymentMethod,
 } from '../api/dashboard'
 import { fetchHouseholds } from '../api/households'
+import KindPicker from './KindPicker'
 import { findRate, fmtRate } from '../utils/rates'
 import { invalidateFinancialData } from '../lib/queryClient'
 import { useHomeCurrency } from '../hooks/useHomeCurrency'
@@ -202,18 +203,7 @@ function QuickCreateCategory({ defaultKind, onCreated, onCancel }: QuickCreateCa
         placeholder="Nombre de la categoría"
         className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500/60 transition-colors w-full"
       />
-      <div className="flex gap-1 flex-wrap">
-        <span className="text-[10px] text-slate-500 self-center mr-1">Se usa para:</span>
-        {(Object.keys(CATEGORY_KIND_LABELS) as CategoryKind[]).map(k => (
-          <button
-            key={k}
-            onClick={() => setKind(k)}
-            className={`px-2 py-0.5 rounded-md text-[10px] border transition-colors ${kind === k ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300' : 'border-slate-600 text-slate-400 hover:text-slate-200'}`}
-          >
-            {CATEGORY_KIND_LABELS[k]}
-          </button>
-        ))}
-      </div>
+      <KindPicker value={kind} onChange={setKind} />
       <div className="flex gap-1.5 flex-wrap">
         {PRESET_COLORS.map(c => (
           <button
@@ -365,7 +355,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   // Al editar un movimiento viejo cuyo concepto no corresponde al tipo, se sigue mostrando
   const visibleConcepts = selectedConcept && !typeConcepts.some(c => c.id === selectedConcept.id)
     ? [selectedConcept, ...typeConcepts] : typeConcepts
-  const typeCategories = categories.filter(c => c.kind === kindForType || c.kind === 'any')
+  const typeCategories = categories.filter(c => kindAllows(c.kind, kindForType as 'expense' | 'income' | 'transfer'))
   const search = conceptSearch.trim().toLowerCase()
   const conceptGroups = categories
     .map(cat => ({

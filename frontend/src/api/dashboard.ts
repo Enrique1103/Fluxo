@@ -198,9 +198,35 @@ export const createAccount = async (payload: {
 
 // --- Categories & Concepts ---
 /** Para qué movimientos se ofrecen los conceptos de la categoría */
-export type CategoryKind = 'expense' | 'income' | 'transfer' | 'any'
-export const CATEGORY_KIND_LABELS: Record<CategoryKind, string> = {
-  expense: 'Gastos', income: 'Ingresos', transfer: 'Transferencias', any: 'Todos',
+/** Tipo de movimiento base */
+export type BaseKind = 'expense' | 'income' | 'transfer'
+/** Para qué se usa una categoría: uno o dos tipos ("expense,income") o "any" (los tres) */
+export type CategoryKind = string
+export const BASE_KINDS: BaseKind[] = ['expense', 'income', 'transfer']
+export const BASE_KIND_LABELS: Record<BaseKind, string> = {
+  expense: 'Gastos', income: 'Ingresos', transfer: 'Transferencias',
+}
+/** Tipos que abarca una categoría ("any" = los tres) */
+export function kindParts(kind: CategoryKind | null | undefined): BaseKind[] {
+  if (!kind || kind === 'any') return [...BASE_KINDS]
+  return BASE_KINDS.filter(k => kind.split(',').includes(k))
+}
+/** Arma el valor a guardar desde los tipos marcados (los tres = "any") */
+export function kindFromParts(parts: BaseKind[]): CategoryKind {
+  const set = BASE_KINDS.filter(k => parts.includes(k))
+  return set.length === 3 ? 'any' : set.join(',')
+}
+export function kindAllows(kind: CategoryKind | null | undefined, type: BaseKind): boolean {
+  return kindParts(kind).includes(type)
+}
+/** "Gastos", "Gastos e Ingresos", "Todos" */
+export function kindLabel(kind: CategoryKind | null | undefined): string {
+  const parts = kindParts(kind)
+  if (parts.length === 3) return 'Todos'
+  const names = parts.map(k => BASE_KIND_LABELS[k])
+  if (names.length < 2) return names[0] ?? ''
+  const last = names[names.length - 1]
+  return `${names.slice(0, -1).join(', ')} ${/^[Ii]/.test(last) ? 'e' : 'y'} ${last}`
 }
 export interface Category {
   id: string; name: string; color: string | null; icon: string | null; is_system: boolean
@@ -228,7 +254,7 @@ export function conceptsForType(
     // Los reintegros (plata que vuelve de un gasto) solo se cargan como ingreso
     if (c.is_refund) return want === 'income'
     const k = kindOf.get(c.category_id)
-    return k === want || k === 'any'
+    return k !== undefined && kindAllows(k, want)
   })
 }
 

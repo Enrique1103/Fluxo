@@ -10,14 +10,16 @@ import {
   createConcept,
   updateConcept,
   deleteConcept,
-  CATEGORY_KIND_LABELS,
+  kindLabel,
+  kindParts,
   type Category,
   type CategoryKind,
   type Concept,
 } from '../api/dashboard'
+import KindPicker from './KindPicker'
 import { invalidateFinancialData } from '../lib/queryClient'
 
-const KIND_STYLES: Record<CategoryKind, string> = {
+const KIND_STYLES: Record<string, string> = {
   expense:  'text-rose-300 border-rose-400/30 bg-rose-400/10',
   income:   'text-cyan-300 border-cyan-400/30 bg-cyan-400/10',
   transfer: 'text-amber-300 border-amber-400/30 bg-amber-400/10',
@@ -26,8 +28,8 @@ const KIND_STYLES: Record<CategoryKind, string> = {
 
 function KindBadge({ kind }: { kind: CategoryKind }) {
   return (
-    <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded-md border ${KIND_STYLES[kind] ?? KIND_STYLES.any}`}>
-      {CATEGORY_KIND_LABELS[kind] ?? kind}
+    <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded-md border ${kindParts(kind).length === 1 ? KIND_STYLES[kindParts(kind)[0]] : KIND_STYLES.any}`}>
+      {kindLabel(kind)}
     </span>
   )
 }
@@ -45,20 +47,6 @@ function RefundToggle({ value, onChange }: { value: boolean; onChange: (v: boole
   )
 }
 
-/** Selector de "para qué movimientos se usa" la categoría */
-function KindPicker({ value, onChange }: { value: CategoryKind; onChange: (k: CategoryKind) => void }) {
-  return (
-    <div className="flex gap-1 flex-wrap items-center">
-      <span className="text-[10px] text-slate-500 mr-1">Se usa para:</span>
-      {(Object.keys(CATEGORY_KIND_LABELS) as CategoryKind[]).map(k => (
-        <button key={k} onClick={() => onChange(k)}
-          className={`px-2 py-0.5 rounded-md text-[10px] border transition-colors ${value === k ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300' : 'border-slate-600 text-slate-400 hover:text-slate-200'}`}>
-          {CATEGORY_KIND_LABELS[k]}
-        </button>
-      ))}
-    </div>
-  )
-}
 
 const PRESET_COLORS = [
   '#22d3ee', '#34d399', '#a78bfa', '#f43f5e', '#fb923c',
@@ -267,7 +255,7 @@ function ConceptRow({ concept, categories, onSaved, onDeleted }: {
         <div className="mt-2 pl-5 space-y-1">
           <select value={categoryId} onChange={e => setCategoryId(e.target.value)}
             className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/60">
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name} · {CATEGORY_KIND_LABELS[c.kind] ?? c.kind}</option>)}
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name} · {kindLabel(c.kind)}</option>)}
           </select>
           {categoryId !== concept.category_id && (
             <p className="text-[10px] text-amber-400">Los movimientos con este concepto también pasan a la nueva categoría.</p>
@@ -379,7 +367,7 @@ function CreateConceptForm({ categories, onCreated }: { categories: Category[]; 
       <select value={categoryId} onChange={e => setCategoryId(e.target.value)}
         className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/60">
         <option value="">¿A qué categoría pertenece?</option>
-        {categories.map(c => <option key={c.id} value={c.id}>{c.name} · {CATEGORY_KIND_LABELS[c.kind] ?? c.kind}</option>)}
+        {categories.map(c => <option key={c.id} value={c.id}>{c.name} · {kindLabel(c.kind)}</option>)}
       </select>
       <RefundToggle value={isRefund} onChange={setIsRefund} />
       {error && <p className="text-rose-400 text-[10px]">{error}</p>}
