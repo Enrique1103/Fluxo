@@ -513,7 +513,7 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
         DailyExpense(date=k, total=v)
         for k, v in sorted(daily_totals.items())
     ]
-    # Tipo de la cuenta destino de cada transferencia, para distinguir retiros de efectivo
+    # Cuentas de efectivo: retiro = banco → efectivo; carga = efectivo → banco o billetera
     dest_cash_names = {
         name for (name,) in db.query(Account.name).filter(
             Account.user_id == user.id, Account.type == AccountType.CASH
@@ -530,7 +530,10 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
             account_name=acc_name,
             description=tx.description,
             transfer_dest_name=dest_acc_name or ext_acc_name,
-            is_withdrawal=tx.type == TransactionType.TRANSFER and dest_acc_name in dest_cash_names,
+            is_withdrawal=tx.type == TransactionType.TRANSFER and dest_acc_name in dest_cash_names
+                and acc_name not in dest_cash_names,
+            is_deposit=tx.type == TransactionType.TRANSFER and acc_name in dest_cash_names
+                and dest_acc_name is not None and dest_acc_name not in dest_cash_names,
             metodo_pago=tx.metodo_pago.value if tx.type.value == "expense" else None,
             instalment_plan_id=str(tx.instalment_plan_id) if tx.instalment_plan_id else None,
         )

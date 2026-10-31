@@ -139,6 +139,9 @@ def test_withdrawal_flag_in_monthly_breakdown(mixed):
     bd = c.get(f"{BASE}/analytics/monthly-breakdown", params={"year": TODAY.year, "month": TODAY.month}, headers=h).json()
     flags = {t["transfer_dest_name"]: t["is_withdrawal"] for t in bd["transactions"] if t["type"] == "transfer"}
     assert flags == {"USD": True, "Banco": False}
+    # Efectivo → banco = carga (Retiro / Carga dentro de Transferencia)
+    deposits = {t["transfer_dest_name"]: t["is_deposit"] for t in bd["transactions"] if t["type"] == "transfer"}
+    assert deposits == {"USD": False, "Banco": True}
 
 
 def test_rate_rule_exact_average_prev_next(authed):
