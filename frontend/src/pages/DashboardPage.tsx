@@ -79,7 +79,12 @@ export default function DashboardPage() {
   const [confirmDeleteGoalId, setConfirmDeleteGoalId] = useState<string | null>(null)
   const [deletingGoalId,   setDeletingGoalId]   = useState<string | null>(null)
   const [monthsAhead,   setMonthsAhead]   = useState(24)
-  const [runwayYears,   setRunwayYears]   = useState(1)
+  // El plazo elegido se recuerda en este dispositivo (antes volvía a 1 año al recargar)
+  const [runwayYears,   setRunwayYears]   = useState(() => {
+    const v = parseFloat(localStorage.getItem('runwayYears') ?? '')
+    return v > 0 ? v : 1
+  })
+  useEffect(() => { localStorage.setItem('runwayYears', String(runwayYears)) }, [runwayYears])
   const [runwayPickerOpen, setRunwayPickerOpen] = useState(false)
   const [customYears,  setCustomYears]  = useState('')
   const [customMonths, setCustomMonths] = useState('')
