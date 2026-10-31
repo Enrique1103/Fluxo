@@ -136,20 +136,14 @@ export default function AccountModal({ open, onClose }: Props) {
 
           {/* Saldo inicial */}
           <div>
-            <label className={labelClass}>
-              {type === 'credit'
-                ? 'Deuda actual (negativo, ej: -15000)'
-                : type === 'investment'
-                ? 'Saldo inicial (negativo si es posición en rojo)'
-                : 'Saldo inicial'}
-            </label>
+            <label className={labelClass}>Saldo inicial</label>
             <input
               type="number"
               step="0.01"
               {...(type !== 'credit' && type !== 'investment' ? { min: '0' } : {})}
               value={balance}
               onChange={e => setBalance(e.target.value)}
-              placeholder={type === 'credit' ? '-15000' : '0.00'}
+              placeholder="0.00"
               className={inputClass}
             />
           </div>

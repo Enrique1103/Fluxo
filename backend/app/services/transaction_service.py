@@ -39,7 +39,8 @@ def _apply_expense(account: Account, amount: Decimal) -> None:
             raise InsufficientCreditLimit(
                 f"Límite de crédito insuficiente. Disponible: {account.credit_limit + account.balance}"
             )
-    else:
+    elif account.type != AccountType.INVESTMENT:
+        # Efectivo y débito no pueden quedar negativos
         if account.balance < amount:
             raise InsufficientFunds(
                 f"Saldo insuficiente. Disponible: {account.balance}"
@@ -75,7 +76,8 @@ def _reverse_income(account: Account, amount: Decimal) -> None:
             raise InsufficientCreditLimit(
                 f"No se puede: la tarjeta {account.name} superaría su límite de crédito."
             )
-    elif new_balance < Decimal("0.00"):
+    elif account.type != AccountType.INVESTMENT and new_balance < Decimal("0.00"):
+        # Inversión puede quedar negativa; efectivo y débito no
         raise InsufficientFunds(
             f"No se puede: el saldo de {account.name} quedaría en {new_balance}. "
             f"Ese dinero ya se usó en otros movimientos de la cuenta."

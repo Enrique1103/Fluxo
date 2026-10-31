@@ -40,19 +40,24 @@ class TestCreateAccount:
         assert body["is_liability"] is True
         assert body["credit_limit"] == "2000.00"
 
-    def test_create_credit_balance_silently_reset_to_zero(self, authed):
-        """
-        BUG DOCUMENTADO: el schema resetea silenciosamente el balance a 0
-        en cuentas de crédito en lugar de rechazar con 422.
-        Se espera 201 con balance=0 (comportamiento actual).
-        """
+    def test_create_credit_with_negative_balance(self, authed):
+        """Las cuentas de crédito admiten saldo negativo inicial (deuda preexistente)."""
         c, h = authed
         r = c.post(f"{BASE}/accounts", json={
-            "name": "Visa Mala", "type": "credit", "currency": "USD",
-            "balance": "500.00", "credit_limit": "2000.00",
+            "name": "Visa Deuda", "type": "credit", "currency": "USD",
+            "balance": "-500.00", "credit_limit": "2000.00",
         }, headers=h)
         assert r.status_code == 201
-        # El balance enviado (500) es ignorado y forzado a 0
+        assert r.json()["balance"] == "-500.00"
+
+    def test_create_credit_zero_balance(self, authed):
+        """Las cuentas de crédito pueden crearse con saldo 0 (sin deuda inicial)."""
+        c, h = authed
+        r = c.post(f"{BASE}/accounts", json={
+            "name": "Visa Nueva", "type": "credit", "currency": "USD",
+            "balance": "0.00", "credit_limit": "2000.00",
+        }, headers=h)
+        assert r.status_code == 201
         assert r.json()["balance"] == "0.00"
 
     def test_create_duplicate_name(self, authed):
