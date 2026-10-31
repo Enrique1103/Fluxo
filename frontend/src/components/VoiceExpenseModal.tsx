@@ -356,7 +356,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             <Mic size={18} className="text-emerald-400" />
             <span className="font-semibold text-sm text-white">
               {phase === 'listening'
-                ? txType === 'income' ? 'Di tu ingreso' : txType === 'transfer' ? 'Di tu transferencia' : txType === 'withdrawal' ? 'Di tu retiro' : 'Di tu gasto'
+                ? txType === 'income' ? 'Di tu ingreso' : txType === 'transfer' ? 'Di tu transferencia' : txType === 'withdrawal' ? 'Di tu retiro o carga' : 'Di tu gasto'
                 : 'Fluxo entendió'}
             </span>
           </div>
@@ -369,16 +369,15 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
         {phase === 'listening' && (
           <div className="px-5 pb-6 flex flex-col items-center gap-5">
             {/* Type toggle */}
-            <div className="w-full grid grid-cols-4 gap-1 p-1 rounded-xl bg-slate-800/30 border border-slate-700/50">
-              {(['income', 'expense', 'transfer', 'withdrawal'] as const).map(type => {
-                const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia', withdrawal: 'Retiro' }
+            <div className="w-full grid grid-cols-3 gap-1 p-1 rounded-xl bg-slate-800/30 border border-slate-700/50">
+              {(['income', 'expense', 'transfer'] as const).map(type => {
+                const labels = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia' }
                 const colors = {
                   income:   'bg-cyan-400/15 border-cyan-400/40 text-cyan-400',
                   expense:  'bg-rose-400/15 border-rose-400/40 text-rose-400',
                   transfer: 'bg-amber-400/15 border-amber-400/40 text-amber-400',
-                  withdrawal: 'bg-lime-400/15 border-lime-400/40 text-lime-400',
                 }
-                const active = txType === type
+                const active = txType === type || (type === 'transfer' && isMove)
                 return (
                   <button
                     key={type}
@@ -392,6 +391,18 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 )
               })}
             </div>
+            {/* Dentro de Transferencia: entre cuentas o Retiro / Carga */}
+            {isMove && (
+              <div className="w-full flex gap-1 p-1 -mt-3 rounded-xl bg-slate-800/30 border border-slate-700/50">
+                {([['transfer', 'Entre cuentas'], ['withdrawal', 'Retiro / Carga']] as const).map(([t, label]) => (
+                  <button key={t} onClick={() => setTxType(t)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      txType === t ? 'bg-amber-400/15 text-amber-400' : 'text-slate-500 hover:text-slate-300'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Hint */}
             <div className="w-full rounded-xl px-4 py-3 text-center bg-slate-800/30 border border-slate-700/50">
@@ -577,7 +588,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             {/* Source account */}
             <div>
               <label className="text-xs text-slate-400 mb-1 block">
-                {txType === 'transfer' ? 'Cuenta origen' : txType === 'withdrawal' ? 'Sacás de' : 'Cuenta'}
+                {txType === 'transfer' ? 'Cuenta origen' : txType === 'withdrawal' ? 'Sale de' : 'Cuenta'}
               </label>
               {unmatchedAccount && (
                 <div className="flex items-center gap-1.5 text-amber-400 text-xs mb-1">
@@ -618,7 +629,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             {/* Dest account — transferencias (otra cuenta) y retiros (efectivo) */}
             {isMove && (
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">{txType === 'withdrawal' ? 'Efectivo donde queda la plata' : 'Cuenta destino'}</label>
+                <label className="text-xs text-slate-400 mb-1 block">{txType !== 'withdrawal' ? 'Cuenta destino' : (accounts as Account[]).find(x => x.id === accountId)?.type === 'cash' ? 'Cuenta donde la cargás' : 'Efectivo donde queda la plata'}</label>
                 <div className="relative">
                   <button
                     onClick={() => setOpenDd(openDd === 'destAccount' ? null : 'destAccount')}
@@ -634,7 +645,8 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   </button>
                   {openDd === 'destAccount' && (
                     <div className={ddPanel}>
-                      {(accounts as Account[]).filter(a => a.id !== accountId && (txType !== 'withdrawal' || a.type === 'cash')).map(a => (
+                      {(accounts as Account[]).filter(a => a.id !== accountId && (txType !== 'withdrawal'
+                        || ((accounts as Account[]).find(x => x.id === accountId)?.type === 'cash' ? a.type !== 'cash' : a.type === 'cash'))).map(a => (
                         <button
                           key={a.id}
                           onMouseDown={e => e.preventDefault()}
@@ -813,7 +825,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
               >
                 {submitting
                   ? <Loader2 size={16} className="animate-spin" />
-                  : txType === 'income' ? 'Registrar ingreso' : txType === 'transfer' ? 'Transferir' : txType === 'withdrawal' ? 'Registrar retiro' : 'Confirmar gasto'
+                  : txType === 'income' ? 'Registrar ingreso' : txType === 'transfer' ? 'Transferir' : txType === 'withdrawal' ? 'Registrar retiro / carga' : 'Confirmar gasto'
                 }
               </button>
             </div>
