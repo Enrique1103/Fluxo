@@ -1,5 +1,6 @@
 ﻿import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import useTheme from '../hooks/useTheme'
+import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
@@ -83,6 +84,14 @@ export default function DashboardPage() {
   const [customYears,  setCustomYears]  = useState('')
   const [customMonths, setCustomMonths] = useState('')
   const runwayPickerRef = useRef<HTMLDivElement>(null)
+  const runwaySheetRef  = useRef<HTMLDivElement>(null)   // hoja inferior en celular (va en un portal)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 639px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    const on = () => setIsMobile(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
   const loadMoreInProgress = useRef(false)
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
@@ -168,8 +177,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!runwayPickerOpen) return
     const handler = (e: MouseEvent) => {
-      if (runwayPickerRef.current && !runwayPickerRef.current.contains(e.target as Node))
-        setRunwayPickerOpen(false)
+      const t = e.target as Node
+      if (runwayPickerRef.current?.contains(t) || runwaySheetRef.current?.contains(t)) return
+      setRunwayPickerOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -313,6 +323,48 @@ export default function DashboardPage() {
 
     return { months, days, pct, monthsToTarget, closedCount, baseExpenses, usingCurrent: closedMonthsStats.usingCurrent }
   }, [summary, runwayYears, avgMonthlySavings, closedMonthsStats, chartData])
+
+  // Contenido del selector de plazo (se usa en el menú de escritorio y en la hoja de celular)
+  const runwayPickerBody = (
+    <>
+                  <p className="text-[10px] text-slate-500 uppercase font-semibold mb-2 px-1">Personalizado</p>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Años"
+                      value={customYears}
+                      onChange={e => setCustomYears(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-base sm:text-xs text-slate-200 outline-none focus:border-emerald-500/50 placeholder-slate-600"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      max="11"
+                      placeholder="Meses"
+                      value={customMonths}
+                      onChange={e => setCustomMonths(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-base sm:text-xs text-slate-200 outline-none focus:border-emerald-500/50 placeholder-slate-600"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      const y = parseFloat(customYears) || 0
+                      const m = parseFloat(customMonths) || 0
+                      const total = y + m / 12
+                      if (total > 0) {
+                        setRunwayYears(Math.round(total * 12) / 12)
+                        setCustomYears('')
+                        setCustomMonths('')
+                        setRunwayPickerOpen(false)
+                      }
+                    }}
+                    className="mt-2 w-full py-2.5 sm:py-1.5 rounded-lg text-sm sm:text-[11px] font-bold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors border border-emerald-500/30"
+                  >
+                    Aplicar
+                  </button>
+    </>
+  )
 
   return (
     <>
@@ -473,47 +525,25 @@ export default function DashboardPage() {
                 </svg>
               </button>
 
-              {runwayPickerOpen && (
+              {/* Escritorio: menú flotante bajo el botón. Celular: hoja inferior a todo el ancho
+                  (en un portal, porque el contenedor con backdrop-blur recorta los "fixed") */}
+              {runwayPickerOpen && !isMobile && (
                 <div className="absolute right-0 top-8 z-50 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl p-3 w-48"
                   style={{ animation: 'confirmIn 0.12s ease-out' }}
                 >
-                  <p className="text-[10px] text-slate-500 uppercase font-semibold mb-2 px-1">Personalizado</p>
-                  <div className="flex gap-1.5">
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Años"
-                      value={customYears}
-                      onChange={e => setCustomYears(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50 placeholder-slate-600"
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      max="11"
-                      placeholder="Meses"
-                      value={customMonths}
-                      onChange={e => setCustomMonths(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50 placeholder-slate-600"
-                    />
-                  </div>
-                  <button
-                    onClick={() => {
-                      const y = parseFloat(customYears) || 0
-                      const m = parseFloat(customMonths) || 0
-                      const total = y + m / 12
-                      if (total > 0) {
-                        setRunwayYears(Math.round(total * 12) / 12)
-                        setCustomYears('')
-                        setCustomMonths('')
-                        setRunwayPickerOpen(false)
-                      }
-                    }}
-                    className="mt-2 w-full py-1.5 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors border border-emerald-500/30"
-                  >
-                    Aplicar
-                  </button>
+                  {runwayPickerBody}
                 </div>
+              )}
+              {runwayPickerOpen && isMobile && createPortal(
+                <div className="fixed inset-0 z-[70] flex items-end">
+                  <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setRunwayPickerOpen(false)} />
+                  <div ref={runwaySheetRef}
+                    className="sheet relative w-full bg-slate-900 border-t border-slate-700/80 rounded-t-3xl shadow-2xl px-5 pt-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+                    <p className="text-sm font-semibold text-white mb-3">Plazo de Libertad Financiera</p>
+                    {runwayPickerBody}
+                  </div>
+                </div>,
+                document.body,
               )}
             </div>
 
