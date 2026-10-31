@@ -129,3 +129,57 @@ class TestBudgetBulk:
                                         "items": [{"category_id": cat, "max_amount": "0", "currency": "UYU"}]},
                    headers=h)
         assert r.status_code == 422
+
+
+class TestBudgetMultiCategory:
+    def test_multi_category_budget_sums_both(self, authed):
+        c, h = authed
+        cats = c.get(f"{BASE}/categories", headers=h).json()
+        expense_cats = [x for x in cats if not x.get("is_system")][:2]
+        assert len(expense_cats) >= 2, "Need at least 2 categories"
+        cat1, cat2 = expense_cats[0], expense_cats[1]
+        con1 = _concept(c, h, cat1["id"])
+        con2 = _concept(c, h, cat2["id"])
+        acc = _account(c, h)
+        _expense(c, h, acc, con1, "400.00")
+        _expense(c, h, acc, con2, "600.00")
+        r = c.post(BUD, json={"category_id": cat1["id"], "extra_category_ids": [cat2["id"]],
+                               "name": "Casa y comida", "max_amount": "2000", **_period()}, headers=h)
+        assert r.status_code == 201, r.text
+        body = r.json()
+        assert body["extra_category_ids"] == [cat2["id"]]
+        assert body["extra_category_names"] == [cat2["name"]]
+        assert body["name"] == "Casa y comida"
+        assert float(body["spent"]) == 1000.0  # 400 + 600
+
+    def test_multi_category_no_overlap(self, authed):
+        c, h = authed
+        cats = c.get(f"{BASE}/categories", headers=h).json()
+        expense_cats = [x for x in cats if not x.get("is_system")][:2]
+        cat1, cat2 = expense_cats[0], expense_cats[1]
+        r = c.post(BUD, json={"category_id": cat1["id"], "extra_category_ids": [cat2["id"]],
+                               "max_amount": "2000", **_period()}, headers=h)
+        assert r.status_code == 201
+        # Otro presupuesto que incluye cat1 → rechazado
+        r = c.post(BUD, json={"category_id": cat1["id"], "max_amount": "500", **_period()}, headers=h)
+        assert r.status_code == 409, r.text
+
+    def test_multi_category_copied_in_bulk(self, authed):
+        c, h = authed
+        cats = c.get(f"{BASE}/categories", headers=h).json()
+        expense_cats = [x for x in cats if not x.get("is_system")][:2]
+        cat1, cat2 = expense_cats[0], expense_cats[1]
+        src = {"month": 3, "year": 2026, "currency": "UYU"}
+        c.post(BUD, json={"category_id": cat1["id"], "extra_category_ids": [cat2["id"]],
+                           "name": "Grupo", "max_amount": "5000", **src}, headers=h)
+        source = c.get(BUD, params={"month": 3, "year": 2026}, headers=h).json()
+        items = [{"category_id": b["category_id"], "extra_category_ids": b["extra_category_ids"],
+                  "concept_id": b["concept_id"], "name": b["name"], "currency": b["currency"],
+                  "max_amount": "6000"} for b in source]
+        r = c.post(f"{BUD}/bulk", json={"month": 4, "year": 2026, "items": items}, headers=h)
+        assert r.status_code == 200, r.text
+        dest = c.get(BUD, params={"month": 4, "year": 2026}, headers=h).json()
+        assert len(dest) == 1
+        assert dest[0]["extra_category_ids"] == [cat2["id"]]
+        assert dest[0]["name"] == "Grupo"
+        assert float(dest[0]["max_amount"]) == 6000.0
