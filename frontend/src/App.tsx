@@ -25,18 +25,36 @@ function SplashScreen() {
   )
 }
 
+/** Decodifica el payload del JWT y devuelve true si expiró (sin verificar firma). */
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return typeof payload.exp === 'number' && payload.exp * 1000 < Date.now()
+  } catch {
+    return true
+  }
+}
+
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token)
+  const logout = useAuthStore((s) => s.logout)
   const isAdmin = useAuthStore((s) => s.isAdmin)
-  if (!token) return <Navigate to="/login" replace />
+  if (!token || isTokenExpired(token)) {
+    if (token) logout()
+    return <Navigate to="/login" replace />
+  }
   if (isAdmin) return <Navigate to="/admin" replace />
   return <>{children}<MobileNav /></>
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token)
+  const logout = useAuthStore((s) => s.logout)
   const isAdmin = useAuthStore((s) => s.isAdmin)
-  if (!token) return <Navigate to="/login" replace />
+  if (!token || isTokenExpired(token)) {
+    if (token) logout()
+    return <Navigate to="/login" replace />
+  }
   if (!isAdmin) return <Navigate to="/" replace />
   return <>{children}</>
 }
