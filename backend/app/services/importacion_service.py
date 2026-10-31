@@ -1919,6 +1919,7 @@ class ImportacionService:
             metodo_pago=metodo,
             import_hash=mov.get("import_hash"),
             household_id=hh_id,
+            is_refund=bool(tipo == TransactionType.INCOME and concepto.is_refund),
         )
         # La vista del hogar lee la tabla de vínculos (F04), no solo household_id
         if hh_id:

@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 class ConceptCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     category_id: uuid.UUID
+    # Reintegro: se carga como ingreso y resta del gasto de su categoría
+    is_refund: bool = False
 
 
 # --- Actualización ---
@@ -16,6 +18,7 @@ class ConceptCreate(BaseModel):
 class ConceptUpdate(BaseModel):
     name: str | None = Field(None, min_length=2, max_length=100)
     category_id: uuid.UUID | None = None
+    is_refund: bool | None = None
 
 
 # Filtro de conceptos por tipo de movimiento (GET /concepts?type=expense)
@@ -30,5 +33,6 @@ class ConceptResponse(BaseModel):
     name: str
     frequency_score: int
     is_system: bool
+    is_refund: bool = False
 
     model_config = {"from_attributes": True}

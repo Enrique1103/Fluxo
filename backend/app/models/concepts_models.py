@@ -26,6 +26,9 @@ class Concept(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     frequency_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Reintegro: plata que vuelve de un gasto (ej: "Reintegro del Hogar"). Se carga como
+    # ingreso, pero en las gráficas RESTA del gasto de su categoría en vez de sumar ingreso.
+    is_refund: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
     # Relaciones
     user = relationship("User", back_populates="concepts")

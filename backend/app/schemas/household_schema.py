@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import date as PyDate, datetime
 from decimal import Decimal
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from app.models.household_models import SplitType, MemberRole, MemberStatus, InviteStatus, AnalysisLevel
 
 
@@ -161,6 +161,36 @@ class CategoryBreakdown(BaseModel):
     currency: str
 
 
+class SettlementPayment(BaseModel):
+    """Pago registrado del balanceo del mes."""
+    id: uuid.UUID
+    from_user_id: uuid.UUID
+    from_user_name: str
+    to_user_id: uuid.UUID
+    to_user_name: str
+    amount: Decimal
+    currency: str
+    paid_date: str
+    comment: str | None
+    confirmed: bool          # el que cobra ya indicó a qué cuenta entró
+
+
+class SettlementPayIn(BaseModel):
+    """El que debe registra el pago: a quién, de qué cuenta, cuándo y un comentario."""
+    year: int = Field(..., ge=2000, le=2100)
+    month: int = Field(..., ge=1, le=12)
+    to_user_id: uuid.UUID
+    account_id: uuid.UUID
+    date: PyDate
+    comment: str | None = Field(default=None, max_length=100)
+
+
+class SettlementConfirmIn(BaseModel):
+    """El que cobra confirma a qué cuenta entró la plata."""
+    account_id: uuid.UUID
+    date: PyDate | None = None
+
+
 class HouseholdAnalyticsResponse(BaseModel):
     household_id: uuid.UUID
     period: str                             # "YYYY-MM"
@@ -168,6 +198,7 @@ class HouseholdAnalyticsResponse(BaseModel):
     members: list[MemberContribution]
     shared_expenses: list[SharedExpense]
     settlement: list[SettlementItem]
+    settlement_payments: list[SettlementPayment] = []
     alerts: list[HouseholdAlert]
     expense_by_category: list[CategoryBreakdown]
     total_shared: Decimal

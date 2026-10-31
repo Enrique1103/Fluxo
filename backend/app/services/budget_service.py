@@ -16,21 +16,28 @@ from app.exceptions.budget_exceptions import (
 
 
 def _compute_spent(db: Session, budget: Budget) -> Decimal:
-    result = (
-        db.query(func.sum(Transaction.amount))
-        .join(Account, Transaction.account_id == Account.id)
-        .filter(
-            Transaction.user_id    == budget.user_id,
-            Transaction.category_id == budget.category_id,
-            Transaction.type       == TransactionType.EXPENSE,
-            Transaction.is_deleted == False,
-            func.extract("month", Transaction.date) == budget.month,
-            func.extract("year",  Transaction.date) == budget.year,
-            Account.currency == budget.currency,
+    def _sum(*type_filter) -> Decimal:
+        result = (
+            db.query(func.sum(Transaction.amount))
+            .join(Account, Transaction.account_id == Account.id)
+            .filter(
+                Transaction.user_id    == budget.user_id,
+                Transaction.category_id == budget.category_id,
+                *type_filter,
+                Transaction.is_deleted == False,
+                func.extract("month", Transaction.date) == budget.month,
+                func.extract("year",  Transaction.date) == budget.year,
+                Account.currency == budget.currency,
+            )
+            .scalar()
         )
-        .scalar()
+        return result or Decimal("0")
+
+    # Gastos de la categoría menos los reintegros que volvieron a esa categoría
+    spent = _sum(Transaction.type == TransactionType.EXPENSE) - _sum(
+        Transaction.type == TransactionType.INCOME, Transaction.is_refund == True,  # noqa: E712
     )
-    return result or Decimal("0")
+    return max(spent, Decimal("0"))
 
 
 def _to_response(db: Session, budget: Budget) -> BudgetResponse:

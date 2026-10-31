@@ -29,7 +29,13 @@ def get_all_by_user(
     if category_id is not None:
         q = q.filter(Concept.category_id == category_id)
     if kinds:
-        q = q.join(Category, Category.id == Concept.category_id).filter(Category.kind.in_(kinds))
+        # Los reintegros solo se ofrecen en ingresos, sea cual sea el tipo de su categoría
+        from sqlalchemy import or_, and_
+        q = q.join(Category, Category.id == Concept.category_id)
+        if "income" in kinds:
+            q = q.filter(or_(Concept.is_refund == True, Category.kind.in_(kinds)))  # noqa: E712
+        else:
+            q = q.filter(Concept.is_refund == False, Category.kind.in_(kinds))  # noqa: E712
     return q.order_by(Concept.frequency_score.desc(), Concept.name).all()
 
 
@@ -39,6 +45,7 @@ def create(
     name: str,
     is_system: bool = False,
     category_id: uuid.UUID | None = None,
+    is_refund: bool = False,
 ) -> Concept:
     if category_id is None:
         raise ValueError("Todo concepto debe pertenecer a una categoría")
@@ -48,6 +55,7 @@ def create(
         frequency_score=0,
         is_system=is_system,
         category_id=category_id,
+        is_refund=is_refund,
     )
     db.add(db_concept)
     db.flush()

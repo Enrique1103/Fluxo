@@ -69,6 +69,7 @@ def get_summary(db: Session, user: User, display_currency: str | None = None) ->
             Transaction.date,
             Account.currency,
             Category.name,
+            Transaction.is_refund,
         )
         .join(Account, Transaction.account_id == Account.id)
         .outerjoin(Category, Transaction.category_id == Category.id)
@@ -98,8 +99,14 @@ def get_summary(db: Session, user: User, display_currency: str | None = None) ->
     income_this_month = Decimal("0.00")
     expense_this_month = Decimal("0.00")
     by_category: dict[str, Decimal] = {}
-    for tx_type, amount, commission, ext_acc_id, tx_date, currency, cat_name in rows:
-        if tx_type == TransactionType.INCOME:
+    for tx_type, amount, commission, ext_acc_id, tx_date, currency, cat_name, is_refund in rows:
+        if tx_type == TransactionType.INCOME and is_refund:
+            # Reintegro: resta del gasto de su categoría (no es un ingreso real)
+            converted = _to_target(amount, currency, tx_date)
+            expense_this_month -= converted
+            if tx_date <= today and cat_name is not None:
+                by_category[cat_name] = by_category.get(cat_name, Decimal("0.00")) - converted
+        elif tx_type == TransactionType.INCOME:
             income_this_month += _to_target(amount, currency, tx_date)
         elif tx_type == TransactionType.EXPENSE:
             converted = _to_target(amount, currency, tx_date)

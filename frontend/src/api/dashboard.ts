@@ -203,6 +203,8 @@ export interface Category {
 /** Todo concepto pertenece a una categoría: al elegir el concepto, la categoría se completa sola */
 export interface Concept {
   id: string; name: string; category_id: string; frequency_score: number; is_system: boolean
+  /** Reintegro: se carga como ingreso y resta del gasto de su categoría */
+  is_refund?: boolean
 }
 
 /**
@@ -217,6 +219,8 @@ export function conceptsForType(
   const want = type === 'withdrawal' ? 'transfer' : type
   const kindOf = new Map(categories.map(c => [c.id, c.kind ?? 'expense']))
   return concepts.filter(c => {
+    // Los reintegros (plata que vuelve de un gasto) solo se cargan como ingreso
+    if (c.is_refund) return want === 'income'
     const k = kindOf.get(c.category_id)
     return k === want || k === 'any'
   })
@@ -379,12 +383,12 @@ export const deleteCategory = async (id: string): Promise<void> => {
 }
 
 // --- Concept management ---
-export const createConcept = async (payload: { name: string; category_id: string }): Promise<Concept> => {
+export const createConcept = async (payload: { name: string; category_id: string; is_refund?: boolean }): Promise<Concept> => {
   const { data } = await client.post<Concept>('/v1/concepts', payload)
   return data
 }
 /** Cambiar category_id mueve también los movimientos de ese concepto a la nueva categoría */
-export const updateConcept = async (id: string, payload: { name?: string; category_id?: string }): Promise<Concept> => {
+export const updateConcept = async (id: string, payload: { name?: string; category_id?: string; is_refund?: boolean }): Promise<Concept> => {
   const { data } = await client.patch<Concept>(`/v1/concepts/${id}`, payload)
   return data
 }

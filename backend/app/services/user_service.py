@@ -105,6 +105,12 @@ def _hard_delete_user(db: Session, db_user: User) -> None:
         {"transfer_id": None}, synchronize_session=False
     )
 
+    # Pagos del balanceo del hogar donde participa (apuntan a sus movimientos y a su usuario)
+    from app.models.household_models import HouseholdSettlement
+    db.query(HouseholdSettlement).filter(
+        (HouseholdSettlement.from_user_id == uid) | (HouseholdSettlement.to_user_id == uid)
+    ).delete(synchronize_session=False)
+
     from app.models.review_models import TransactionReview
     db.query(TransactionReview).filter(TransactionReview.flagged_by_user_id == uid).delete(synchronize_session=False)
 
@@ -138,6 +144,8 @@ def _hard_delete_user(db: Session, db_user: User) -> None:
     db.flush()
 
     if household_ids_to_delete:
+        from app.models.household_models import HouseholdSettlement as _HS
+        db.query(_HS).filter(_HS.household_id.in_(household_ids_to_delete)).delete(synchronize_session=False)
         db.query(HouseholdInvite).filter(
             HouseholdInvite.household_id.in_(household_ids_to_delete)
         ).delete(synchronize_session=False)

@@ -36,3 +36,11 @@ class InviteAlreadyUsed(HouseholdException):
 
 class CannotRemoveLastAdmin(HouseholdException):
     pass
+
+
+class SettlementNotAllowed(HouseholdException):
+    pass
+
+
+class SettlementNotFound(HouseholdException):
+    pass

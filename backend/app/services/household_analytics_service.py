@@ -12,7 +12,7 @@ from app.models.transactions_models import Transaction, TransactionHousehold, Tr
 from app.models.users_models import User
 from app.schemas.household_schema import (
     HouseholdAnalyticsResponse, MemberContribution,
-    SettlementItem, SharedExpense, HouseholdAlert, CategoryBreakdown,
+    SettlementItem, SettlementPayment, SharedExpense, HouseholdAlert, CategoryBreakdown,
     ConceptBreakdown, MemberIncome, MemberTransaction,
 )
 
@@ -44,6 +44,7 @@ def _get_incomes(
         .filter(
             Transaction.user_id == user_id,
             Transaction.type == TransactionType.INCOME,
+            Transaction.is_refund == False,  # noqa: E712 — un reintegro no es ingreso
             Transaction.transfer_role.is_(None),
             Transaction.is_deleted == False,
             Transaction.date >= date_from,
@@ -243,6 +244,14 @@ def get_analytics(
         uid: expenses_paid[uid] - should_pay[uid]
         for uid in member_ids
     }
+    # Pagos del balanceo ya registrados este mes: el que pagó queda "a favor" por ese
+    # monto y el que cobró deja de tenerlo pendiente, así la deuda vuelve a cero.
+    from app.services import household_settlement_service
+    payments = household_settlement_service.active_for_period(db, household_id, year, month)
+    for p in payments:
+        if p.from_user_id in balances and p.to_user_id in balances:
+            balances[p.from_user_id] += p.amount
+            balances[p.to_user_id] -= p.amount
     raw_settlement = _simplify_debts(balances)
 
     settlement_list: list[SettlementItem] = [
@@ -430,6 +439,21 @@ def get_analytics(
         members=contributions,
         shared_expenses=shared_expense_list,
         settlement=settlement_list,
+        settlement_payments=[
+            SettlementPayment(
+                id=p.id,
+                from_user_id=p.from_user_id,
+                from_user_name=_get_user_name(db, p.from_user_id),
+                to_user_id=p.to_user_id,
+                to_user_name=_get_user_name(db, p.to_user_id),
+                amount=p.amount,
+                currency=p.currency,
+                paid_date=str(p.paid_date),
+                comment=p.comment,
+                confirmed=household_settlement_service.is_confirmed(p),
+            )
+            for p in payments
+        ],
         alerts=alerts,
         expense_by_category=expense_by_category,
         total_shared=total_shared.quantize(Decimal("0.01")),

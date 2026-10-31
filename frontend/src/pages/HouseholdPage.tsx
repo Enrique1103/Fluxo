@@ -23,8 +23,9 @@ import CreateModal from '../components/household/CreateModal'
 import JoinModal from '../components/household/JoinModal'
 import EditModal from '../components/household/EditModal'
 import FlagModal from '../components/household/FlagModal'
+import SettlementModal from '../components/household/SettlementModal'
 import ReviewsPanel from '../components/household/ReviewsPanel'
-import type { SharedExpense } from '../api/households'
+import type { SharedExpense, SettlementItem, SettlementPayment } from '../api/households'
 import SettingsDrawer from '../components/SettingsDrawer'
 import MonthYearPicker from '../components/MonthYearPicker'
 import ExportButton from '../components/ExportButton'
@@ -66,6 +67,9 @@ export default function HouseholdPage() {
 
   const [year,   setYear]   = useState(() => new Date().getFullYear())
   const [month,  setMonth]  = useState(() => new Date().getMonth() + 1)
+  // Balanceo: pago a registrar (deudor) o pago a confirmar (acreedor)
+  const [payItem,     setPayItem]     = useState<SettlementItem | null>(null)
+  const [confirmItem, setConfirmItem] = useState<SettlementPayment | null>(null)
   const [flagTx, setFlagTx] = useState<SharedExpense | null>(null)
 
   const [donutGroupBy,      setDonutGroupBy]      = useState<'category' | 'concept'>('category')
@@ -1163,7 +1167,7 @@ export default function HouseholdPage() {
                     {/* ══════════════════════════════════════════════════ */}
                     {/* 3. LIQUIDACIÓN                                    */}
                     {/* ══════════════════════════════════════════════════ */}
-                    {analytics.settlement.length > 0 ? (
+                                        {analytics.settlement.length > 0 ? (
                       <div className={`rounded-3xl border overflow-hidden bg-slate-900 border-slate-800`}>
                         <div className={`px-5 py-4 border-b border-slate-800`}>
                           <p className={sectionTitle}>Liquidación</p>
@@ -1173,7 +1177,8 @@ export default function HouseholdPage() {
                             const palFrom = avatarPalette(s.from_user_name)
                             const palTo   = avatarPalette(s.to_user_name)
                             return (
-                              <div key={i} className={`flex items-center gap-3 p-3.5 rounded-2xl border bg-rose-500/6 border-rose-500/15`}>
+                              <div key={i}>
+                              <div className={`flex items-center gap-3 p-3.5 rounded-2xl border bg-rose-500/6 border-rose-500/15`}>
                                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 ${palFrom.bg} ${palFrom.text}`}>
                                   {s.from_user_name.charAt(0).toUpperCase()}
                                 </div>
@@ -1195,6 +1200,13 @@ export default function HouseholdPage() {
                                   {s.to_user_name.charAt(0).toUpperCase()}
                                 </div>
                               </div>
+                              {s.from_user_id === currentUserId && (
+                                <button onClick={() => setPayItem(s)}
+                                  className="w-full mt-1.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 transition-all">
+                                  Registrar pago a {s.to_user_name}
+                                </button>
+                              )}
+                              </div>
                             )
                           })}
                         </div>
@@ -1205,6 +1217,41 @@ export default function HouseholdPage() {
                         <p className={`text-xs mt-0.5 text-emerald-600`}>Todos contribuyeron según lo acordado</p>
                       </div>
                     ) : null}
+                    {/* Pagos del balanceo registrados este mes */}
+                    {(analytics.settlement_payments ?? []).length > 0 && (
+                      <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                        <div className="px-5 py-4 border-b border-slate-800">
+                          <p className={sectionTitle}>Pagos del balanceo</p>
+                        </div>
+                        <div className="p-4 space-y-2">
+                          {(analytics.settlement_payments ?? []).map(p => (
+                            <div key={p.id} className="p-3 rounded-2xl border border-slate-800 bg-slate-800/40">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-xs text-slate-200 min-w-0 truncate">
+                                  <span className="font-semibold">{p.from_user_name}</span> le pagó a <span className="font-semibold">{p.to_user_name}</span>
+                                </p>
+                                <span className="text-sm font-bold tabular-nums text-slate-200 shrink-0">{fmt(Number(p.amount))} {p.currency}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2 mt-1">
+                                <p className="text-[11px] text-slate-500 truncate">
+                                  {p.paid_date.split('-').reverse().join('/')}{p.comment ? ` · ${p.comment}` : ''}
+                                </p>
+                                {p.confirmed ? (
+                                  <span className="text-[10px] font-semibold text-emerald-400 shrink-0">✓ Recibido</span>
+                                ) : p.to_user_id === currentUserId ? (
+                                  <button onClick={() => setConfirmItem(p)}
+                                    className="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25">
+                                    Confirmar recibido
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-amber-400 shrink-0">Falta que {p.to_user_name} confirme</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* ══════════════════════════════════════════════════ */}
                     {/* 4. HISTORIAL DE GASTOS                            */}
@@ -1465,6 +1512,22 @@ export default function HouseholdPage() {
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} />}
       {showJoin   && <JoinModal   onClose={() => setShowJoin(false)}   />}
       {showEdit   && household && <EditModal household={household} onClose={() => setShowEdit(false)} />}
+      {household && payItem && (
+        <SettlementModal
+          mode="pay" open onClose={() => setPayItem(null)}
+          householdId={household.id} year={year} month={month}
+          toUserId={payItem.to_user_id} otherName={payItem.to_user_name}
+          amount={Number(payItem.amount)} currency={payItem.currency}
+        />
+      )}
+      {household && confirmItem && (
+        <SettlementModal
+          mode="confirm" open onClose={() => setConfirmItem(null)}
+          householdId={household.id} settlementId={confirmItem.id} paidDate={confirmItem.paid_date}
+          otherName={confirmItem.from_user_name}
+          amount={Number(confirmItem.amount)} currency={confirmItem.currency}
+        />
+      )}
       {flagTx     && household && (
         <FlagModal
           householdId={household.id}

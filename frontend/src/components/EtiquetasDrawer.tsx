@@ -32,6 +32,19 @@ function KindBadge({ kind }: { kind: CategoryKind }) {
   )
 }
 
+/** Reintegro: plata que vuelve de un gasto (se carga como ingreso y resta del gasto) */
+function RefundToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-start gap-2 text-[11px] text-slate-400 cursor-pointer select-none">
+      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)} className="mt-0.5 accent-emerald-500" />
+      <span>
+        <span className="text-slate-300">Es un reintegro</span>: plata que te devuelven de un gasto.
+        Se carga como ingreso pero <span className="text-slate-300">resta del gasto</span> de la categoría.
+      </span>
+    </label>
+  )
+}
+
 /** Selector de "para qué movimientos se usa" la categoría */
 function KindPicker({ value, onChange }: { value: CategoryKind; onChange: (k: CategoryKind) => void }) {
   return (
@@ -170,6 +183,7 @@ function ConceptRow({ concept, categories, onSaved, onDeleted }: {
   const [editing,       setEditing]       = useState(false)
   const [name,          setName]          = useState(concept.name)
   const [categoryId,    setCategoryId]    = useState(concept.category_id)
+  const [isRefund,      setIsRefund]      = useState(!!concept.is_refund)
   const [saving,        setSaving]        = useState(false)
   const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -182,6 +196,7 @@ function ConceptRow({ concept, categories, onSaved, onDeleted }: {
       await updateConcept(concept.id, {
         name: name.trim(),
         ...(categoryId !== concept.category_id ? { category_id: categoryId } : {}),
+        ...(isRefund !== !!concept.is_refund ? { is_refund: isRefund } : {}),
       })
       onSaved(); setEditing(false)
     }
@@ -195,7 +210,7 @@ function ConceptRow({ concept, categories, onSaved, onDeleted }: {
     catch (err) { setError(parseErr(err, 'No se pudo eliminar')); setDeleting(false) }
   }
 
-  const handleCancel = () => { setName(concept.name); setCategoryId(concept.category_id); setError(null); setEditing(false) }
+  const handleCancel = () => { setName(concept.name); setCategoryId(concept.category_id); setIsRefund(!!concept.is_refund); setError(null); setEditing(false) }
 
   return (
     <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3">
@@ -207,7 +222,10 @@ function ConceptRow({ concept, categories, onSaved, onDeleted }: {
             className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-200 outline-none focus:border-emerald-500/60 transition-colors font-mono tracking-wide"
           />
         ) : (
-          <span className="flex-1 text-sm text-slate-200 font-mono tracking-wide truncate">{concept.name}</span>
+          <>
+            <span className="flex-1 text-sm text-slate-200 font-mono tracking-wide truncate">{concept.name}</span>
+            {concept.is_refund && <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-md border text-emerald-300 border-emerald-400/30 bg-emerald-400/10">Reintegro</span>}
+          </>
         )}
         {concept.is_system ? (
           <Lock className="w-3.5 h-3.5 text-slate-600 shrink-0" />
@@ -254,6 +272,7 @@ function ConceptRow({ concept, categories, onSaved, onDeleted }: {
           {categoryId !== concept.category_id && (
             <p className="text-[10px] text-amber-400">Los movimientos con este concepto también pasan a la nueva categoría.</p>
           )}
+          <RefundToggle value={isRefund} onChange={setIsRefund} />
         </div>
       )}
       {error && <p className="text-rose-400 text-[10px] mt-1">{error}</p>}
@@ -326,6 +345,7 @@ function CreateConceptForm({ categories, onCreated }: { categories: Category[]; 
   const [open,   setOpen]   = useState(false)
   const [name,   setName]   = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [isRefund, setIsRefund] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
 
@@ -334,9 +354,9 @@ function CreateConceptForm({ categories, onCreated }: { categories: Category[]; 
     if (!categoryId) { setError('Elegí a qué categoría pertenece'); return }
     setSaving(true); setError(null)
     try {
-      await createConcept({ name: name.trim(), category_id: categoryId })
+      await createConcept({ name: name.trim(), category_id: categoryId, is_refund: isRefund })
       await queryClient.invalidateQueries({ queryKey: ['concepts'] })
-      setName(''); setCategoryId(''); setOpen(false); onCreated()
+      setName(''); setCategoryId(''); setIsRefund(false); setOpen(false); onCreated()
     } catch (err) { setError(parseErr(err, 'No se pudo crear')) }
     finally { setSaving(false) }
   }
@@ -361,6 +381,7 @@ function CreateConceptForm({ categories, onCreated }: { categories: Category[]; 
         <option value="">¿A qué categoría pertenece?</option>
         {categories.map(c => <option key={c.id} value={c.id}>{c.name} · {CATEGORY_KIND_LABELS[c.kind] ?? c.kind}</option>)}
       </select>
+      <RefundToggle value={isRefund} onChange={setIsRefund} />
       {error && <p className="text-rose-400 text-[10px]">{error}</p>}
       <div className="flex gap-2">
         <button onClick={handleSubmit} disabled={saving}

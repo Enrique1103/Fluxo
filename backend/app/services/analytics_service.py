@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pandas as pd
 import plotly.graph_objects as go
-from sqlalchemy import or_, func
+from sqlalchemy import or_, and_, func
 from sqlalchemy.orm import Session
 
 from sqlalchemy.orm import aliased
@@ -93,13 +93,17 @@ def expenses_by_category(
 ) -> dict:
     target = str(user.currency_default)
     rows = (
-        db.query(Category.name, Transaction.amount, Transaction.date, Account.currency)
+        db.query(Category.name, Transaction.amount, Transaction.date, Account.currency, Transaction.is_refund)
         .join(Transaction, Transaction.category_id == Category.id)
         .join(Account, Transaction.account_id == Account.id)
         .filter(
             Transaction.user_id == user.id,
             Transaction.is_deleted == False,
-            Transaction.type == TransactionType.EXPENSE,
+            # Gastos, menos los reintegros (ingresos que devuelven plata de un gasto)
+            or_(
+                Transaction.type == TransactionType.EXPENSE,
+                and_(Transaction.type == TransactionType.INCOME, Transaction.is_refund == True),  # noqa: E712
+            ),
             Transaction.date >= date_from,
             Transaction.date <= date_to,
             or_(
@@ -114,10 +118,12 @@ def expenses_by_category(
         return go.Figure().to_dict()
 
     df = pd.DataFrame(
-        [(cat, float(Decimal(str(amt)) * _rate(db, user.id, str(cur), target, d))) for cat, amt, d, cur in rows],
+        [(cat, (-1 if refund else 1) * float(Decimal(str(amt)) * _rate(db, user.id, str(cur), target, d)))
+         for cat, amt, d, cur, refund in rows],
         columns=["category", "amount"],
     )
     grouped = df.groupby("category")["amount"].sum().reset_index()
+    grouped = grouped[grouped["amount"] > 0]
     grouped = grouped.sort_values("amount", ascending=False)
 
     fig = go.Figure(
@@ -160,7 +166,7 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
 
     # Income and expense transactions — include account currency for conversion
     rows_ie = (
-        db.query(Transaction.date, Transaction.type, Transaction.amount, Account.currency)
+        db.query(Transaction.date, Transaction.type, Transaction.amount, Account.currency, Transaction.is_refund)
         .join(Account, Transaction.account_id == Account.id)
         .filter(*base_filter, Transaction.type.in_([TransactionType.INCOME, TransactionType.EXPENSE]))
         .all()
@@ -191,14 +197,16 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
     income_by_month: dict[str, float] = {lbl: 0.0 for lbl in month_labels}
     expense_by_month: dict[str, float] = {lbl: 0.0 for lbl in month_labels}
 
-    for tx_date, tx_type, tx_amount, acc_currency in rows_ie:
+    for tx_date, tx_type, tx_amount, acc_currency, is_refund in rows_ie:
         lbl = tx_date.strftime("%Y-%m")
         if lbl not in income_by_month:
             continue
         acc_cur = acc_currency.value if hasattr(acc_currency, 'value') else str(acc_currency)
         rate = _rate(db, user.id, acc_cur, target_currency, tx_date)
         converted = float(Decimal(str(tx_amount)) * rate)
-        if tx_type == TransactionType.INCOME:
+        if tx_type == TransactionType.INCOME and is_refund:
+            expense_by_month[lbl] -= converted   # reintegro: resta del gasto
+        elif tx_type == TransactionType.INCOME:
             income_by_month[lbl] += converted
         else:
             expense_by_month[lbl] += converted
@@ -439,12 +447,17 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
     income = sum(
         _convert(tx.amount, acc_currency, tx.date)
         for tx, _, _, _, acc_currency, _, _ in rows
-        if tx.type == TransactionType.INCOME
+        if tx.type == TransactionType.INCOME and not tx.is_refund
     )
+    # Los reintegros restan del gasto (ej: lo que te devuelven del balanceo del hogar)
     expenses = sum(
         _convert(tx.amount, acc_currency, tx.date)
         for tx, _, _, _, acc_currency, _, _ in rows
         if tx.type == TransactionType.EXPENSE
+    ) - sum(
+        _convert(tx.amount, acc_currency, tx.date)
+        for tx, _, _, _, acc_currency, _, _ in rows
+        if tx.type == TransactionType.INCOME and tx.is_refund
     )
     # Igual que el resumen y el gráfico Ingresos·Gastos: lo que sale en transferencias
     # externas y las comisiones también es gasto del mes
@@ -473,6 +486,8 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
             con_totals[concept_key] = con_totals.get(concept_key, 0.0) + converted
             key = tx.date.isoformat()
             daily_totals[key] = daily_totals.get(key, 0.0) + converted
+        elif tx.type == TransactionType.INCOME and tx.is_refund:
+            cat_totals[cat_name] = cat_totals.get(cat_name, 0.0) - converted
         elif tx.type == TransactionType.INCOME:
             income_cat_totals[cat_name] = income_cat_totals.get(cat_name, 0.0) + converted
             income_con_totals[concept_key] = income_con_totals.get(concept_key, 0.0) + converted
@@ -480,6 +495,7 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
     categories = [
         CategoryStat(name=k, total=v)
         for k, v in sorted(cat_totals.items(), key=lambda x: -x[1])
+        if v > 0
     ]
     income_categories = [
         CategoryStat(name=k, total=v)
