@@ -303,7 +303,7 @@ def test_monthly_total_usd_converted(authed, cash_account):
     _rate(c, h, "USD", "UYU", 40, prev)
     c.post(f"{BASE}/monthly-totals", json={"rows": [
         {"year": prev.year, "month": prev.month, "currency": "USD", "income": "100", "expense": "50"}]}, headers=h)
-    assert _ive(c, h, prev.strftime("%Y-%m")) == {"Ingresos": 4000.0, "Egresos": 2000.0}
+    assert _ive(c, h, prev.strftime("%Y-%m")) == {"Ingresos": 4000.0, "Egresos": 2000.0, "Extraordinarios": 0.0}
     assert _breakdown(c, h, prev)["income"] == 4000.0
 
 
@@ -323,3 +323,19 @@ def test_parser_amount_formats():
     assert out["errors"] == []
     assert out["rows"][0] == {"year": 2024, "month": 3, "currency": "UYU", "income": "1234.50", "expense": "1000.00"}
     assert out["rows"][1]["income"] == "1.50" and out["rows"][1]["expense"] == "12.50"
+
+
+def test_vacation_expenses_marked_extraordinary(authed, cash_account, seeds):
+    """Gastos en Viajes / Vacaciones: cuentan en Egresos (salen de la cuenta) y además se
+    informan como Extraordinarios para que el índice de Libertad Financiera los excluya."""
+    c, h = authed
+    cid, cat = seeds
+    r = c.post(f"{BASE}/categories", json={"name": "Viajes", "kind": "expense"}, headers=h)
+    assert r.status_code == 201, r.text
+    trip = c.post(f"{BASE}/concepts", json={"name": "Hotel", "category_id": r.json()["id"]}, headers=h)
+    assert trip.status_code == 201, trip.text
+    _tx(c, h, cash_account["id"], trip.json()["id"], None, 800, "expense")
+    _tx(c, h, cash_account["id"], cid, cat, 200, "expense")
+    ive = _ive(c, h)
+    assert ive["Egresos"] == 1000.0
+    assert ive["Extraordinarios"] == 800.0

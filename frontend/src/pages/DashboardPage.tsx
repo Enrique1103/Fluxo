@@ -264,14 +264,18 @@ export default function DashboardPage() {
       .slice(-3)
     if (closed.length > 0) {
       const avg         = closed.reduce((s, d) => s + d.ahorro, 0) / closed.length
-      const avgExpenses = closed.reduce((s, d) => s + d.gastos, 0) / closed.length
-      return { avg, avgExpenses, count: closed.length, usingCurrent: false }
+      // Gastos de Viajes / Vacaciones no cuentan para el promedio (son extraordinarios);
+      // sí siguen restando del saldo y del ahorro real
+      const avgExpenses = closed.reduce((s, d) => s + d.gastos - (d.extraordinarios ?? 0), 0) / closed.length
+      const excluded    = closed.reduce((s, d) => s + (d.extraordinarios ?? 0), 0)
+      return { avg, avgExpenses, excluded, count: closed.length, usingCurrent: false }
     }
     const current = chartData.find(d => d.month === todayLabel)
     if (current && (current.ingresos > 0 || current.gastos > 0)) {
-      return { avg: current.ahorro, avgExpenses: current.gastos, count: 0, usingCurrent: true }
+      return { avg: current.ahorro, avgExpenses: current.gastos - (current.extraordinarios ?? 0),
+               excluded: current.extraordinarios ?? 0, count: 0, usingCurrent: true }
     }
-    return { avg: 0, avgExpenses: 0, count: 0, usingCurrent: false }
+    return { avg: 0, avgExpenses: 0, excluded: 0, count: 0, usingCurrent: false }
   }, [chartData])
 
   const avgMonthlySavings = closedMonthsStats.avg
@@ -284,10 +288,12 @@ export default function DashboardPage() {
       ?? Number(summary?.net_worth ?? 0)
     const closedCount = closedMonthsStats.count
 
-    // Promedio de gastos: últimos 6 meses cerrados (o menos si no hay);
+    // Promedio de gastos: últimos 3 meses cerrados (sin Viajes / Vacaciones) (o menos si no hay);
     // si no hay historial, usa el mes actual en curso (currency-safe via chartData)
-    const currentMonthGastos = chartData.find(d => d.month === todayLabel)?.gastos
-      ?? Number(summary?.expense_this_month ?? 0)
+    const currentMonth = chartData.find(d => d.month === todayLabel)
+    const currentMonthGastos = currentMonth
+      ? currentMonth.gastos - (currentMonth.extraordinarios ?? 0)
+      : Number(summary?.expense_this_month ?? 0)
     const baseExpenses = closedCount > 0 ? closedMonthsStats.avgExpenses : currentMonthGastos
 
     if (baseExpenses <= 0) return { months: 0, days: 0, pct: 0, monthsToTarget: null as number | null, closedCount, baseExpenses: 0 }
@@ -444,6 +450,12 @@ export default function DashboardPage() {
                   {runway.closedCount > 0
                     ? `Basado en promedio de gastos de los últimos ${runway.closedCount} mes${runway.closedCount !== 1 ? 'es' : ''}`
                     : 'Basado en gastos del mes en curso'}
+                  <span title="Viajes y vacaciones son gastos extraordinarios: siguen restando de tus cuentas, pero no se usan para calcular este índice.">
+                    {' · sin contar Viajes / Vacaciones'}
+                    {closedMonthsStats.excluded > 0 && !privacyMode && (
+                      <> ({fmtMoney(closedMonthsStats.excluded, currency, privacyMode)} excluidos)</>
+                    )}
+                  </span>
                 </p>
               </>
             )}

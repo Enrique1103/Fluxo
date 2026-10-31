@@ -59,8 +59,8 @@ def test_totals_show_in_income_vs_expenses_and_patrimonio(authed, cash_account):
     ]}, headers=h)
 
     ive = _ive(c, h)
-    assert ive[_label(y2, m2)] == {"Ingresos": 50000.0, "Egresos": 30000.0}
-    assert ive[_label(y1, m1)] == {"Ingresos": 40000.0, "Egresos": 45000.0}
+    assert ive[_label(y2, m2)] == {"Ingresos": 50000.0, "Egresos": 30000.0, "Extraordinarios": 0.0}
+    assert ive[_label(y1, m1)] == {"Ingresos": 40000.0, "Egresos": 45000.0, "Extraordinarios": 0.0}
 
     pat = {p["month"]: p["value"] for p in c.get(f"{BASE}/analytics/patrimonio", params={"currency": "UYU"}, headers=h).json()}
     now = pat[TODAY.strftime("%Y-%m")]
@@ -76,7 +76,7 @@ def test_totals_in_usd_are_converted(authed):
     c.post(f"{BASE}/exchange-rates", json={"from_currency": "USD", "to_currency": "UYU", "rate": "40",
                                            "year": y, "month": m}, headers=h)
     c.post(MT, json={"rows": [{"year": y, "month": m, "currency": "USD", "income": "100", "expense": "50"}]}, headers=h)
-    assert _ive(c, h)[_label(y, m)] == {"Ingresos": 4000.0, "Egresos": 2000.0}
+    assert _ive(c, h)[_label(y, m)] == {"Ingresos": 4000.0, "Egresos": 2000.0, "Extraordinarios": 0.0}
 
 
 def test_monthly_breakdown_includes_totals(authed):
