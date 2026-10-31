@@ -5,6 +5,16 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 
+# Para qué tipo de movimiento se usan los conceptos de la categoría.
+# Se guarda como texto (no ENUM de Postgres) para poder sumar valores sin migrar el tipo.
+CATEGORY_KINDS = ("expense", "income", "transfer", "any")
+TX_TYPE_TO_KINDS = {
+    "expense":  ("expense", "any"),
+    "income":   ("income", "any"),
+    "transfer": ("transfer", "any"),
+}
+
+
 class Category(Base):
     __tablename__ = "categories"
     __table_args__ = (
@@ -23,8 +33,13 @@ class Category(Base):
     icon: Mapped[str | None] = mapped_column(String(50), nullable=True)
     color: Mapped[str | None] = mapped_column(CHAR(7), nullable=True)
     is_system: Mapped[bool] = mapped_column(Boolean, default=False)
+    # expense | income | transfer | any — filtra qué conceptos se ofrecen según el tipo de movimiento
+    kind: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="expense", server_default="expense"
+    )
 
     # Relaciones
     user = relationship("User", back_populates="categories")
     transactions = relationship("Transaction", back_populates="category")
+    concepts = relationship("Concept", back_populates="category")
     budgets = relationship("Budget", back_populates="category", cascade="all, delete-orphan")

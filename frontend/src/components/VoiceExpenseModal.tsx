@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Mic, X, Home, AlertCircle, Loader2, RotateCcw, CreditCard, ChevronDown } from 'lucide-react'
 import { parseVoiceExpense, type VoiceAccount } from '../utils/voiceParser'
-import { fetchAccounts, withoutArchived, fetchCategories, fetchConcepts, fetchExchangeRates, createTransaction, createInstalmentPlan } from '../api/dashboard'
+import { fetchAccounts, withoutArchived, fetchCategories, fetchConcepts, fetchExchangeRates, createTransaction, createInstalmentPlan, conceptsForType } from '../api/dashboard'
 import { findRate, fmtRate } from '../utils/rates'
 import { norm } from '../utils/voiceParser'
 import { fetchHouseholds } from '../api/households'
@@ -56,7 +56,16 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
   const [amount,      setAmount]      = useState('')
   const [currency,    setCurrency]    = useState(homeCurrency)
   const [conceptId,   setConceptId]   = useState('')
-  const [categoryId,  setCategoryId]  = useState('')
+  // Solo se elige el concepto; la categoría es la del concepto. La lista se filtra por tipo.
+  const typeConcepts     = conceptsForType(concepts as Concept[], categories as Category[], txType)
+  const selectedConcept  = (concepts as Concept[]).find(c => c.id === conceptId)
+  const selectedCategory = selectedConcept ? (categories as Category[]).find(c => c.id === selectedConcept.category_id) : undefined
+  const conceptGroups    = (categories as Category[])
+    .map(cat => ({ cat, items: typeConcepts.filter(c => c.category_id === cat.id) }))
+    .filter(g => g.items.length > 0)
+  useEffect(() => {
+    if (conceptId && (concepts as Concept[]).length > 0 && !typeConcepts.some(c => c.id === conceptId)) setConceptId('')
+  }, [txType])
   const [accountId,   setAccountId]   = useState('')
   const [description, setDescription] = useState('')
   const [isHousehold, setIsHousehold] = useState(false)
@@ -101,7 +110,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       setInterim('')
       setSpeechError('')
       setTxType('expense')
-      setAmount(''); setCurrency(homeCurrency); setConceptId(''); setCategoryId('')
+      setAmount(''); setCurrency(homeCurrency); setConceptId('')
       setAccountId(''); setDestAccountId(''); setDescription(''); setIsHousehold(false)
       setRawText(''); setUnmatchedAccount(null); setUnmatchedConcept(null)
       setCommission(''); setOtherAmount('')
@@ -180,11 +189,15 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
     if (parsed.currency) setCurrency(parsed.currency)
     setIsHousehold(parsed.isHousehold)
 
-    if (parsed.matchedConceptId) {
+    // Solo vale un concepto que sirva para el tipo de movimiento (sin "Supermercado" en un ingreso)
+    const okForType = parsed.matchedConceptId
+      && conceptsForType(latestConcepts, categoriesRef.current, txTypeRef.current).some(c => c.id === parsed.matchedConceptId)
+    if (parsed.matchedConceptId && okForType) {
       setConceptId(parsed.matchedConceptId)
       setUnmatchedConcept(null)
-      const matched = latestConcepts.find(c => c.id === parsed.matchedConceptId)
-      if (matched?.category_id) setCategoryId(matched.category_id)
+    } else if (parsed.matchedConceptId) {
+      setConceptId('')
+      setUnmatchedConcept(latestConcepts.find(c => c.id === parsed.matchedConceptId)?.name ?? parsed.spokenConceptText ?? null)
     } else if (parsed.spokenConceptText) {
       setConceptId('')
       setUnmatchedConcept(parsed.spokenConceptText)
@@ -225,10 +238,14 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       if (src) setAccountId(src)
       setDestAccountId(dest)
       setUnmatchedAccount(null)
-      // Concepto/categoría: el lugar si se dijo (Abitab, Redpagos…) o Extracción de Dinero
+      // Concepto: el lugar si se dijo (Abitab, Redpagos…); si no, el más usado de "Extracción de Dinero"
       const cats = categoriesRef.current
       const extr = cats.find(c => norm(c.name).includes('extraccion'))
-      if (extr) setCategoryId(extr.id)
+      if (extr) {
+        const extrConcept = conceptsRef.current.filter(c => c.category_id === extr.id)
+          .sort((a, b) => b.frequency_score - a.frequency_score)[0]
+        if (extrConcept) setConceptId(prev => prev || extrConcept.id)
+      }
     }
 
     setPhase('review')
@@ -262,7 +279,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
         setSubmitError(txType === 'withdrawal' ? 'Elegí el efectivo donde queda la plata' : 'Seleccioná la cuenta destino'); return
       }
     } else {
-      if (!categoryId) { setSubmitError('Seleccioná una categoría'); return }
+      if (!conceptId) { setSubmitError('Elegí un concepto'); return }
     }
 
     if (txType === 'expense' && isCredit && enCuotas) {
@@ -270,23 +287,10 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       if (!n || n < 2) { setSubmitError('El número de cuotas debe ser al menos 2'); return }
     }
 
-    let resolvedConceptId  = conceptId
-    let resolvedCategoryId = categoryId
-    if (isMove) {
-      const transferConcept = (concepts as Concept[]).find(c => c.name.toLowerCase() === 'transferencia')
-      const sinClasifCat    = (categories as Category[]).find(c => c.name.toLowerCase() === 'sin clasificar')
-      const extrCat         = (categories as Category[]).find(c => norm(c.name).includes('extraccion'))
-      if (txType === 'withdrawal') {
-        // Retiro: el concepto dicho (Abitab, Cajero…) si lo hay; categoría Extracción de Dinero
-        resolvedConceptId  = conceptId || ''
-        resolvedCategoryId = categoryId || extrCat?.id || transferConcept?.category_id || sinClasifCat?.id || (categories as Category[])[0]?.id || ''
-      } else {
-        resolvedConceptId  = transferConcept?.id ?? (concepts as Concept[])[0]?.id ?? ''
-        // La categoría del concepto Transferencia (ej: Transacciones); si no, Sin clasificar
-        resolvedCategoryId = transferConcept?.category_id ?? sinClasifCat?.id ?? (categories as Category[])[0]?.id ?? ''
-      }
-      if (!resolvedCategoryId) { setSubmitError('No se encontraron datos necesarios para la transferencia'); return }
-    }
+    // La categoría sale del concepto. En transferencias sin concepto el servidor usa "Transferencia".
+    const resolvedConceptId = txType === 'transfer'
+      ? ((concepts as Concept[]).find(c => c.name.toLowerCase() === 'transferencia')?.id ?? '')
+      : conceptId
 
     // Retiro en otra moneda: amount = lo que sale de la cuenta; destination_amount = lo que llega
     let sourceAmount = parseFloat(amount)
@@ -307,8 +311,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
       if (txType === 'expense' && isCredit && enCuotas) {
         await createInstalmentPlan({
           account_id:   accountId,
-          concept_id:   resolvedConceptId || null,
-          category_id:  resolvedCategoryId,
+          concept_id:   resolvedConceptId,
           total_amount: parseFloat(amount),
           n_cuotas:     parseInt(nCuotas),
           fecha_inicio: today(),
@@ -319,7 +322,6 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
         await createTransaction({
           account_id:   accountId,
           concept_id:   resolvedConceptId || null,
-          category_id:  resolvedCategoryId,
           amount:       sourceAmount,
           type:         isMove ? 'transfer' : txType,
           date:         today(),
@@ -525,94 +527,49 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             {txType !== 'transfer' && (
               <>
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Concepto <span className="text-slate-600">(opcional)</span></label>
+                  <label className="text-xs text-slate-400 mb-1 block">
+                    Concepto {txType === 'withdrawal' && <span className="text-slate-600">(opcional)</span>}
+                  </label>
                   {unmatchedConcept && (
                     <div className="flex items-center gap-1.5 text-amber-400 text-xs mb-1">
-                      <AlertCircle size={12} /> No encontré "{unmatchedConcept}", elegí uno:
+                      <AlertCircle size={12} /> No encontré "{unmatchedConcept}" para este tipo de movimiento, elegí uno:
                     </div>
                   )}
                   <div className="relative">
                     <button
                       onClick={() => setOpenDd(openDd === 'concept' ? null : 'concept')}
                       onBlur={closeDd}
-                      className={`${ddBtn} ${conceptId ? 'text-slate-200' : 'text-slate-400'}`}
+                      className={`${ddBtn} ${conceptId ? 'text-slate-200' : 'text-slate-400 border-amber-500/50'}`}
                     >
                       <span className="truncate">
-                        {conceptId
-                          ? (concepts as Concept[]).find(c => c.id === conceptId)?.name ?? 'Sin concepto'
-                          : 'Sin concepto'}
+                        {selectedConcept ? selectedConcept.name : txType === 'withdrawal' ? 'Transferencia' : '— Elegir concepto —'}
                       </span>
                       <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
                     </button>
                     {openDd === 'concept' && (
                       <div className={ddPanel}>
-                        <button
-                          onMouseDown={e => e.preventDefault()}
-                          onClick={() => { setConceptId(''); setOpenDd(null) }}
-                          className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${!conceptId ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
-                        >
-                          Sin concepto
-                          {!conceptId && <span className="text-emerald-400 text-[10px]">✓</span>}
-                        </button>
-                        {(concepts as Concept[]).map(c => (
-                          <button
-                            key={c.id}
-                            onMouseDown={e => e.preventDefault()}
-                            onClick={() => {
-                              setConceptId(c.id)
-                              if (c.category_id) setCategoryId(c.category_id)
-                              setOpenDd(null)
-                            }}
-                            className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${conceptId === c.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
-                          >
-                            <span className="truncate">{c.name}</span>
-                            {conceptId === c.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
-                          </button>
+                        {conceptGroups.map(({ cat, items }) => (
+                          <div key={cat.id}>
+                            <p className="px-3 pt-2 pb-0.5 text-[10px] uppercase tracking-wider text-slate-500">{cat.name}</p>
+                            {items.map(c => (
+                              <button
+                                key={c.id}
+                                onMouseDown={e => e.preventDefault()}
+                                onClick={() => { setConceptId(c.id); setUnmatchedConcept(null); setOpenDd(null) }}
+                                className={`w-full text-left pl-6 pr-3 py-1.5 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${conceptId === c.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
+                              >
+                                <span className="truncate">{c.name}</span>
+                                {conceptId === c.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                              </button>
+                            ))}
+                          </div>
                         ))}
                       </div>
                     )}
                   </div>
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Categoría</label>
-                  <div className="relative">
-                    <button
-                      onClick={() => setOpenDd(openDd === 'category' ? null : 'category')}
-                      onBlur={closeDd}
-                      className={`${ddBtn} ${categoryId ? 'text-slate-200' : 'text-slate-400 border-amber-500/50'}`}
-                    >
-                      <span className="truncate">
-                        {categoryId
-                          ? (categories as Category[]).find(c => c.id === categoryId)?.name ?? '— Elegir categoría —'
-                          : '— Elegir categoría —'}
-                      </span>
-                      <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
-                    </button>
-                    {openDd === 'category' && (
-                      <div className={ddPanel}>
-                        <button
-                          onMouseDown={e => e.preventDefault()}
-                          onClick={() => { setCategoryId(''); setOpenDd(null) }}
-                          className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${!categoryId ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
-                        >
-                          — Elegir categoría —
-                          {!categoryId && <span className="text-emerald-400 text-[10px]">✓</span>}
-                        </button>
-                        {(categories as Category[]).map(c => (
-                          <button
-                            key={c.id}
-                            onMouseDown={e => e.preventDefault()}
-                            onClick={() => { setCategoryId(c.id); setOpenDd(null) }}
-                            className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${categoryId === c.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}
-                          >
-                            <span className="truncate">{c.name}</span>
-                            {categoryId === c.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {selectedCategory && (
+                    <p className="mt-1 text-[11px] text-slate-500">Categoría: <span className="text-slate-300">{selectedCategory.name}</span></p>
+                  )}
                 </div>
               </>
             )}

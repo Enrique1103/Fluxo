@@ -48,6 +48,7 @@ def register(db: Session, user_in: UserCreate) -> User:
             icon=cat_data["icon"],
             color=cat_data["color"],
             is_system=cat_data["is_system"],
+            kind=cat_data.get("kind", "expense"),
         )
         for raw_name in cat_data["concepts"]:
             normalized = normalize_concept(raw_name)

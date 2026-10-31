@@ -10,7 +10,7 @@ from datetime import date
 
 import pytest
 
-from tests.conftest import BASE, LOG, REG, next_email, engine
+from tests.conftest import BASE, LOG, REG, next_email, engine, expense_category
 from app.services import user_service
 
 TODAY = str(date.today())
@@ -54,15 +54,15 @@ def _account(c, h, balance="10000.00"):
 
 
 def _tx(c, h, acc, concept_id=None, category_id=None, amount="100.00", hh=None):
+    # El concepto es obligatorio y define la categoría. Si el test pide una
+    # categoría puntual sin concepto, se crea un concepto dentro de esa categoría.
     body = {"amount": amount, "type": "expense", "date": TODAY, "account_id": acc}
-    if concept_id:
-        body["concept_id"] = concept_id
-        if not category_id:
-            category_id = c.get(f"{BASE}/concepts/{concept_id}", headers=h).json()["category_id"]
-    if not category_id:
-        category_id = c.get(f"{BASE}/categories", headers=h).json()[0]["id"]
-    if category_id:
-        body["category_id"] = category_id
+    if not concept_id and category_id:
+        concept_id = c.post(f"{BASE}/concepts", json={"name": f"Concepto {uuid.uuid4().hex[:6]}",
+                            "category_id": category_id}, headers=h).json()["id"]
+    if not concept_id:
+        concept_id = next(x["id"] for x in c.get(f"{BASE}/concepts?type=expense", headers=h).json())
+    body["concept_id"] = concept_id
     if hh:
         body["household_id"] = hh
     r = c.post(f"{BASE}/transactions", json=body, headers=h)
@@ -257,12 +257,12 @@ class TestCategories:
 class TestConcepts:
     def test_duplicate_concept_409(self, authed):
         c, h = authed
-        assert c.post(f"{BASE}/concepts", json={"name": "perro"}, headers=h).status_code == 201
-        assert c.post(f"{BASE}/concepts", json={"name": " PERRO "}, headers=h).status_code == 409
+        assert c.post(f"{BASE}/concepts", json={"name": "perro", "category_id": expense_category(c, h)}, headers=h).status_code == 201
+        assert c.post(f"{BASE}/concepts", json={"name": " PERRO ", "category_id": expense_category(c, h)}, headers=h).status_code == 409
 
     def test_concept_isolation(self, authed):
         c, h = authed
-        con = c.post(f"{BASE}/concepts", json={"name": "perro"}, headers=h).json()
+        con = c.post(f"{BASE}/concepts", json={"name": "perro", "category_id": expense_category(c, h)}, headers=h).json()
         h2, _, _ = _new_user(c)
         assert c.get(f"{BASE}/concepts/{con['id']}", headers=h2).status_code in (403, 404)
         assert c.delete(f"{BASE}/concepts/{con['id']}", headers=h2).status_code in (403, 404)
@@ -270,14 +270,14 @@ class TestConcepts:
     def test_delete_concept_in_use_409(self, authed, seeds):
         c, h = authed
         _, cat = seeds
-        con = c.post(f"{BASE}/concepts", json={"name": "perro"}, headers=h).json()
+        con = c.post(f"{BASE}/concepts", json={"name": "perro", "category_id": expense_category(c, h)}, headers=h).json()
         acc = _account(c, h)
         _tx(c, h, acc, concept_id=con["id"])
         assert c.delete(f"{BASE}/concepts/{con['id']}", headers=h).status_code == 409
 
     def test_delete_concept_with_only_deleted_tx(self, fk_on, authed):
         c, h = authed
-        con = c.post(f"{BASE}/concepts", json={"name": "perro"}, headers=h).json()
+        con = c.post(f"{BASE}/concepts", json={"name": "perro", "category_id": expense_category(c, h)}, headers=h).json()
         acc = _account(c, h)
         tx = _tx(c, h, acc, concept_id=con["id"])
         assert c.delete(f"{BASE}/transactions/{tx}", headers=h).status_code == 204

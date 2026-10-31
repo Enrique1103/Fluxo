@@ -20,3 +20,11 @@ class ConceptInUseByTransactions(ConceptException):
 
 class SystemConceptCannotBeDeleted(ConceptException):
     pass
+
+
+class ConceptRequired(ConceptException):
+    pass
+
+
+class ConceptTypeMismatch(ConceptException):
+    pass

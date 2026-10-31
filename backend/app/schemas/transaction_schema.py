@@ -33,10 +33,13 @@ class PaymentMethod(str, Enum):
 # --- Creación ---
 # transfer_to_account_id es obligatorio solo cuando type = TRANSFER.
 # metodo_pago solo aplica para EXPENSE; para otros tipos se ignora.
+# concept_id es obligatorio para ingresos y gastos (para transferencias, si falta,
+# se usa "Transferencia"). La categoría NO se envía: es la categoría del concepto.
+# category_id se acepta por compatibilidad con versiones viejas de la app y se ignora.
 class TransactionCreate(BaseModel):
     account_id: uuid.UUID
     concept_id: uuid.UUID | None = None
-    category_id: uuid.UUID
+    category_id: uuid.UUID | None = None
     amount: Decimal = Field(..., gt=0)
     type: TransactionType
     date: PyDate
@@ -83,8 +86,8 @@ class TransactionUpdate(BaseModel):
     amount: Decimal | None = Field(None, gt=0)
     description: str | None = Field(None, max_length=100)
     date: PyDate | None = None
+    # Cambiar el concepto cambia también la categoría (la del nuevo concepto).
     concept_id: uuid.UUID | None = None
-    category_id: uuid.UUID | None = None
     metodo_pago: PaymentMethod | None = None
     household_id: uuid.UUID | None = None
     # None = no tocar los hogares; [] = desasociar de todos los hogares.
@@ -97,7 +100,7 @@ class TransactionResponse(BaseModel):
     user_id: uuid.UUID
     account_id: uuid.UUID
     category_id: uuid.UUID
-    concept_id: uuid.UUID | None
+    concept_id: uuid.UUID
     amount: Decimal
     type: TransactionType
     date: PyDate

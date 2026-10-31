@@ -65,8 +65,9 @@ class Transaction(Base):
     category_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False
     )
-    concept_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("concepts.id"), nullable=True
+    # Obligatorio: la categoría del movimiento es la categoría de su concepto
+    concept_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("concepts.id"), nullable=False
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     type: Mapped[TransactionType] = mapped_column(SQLEnum(TransactionType), nullable=False)

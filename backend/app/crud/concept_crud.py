@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.concepts_models import Concept
-from app.models.transactions_models import Transaction
+from app.models.categories_models import Category
 
 
 def get_by_id(db: Session, concept_id: uuid.UUID) -> Concept | None:
@@ -19,40 +19,18 @@ def get_by_name_and_user(
     ).first()
 
 
-def get_all_by_user(db: Session, user_id: uuid.UUID) -> list[Concept]:
-    return (
-        db.query(Concept)
-        .filter(Concept.user_id == user_id)
-        .order_by(Concept.frequency_score.desc(), Concept.name)
-        .all()
-    )
-
-
-def get_by_category(
-    db: Session, user_id: uuid.UUID, category_id: uuid.UUID
+def get_all_by_user(
+    db: Session,
+    user_id: uuid.UUID,
+    category_id: uuid.UUID | None = None,
+    kinds: tuple[str, ...] | None = None,
 ) -> list[Concept]:
-    """
-    Devuelve los conceptos que el usuario ha usado en transacciones de esta categoría,
-    ordenados por frecuencia de uso con esa categoría.
-    Si no hay historial, devuelve todos los conceptos del usuario.
-    """
-    used = (
-        db.query(Concept)
-        .join(Transaction, Transaction.concept_id == Concept.id)
-        .filter(
-            Concept.user_id == user_id,
-            Transaction.user_id == user_id,
-            Transaction.category_id == category_id,
-            Transaction.is_deleted == False,
-        )
-        .order_by(Concept.frequency_score.desc(), Concept.name)
-        .distinct()
-        .all()
-    )
-    if used:
-        return used
-    # Sin historial → fallback a todos los conceptos
-    return get_all_by_user(db, user_id)
+    q = db.query(Concept).filter(Concept.user_id == user_id)
+    if category_id is not None:
+        q = q.filter(Concept.category_id == category_id)
+    if kinds:
+        q = q.join(Category, Category.id == Concept.category_id).filter(Category.kind.in_(kinds))
+    return q.order_by(Concept.frequency_score.desc(), Concept.name).all()
 
 
 def create(
@@ -62,6 +40,8 @@ def create(
     is_system: bool = False,
     category_id: uuid.UUID | None = None,
 ) -> Concept:
+    if category_id is None:
+        raise ValueError("Todo concepto debe pertenecer a una categoría")
     db_concept = Concept(
         user_id=user_id,
         name=name,
@@ -83,11 +63,6 @@ def update(db: Session, db_concept: Concept, fields: dict) -> Concept:
 
 def increment_frequency(db: Session, db_concept: Concept) -> None:
     db_concept.frequency_score += 1
-    db.flush()
-
-
-def update_category(db: Session, db_concept: Concept, category_id: uuid.UUID) -> None:
-    db_concept.category_id = category_id
     db.flush()
 
 

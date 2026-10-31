@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.api.dependeces import get_current_user
 from app.core.database import get_db
 from app.models.users_models import User
-from app.schemas.concept_schema import ConceptCreate, ConceptUpdate, ConceptResponse
+from app.schemas.concept_schema import ConceptCreate, ConceptUpdate, ConceptResponse, ConceptTxType
 from app.services import concept_service
 
 router = APIRouter(prefix="/concepts", tags=["Concepts"])
@@ -23,10 +23,11 @@ def create_concept(
 @router.get("", response_model=list[ConceptResponse])
 def list_concepts(
     category_id: uuid.UUID | None = None,
+    type: ConceptTxType | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return concept_service.get_all(db, current_user, category_id=category_id)
+    return concept_service.get_all(db, current_user, category_id=category_id, tx_type=type)
 
 
 @router.get("/{concept_id}", response_model=ConceptResponse)

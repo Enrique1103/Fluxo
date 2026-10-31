@@ -1,7 +1,7 @@
 """Tests de hogares (households)."""
 import pytest
 from datetime import date
-from tests.conftest import BASE, next_email
+from tests.conftest import BASE, next_email, any_concept
 
 HH  = f"{BASE}/households"
 TODAY = date.today()
@@ -242,8 +242,8 @@ class TestProportionalSplit:
     """Reparto proporcional: los ingresos de cada miembro se convierten a la moneda del hogar."""
 
     def _seed(self, c, h):
-        concepts = c.get(f"{BASE}/concepts", headers=h).json()
-        return concepts[0]["id"], concepts[0]["category_id"]
+        concept = any_concept(c, h)
+        return concept["id"], concept["category_id"]
 
     def test_proportional_converts_usd_income(self, authed):
         c, h1 = authed

@@ -1813,6 +1813,7 @@ class ImportacionService:
         nombre_cat: str | None,
         categoria_fallback,
         categoria_cache: dict,
+        kind: str = "expense",
     ):
         if not nombre_cat:
             return categoria_fallback
@@ -1822,18 +1823,33 @@ class ImportacionService:
         if categoria is None:
             import re
             slug = re.sub(r"[^a-z0-9]+", "-", nombre_cat.lower()).strip("-")
-            categoria = category_crud.create(self.db, user_id=self.user_id, name=nombre_cat, slug=slug)
+            categoria = category_crud.create(
+                self.db, user_id=self.user_id, name=nombre_cat, slug=slug, kind=kind,
+            )
         categoria_cache[nombre_cat] = categoria
         return categoria
 
-    def _resolver_concepto(self, nombre: str, concepto_cache: dict):
+    def _resolver_concepto(self, nombre: str | None, concepto_cache: dict, categoria):
+        """
+        Concepto del movimiento importado (obligatorio). Si ya existe, se usa con
+        su propia categoría; si es nuevo, se crea dentro de `categoria`. Sin nombre
+        → concepto genérico de la categoría.
+        """
         from app.core.utils import normalize_concept
+        from app.services import concept_service
+        if not (nombre or "").strip():
+            key = ("__default__", categoria.id)
+            if key not in concepto_cache:
+                concepto_cache[key] = concept_service.get_or_create_default(self.db, self.user_id, categoria)
+            return concepto_cache[key]
         nombre = normalize_concept(nombre)[:100]
         if nombre in concepto_cache:
             return concepto_cache[nombre]
         concepto = concept_crud.get_by_name_and_user(self.db, nombre, self.user_id)
         if concepto is None:
-            concepto = concept_crud.create(self.db, user_id=self.user_id, name=nombre)
+            concepto = concept_crud.create(
+                self.db, user_id=self.user_id, name=nombre, category_id=categoria.id,
+            )
         concepto_cache[nombre] = concepto
         return concepto
 
@@ -1857,10 +1873,13 @@ class ImportacionService:
         tipo = TransactionType.EXPENSE if mov["monto"] < 0 else TransactionType.INCOME
         fecha = datetime.strptime(mov["fecha"], "%Y-%m-%d").date()
 
-        categoria = self._resolver_categoria(mov.get("categoria"), categoria_fallback, categoria_cache)
-        # El concepto es opcional (igual que al registrar un movimiento a mano)
-        nombre_concepto = (mov.get("concepto") or "").strip()
-        concepto = self._resolver_concepto(nombre_concepto, concepto_cache) if nombre_concepto else None
+        categoria = self._resolver_categoria(
+            mov.get("categoria"), categoria_fallback, categoria_cache, kind=tipo.value,
+        )
+        # El concepto es obligatorio: si la fila no trae, se usa el genérico de la categoría.
+        # La categoría del movimiento es siempre la de su concepto.
+        concepto = self._resolver_concepto(mov.get("concepto"), concepto_cache, categoria)
+        categoria_id = concepto.category_id or categoria.id
 
         metodo_raw = mov.get("metodo_pago", "otro")
         try:
@@ -1891,8 +1910,8 @@ class ImportacionService:
         tx = Transaction(
             user_id=self.user_id,
             account_id=account.id,
-            category_id=categoria.id,
-            concept_id=concepto.id if concepto else None,
+            category_id=categoria_id,
+            concept_id=concepto.id,
             amount=monto,
             type=tipo,
             date=fecha,
@@ -1906,8 +1925,7 @@ class ImportacionService:
             tx.household_links.append(TransactionHousehold(household_id=hh_id))
         self.db.add(tx)
 
-        if concepto:
-            concepto.frequency_score += 1
+        concepto.frequency_score += 1
         return tx
 
     def _crear_transferencia_zcuentas(
@@ -1933,8 +1951,11 @@ class ImportacionService:
             raise ValueError("Movimiento con monto 0")
         fecha = datetime.strptime(mov["fecha"], "%Y-%m-%d").date()
 
-        concepto  = self._resolver_concepto(mov.get("concepto") or "Transferencia", concepto_cache)
-        categoria = self._resolver_categoria(mov.get("categoria"), categoria_fallback, categoria_cache)
+        categoria = self._resolver_categoria(
+            mov.get("categoria"), categoria_fallback, categoria_cache, kind="transfer",
+        )
+        concepto  = self._resolver_concepto(mov.get("concepto") or "Transferencia", concepto_cache, categoria)
+        categoria_id = concepto.category_id or categoria.id
 
         metodo_raw = mov.get("metodo_pago", "otro")
         try:
@@ -1949,7 +1970,7 @@ class ImportacionService:
             id=uuid.uuid4(),
             user_id=self.user_id,
             account_id=source_account.id,
-            category_id=categoria.id,
+            category_id=categoria_id,
             concept_id=concepto.id,
             amount=monto,
             type=TransactionType.TRANSFER,
@@ -1963,7 +1984,7 @@ class ImportacionService:
             id=uuid.uuid4(),
             user_id=self.user_id,
             account_id=dest_account.id,
-            category_id=categoria.id,
+            category_id=categoria_id,
             concept_id=concepto.id,
             amount=monto,
             type=TransactionType.TRANSFER,

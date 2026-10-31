@@ -125,7 +125,7 @@ class TestConfirmar:
 
 
     def test_confirmar_sin_concepto(self, authed, uyu_account):
-        """El concepto es opcional: se importa sin concepto (no se inventa uno)."""
+        """Sin concepto se usa el concepto genérico de la categoría (el concepto es obligatorio)."""
         c, h = authed
         body = _parsear(c, h, uyu_account["id"], _brou_csv()).json()
         movs = [m for m in body["movimientos"] if m["estado"] == "validado"]
@@ -135,9 +135,11 @@ class TestConfirmar:
         assert r.json()["importados"] == 2
         txs = c.get(f"{BASE}/transactions", headers=h).json()
         assert len(txs) == 2
-        assert all(t["concept_id"] is None for t in txs)
-        names = [x["name"] for x in c.get(f"{BASE}/concepts", headers=h).json()]
-        assert "Importado" not in names
+        concepts = {x["id"]: x for x in c.get(f"{BASE}/concepts", headers=h).json()}
+        for t in txs:
+            assert t["concept_id"] is not None
+            assert concepts[t["concept_id"]]["category_id"] == t["category_id"]
+        assert "Importado" not in [x["name"] for x in concepts.values()]
 
     def test_confirmar_gasto_del_hogar(self, authed, uyu_account):
         """Marcar 'pertenece al hogar' al importar → el gasto aparece en el hogar."""

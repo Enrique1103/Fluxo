@@ -34,6 +34,7 @@ def create(
     icon: str | None = None,
     color: str | None = None,
     is_system: bool = False,
+    kind: str = "expense",
 ) -> Category:
     db_cat = Category(
         user_id=user_id,
@@ -42,6 +43,7 @@ def create(
         icon=icon,
         color=color,
         is_system=is_system,
+        kind=kind,
     )
     db.add(db_cat)
     db.flush()

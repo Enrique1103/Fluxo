@@ -69,17 +69,10 @@ def _compute_cuota_amounts(total_amount: Decimal, n_cuotas: int) -> list[Decimal
 
 
 def create(db: Session, user: User, data: InstalmentPlanCreate) -> InstalmentPlanResponse:
-    # 1. Validar concepto (opcional — None es permitido)
-    concept = None
-    if data.concept_id is not None:
-        concept = concept_crud.get_by_id(db, data.concept_id)
-        if not concept or concept.user_id != user.id:
-            raise ConceptNotBelongsToUser("El concepto no pertenece al usuario")
-
-    # 2. Validar categoría
-    category = category_crud.get_by_id(db, data.category_id)
-    if not category or category.user_id != user.id:
-        raise CategoryNotFound("La categoría no existe o no pertenece al usuario")
+    # 1. Concepto obligatorio (de gastos); la categoría es la del concepto
+    from app.services import concept_service
+    concept = concept_service.resolve_for_transaction(db, user, data.concept_id, "expense")
+    category = concept.category
 
     # 3. Validar cuenta (debe ser de crédito)
     account = account_crud.get_by_id(db, data.account_id)
@@ -90,7 +83,7 @@ def create(db: Session, user: User, data: InstalmentPlanCreate) -> InstalmentPla
             "Los planes de cuotas solo pueden registrarse en cuentas de crédito"
         )
 
-    concept_id = concept.id if concept else None
+    concept_id = concept.id
 
     # 4. Crear el plan
     plan = instalment_plan_crud.create(
@@ -130,8 +123,7 @@ def create(db: Session, user: User, data: InstalmentPlanCreate) -> InstalmentPla
         db.add(tx)
 
     db.flush()
-    if concept:
-        concept_crud.increment_frequency(db, concept)
+    concept_crud.increment_frequency(db, concept)
     db.commit()
     db.refresh(plan)
     return _build_response(db, plan)

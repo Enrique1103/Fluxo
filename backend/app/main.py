@@ -72,6 +72,8 @@ from app.exceptions.concept_exceptions import (
     ConceptAlreadyExists,
     ConceptInUseByTransactions,
     SystemConceptCannotBeDeleted,
+    ConceptRequired,
+    ConceptTypeMismatch,
 )
 from app.exceptions.fin_goal_exceptions import (
     FinGoalNotFound,
@@ -311,6 +313,16 @@ async def handle_concept_in_use(r: Request, exc: ConceptInUseByTransactions):
 @app.exception_handler(SystemConceptCannotBeDeleted)
 async def handle_system_concept(r: Request, exc: SystemConceptCannotBeDeleted):
     return _json(_403, str(exc))
+
+
+@app.exception_handler(ConceptRequired)
+async def handle_concept_required(r: Request, exc: ConceptRequired):
+    return _json(_422, str(exc))
+
+
+@app.exception_handler(ConceptTypeMismatch)
+async def handle_concept_type_mismatch(r: Request, exc: ConceptTypeMismatch):
+    return _json(_422, str(exc))
 
 
 @app.exception_handler(FinGoalNotFound)

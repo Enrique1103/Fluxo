@@ -134,12 +134,30 @@ def debit_account(authed):
 @pytest.fixture
 def seeds(authed):
     """
-    Devuelve el primer concepto y categoría semilla disponibles.
+    Devuelve un concepto semilla que sirve para cualquier tipo de movimiento
+    (su categoría es kind="any") y la categoría de ese concepto.
     Returns: (concept_id, category_id)
     """
     c, h = authed
-    concepts = c.get(f"{BASE}/concepts", headers=h).json()
     cats     = c.get(f"{BASE}/categories", headers=h).json()
+    any_cats = {cat["id"] for cat in cats if cat["kind"] == "any" and not cat["is_system"]}
+    concepts = [x for x in c.get(f"{BASE}/concepts", headers=h).json() if x["category_id"] in any_cats]
     assert concepts, "No hay conceptos semilla"
-    assert cats, "No hay categorias semilla"
-    return concepts[0]["id"], cats[0]["id"]
+    return concepts[0]["id"], concepts[0]["category_id"]
+
+
+def any_concept(c, h) -> dict:
+    """Concepto semilla que sirve para ingresos, gastos y transferencias (categoría kind="any")."""
+    cats = {x["id"]: x for x in c.get(f"{BASE}/categories", headers=h).json()}
+    return next(
+        x for x in c.get(f"{BASE}/concepts", headers=h).json()
+        if cats[x["category_id"]]["kind"] == "any" and not cats[x["category_id"]]["is_system"]
+    )
+
+
+def expense_category(c, h) -> str:
+    """Id de una categoría de gastos del usuario (para crear conceptos en tests)."""
+    return next(
+        x["id"] for x in c.get(f"{BASE}/categories", headers=h).json()
+        if x["kind"] == "expense" and not x["is_system"]
+    )
