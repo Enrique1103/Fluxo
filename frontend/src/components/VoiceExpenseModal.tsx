@@ -391,18 +391,6 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                 )
               })}
             </div>
-            {/* Dentro de Transferencia: entre cuentas o Retiro / Carga */}
-            {isMove && (
-              <div className="w-full flex gap-1 p-1 -mt-3 rounded-xl bg-slate-800/30 border border-slate-700/50">
-                {([['transfer', 'Entre cuentas'], ['withdrawal', 'Retiro / Carga']] as const).map(([t, label]) => (
-                  <button key={t} onClick={() => setTxType(t)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      txType === t ? 'bg-amber-400/15 text-amber-400' : 'text-slate-500 hover:text-slate-300'}`}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Hint */}
             <div className="w-full rounded-xl px-4 py-3 text-center bg-slate-800/30 border border-slate-700/50">
@@ -629,7 +617,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
             {/* Dest account — transferencias (otra cuenta) y retiros (efectivo) */}
             {isMove && (
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">{txType !== 'withdrawal' ? 'Cuenta destino' : (accounts as Account[]).find(x => x.id === accountId)?.type === 'cash' ? 'Cuenta donde la cargás' : 'Efectivo donde queda la plata'}</label>
+                <label className="text-xs text-slate-400 mb-1 block">{txType === 'withdrawal' ? 'Efectivo donde queda la plata' : 'Cuenta destino'}</label>
                 <div className="relative">
                   <button
                     onClick={() => setOpenDd(openDd === 'destAccount' ? null : 'destAccount')}
@@ -645,8 +633,7 @@ export default function VoiceExpenseModal({ open, onClose }: Props) {
                   </button>
                   {openDd === 'destAccount' && (
                     <div className={ddPanel}>
-                      {(accounts as Account[]).filter(a => a.id !== accountId && (txType !== 'withdrawal'
-                        || ((accounts as Account[]).find(x => x.id === accountId)?.type === 'cash' ? a.type !== 'cash' : a.type === 'cash'))).map(a => (
+                      {(accounts as Account[]).filter(a => a.id !== accountId).map(a => (
                         <button
                           key={a.id}
                           onMouseDown={e => e.preventDefault()}

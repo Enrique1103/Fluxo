@@ -258,7 +258,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   const homeCurrency = useHomeCurrency()
   const currencyOpts = [...new Set([homeCurrency, 'USD', 'EUR'])]
 
-  // 'withdrawal' = Transferencia en modo "Retiro / Carga": banco → efectivo (retiro) o efectivo → banco/billetera (carga)
+  // 'withdrawal' ya no se elige en pantalla (todo es Transferencia); se mantiene el tipo por compatibilidad
   const [txType, setTxType] = useState<'income' | 'expense' | 'transfer' | 'withdrawal'>('expense')
   const isMove = txType === 'transfer' || txType === 'withdrawal'
 
@@ -349,11 +349,13 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   useEffect(() => { setDestAmount('') }, [accountId, destAccountId])
 
   const srcAccount   = accounts.find(a => a.id === accountId)
-  // Retiro / Carga: si sale de efectivo es una carga (va a banco o billetera); si no, un retiro (va a efectivo)
-  const isDeposit    = txType === 'withdrawal' && srcAccount?.type === 'cash'
-  const destOptions  = accounts.filter(a => a.id !== accountId && (
-    txType === 'withdrawal' ? (isDeposit ? a.type !== 'cash' : a.type === 'cash') : a.type !== 'cash'))
+  // Una sola Transferencia: cualquier cuenta puede ser destino. Según el tipo de cuenta se ve si es
+  // un retiro (banco/billetera → efectivo) o una carga (efectivo → banco/billetera)
+  const destOptions  = accounts.filter(a => a.id !== accountId)
   const destAccount  = accounts.find(a => a.id === destAccountId)
+  const moveKind     = !isMove || !srcAccount || !destAccount ? null
+    : srcAccount.type !== 'cash' && destAccount.type === 'cash' ? 'Retiro'
+    : srcAccount.type === 'cash' && destAccount.type !== 'cash' ? 'Carga' : null
   const crossCurrency = isMove && !!srcAccount && !!destAccount && srcAccount.currency !== destAccount.currency
   const crossRate    = crossCurrency ? findRate(rates, srcAccount!.currency, destAccount!.currency, date) : null
   const estDestAmount = crossRate !== null && parseFloat(amount) > 0 ? (parseFloat(amount) * crossRate).toFixed(2) : null
@@ -440,8 +442,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
     if (!isEditing) {
       if (!accountId) { setServerError('Seleccioná una cuenta'); return }
       if (isMove && !destAccountId) {
-        setServerError(txType !== 'withdrawal' ? 'Seleccioná la cuenta destino'
-          : isDeposit ? 'Elegí la cuenta donde cargás la plata' : 'Elegí la cuenta de efectivo donde queda la plata'); return
+        setServerError('Seleccioná la cuenta destino'); return
       }
       if (crossCurrency && !(parseFloat(destAmount) > 0) && crossRate === null) {
         setServerError(`Indicá cuánto llegó en ${destAccount!.currency} o cargá la tasa de cambio`); return
@@ -551,18 +552,6 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
           })}
         </div>
 
-        {/* Dentro de Transferencia: entre cuentas, o Retiro / Carga (efectivo ↔ banco o billetera) */}
-        {isMove && !isEditing && (
-          <div className="flex gap-1 p-1 mb-5 -mt-2 bg-slate-800/60 border border-slate-700/50 rounded-xl">
-            {([['transfer', 'Entre cuentas'], ['withdrawal', 'Retiro / Carga']] as const).map(([t, label]) => (
-              <button key={t} onClick={() => { setTxType(t); setDestAccountId('') }}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  txType === t ? 'bg-amber-400/15 text-amber-400' : 'text-slate-400 hover:text-slate-200'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
 
         {/* Inline account creation when no accounts exist */}
         {noAccounts && (
@@ -656,7 +645,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
 
             {/* Cuenta — read-only en modo edición */}
             <div>
-              <label className={labelClass}>{txType === 'withdrawal' ? 'Sale de (banco, billetera o efectivo)' : isMove ? 'Cuenta origen' : 'Cuenta'} {isEditing && <span className="text-slate-600">(no editable)</span>}</label>
+              <label className={labelClass}>{isMove ? 'Cuenta origen' : 'Cuenta'} {isEditing && <span className="text-slate-600">(no editable)</span>}</label>
               <div className="relative">
                 <button
                   onClick={() => !isEditing && setOpenDd(openDd === 'account' ? null : 'account')}
@@ -697,7 +686,14 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
             {/* Cuenta destino — transferencias (a otra cuenta) y retiros (a efectivo) */}
             {isMove && (
               <div>
-                <label className={labelClass}>{txType !== 'withdrawal' ? 'Cuenta destino' : isDeposit ? 'Cuenta donde la cargás' : 'Efectivo donde queda la plata'}</label>
+                <label className={labelClass}>
+                  Cuenta destino
+                  {moveKind && (
+                    <span className="ml-2 px-1.5 py-px rounded text-[10px] font-semibold bg-lime-500/15 text-lime-400 border border-lime-500/20">
+                      {moveKind === 'Retiro' ? 'RETIRO de efectivo' : 'CARGA de efectivo'}
+                    </span>
+                  )}
+                </label>
                 <div className="relative">
                   <button
                     onClick={() => setOpenDd(openDd === 'destAccount' ? null : 'destAccount')}
@@ -707,7 +703,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                     <span className="truncate">
                       {destAccountId
                         ? (() => { const a = accounts.find(a => a.id === destAccountId); return a ? `${a.name} · ${a.currency} · ${Number(a.balance).toLocaleString()}` : '—' })()
-                        : txType === 'withdrawal' && !isDeposit ? 'Elegí tu efectivo' : 'Seleccioná una cuenta'}
+                        : 'Seleccioná una cuenta'}
                     </span>
                     <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
                   </button>
@@ -715,11 +711,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
                     <div className={ddPanel}>
                       {destOptions.length === 0 && (
                         <p className="px-4 py-2 text-xs text-slate-500">
-                          {txType !== 'withdrawal'
-                            ? 'No hay otra cuenta. Para sacar o cargar efectivo usá Retiro / Carga.'
-                            : isDeposit
-                              ? 'No tenés cuentas de banco o billetera donde cargar.'
-                              : 'No tenés cuentas de efectivo. Creá una (ej: Efectivo USD) en Configuración → Cuentas.'}
+                          No hay otra cuenta. Creá una (ej: Efectivo USD) en Configuración → Cuentas.
                         </p>
                       )}
                       {destOptions.map(a => (
@@ -740,9 +732,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               <p className="text-[11px] text-slate-500 -mt-2">
                 {destAccount
                   ? `Las dos cuentas son en ${destAccount.currency}: llega el mismo monto.`
-                  : txType === 'withdrawal' && !isDeposit
-                    ? 'Si sacás en otra moneda (ej: dólares desde una cuenta en pesos), te vamos a pedir cuánto recibiste.'
-                    : 'Si la cuenta destino es en otra moneda, te vamos a pedir cuánto llegó.'}
+                  : 'Si la cuenta destino es en otra moneda (ej: sacás dólares desde una cuenta en pesos), te vamos a pedir cuánto llegó.'}
               </p>
             )}
 
@@ -952,7 +942,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
             {!crossCurrency && (
               <div>
                 <label className={labelClass}>
-                  {txType === 'transfer' ? 'Monto a transferir' : txType === 'withdrawal' ? (isDeposit ? 'Monto que cargás' : 'Monto que sacás') : 'Monto'}
+                  {isMove ? 'Monto a transferir' : 'Monto'}
                 </label>
                 <input type="number" min="0.01" step="0.01" value={amount}
                   onChange={e => setAmount(e.target.value)} placeholder="0.00" className={inputClass} />
