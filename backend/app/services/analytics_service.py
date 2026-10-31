@@ -145,6 +145,11 @@ def expenses_by_category(
 # Chart 2: Ingresos vs egresos por mes (barras agrupadas)
 # ---------------------------------------------------------------------------
 
+# Categorías de gastos extraordinarios/estacionales: cuentan en saldos y gastos,
+# pero NO en el promedio que usa el índice de Libertad Financiera.
+EXTRAORDINARY_CATEGORY_SLUGS = ("viajes", "vacaciones", "viaje")
+
+
 def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: int = 0, display_currency: str | None = None) -> dict:
     target_currency = display_currency or str(user.currency_default)
 
@@ -166,8 +171,10 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
 
     # Income and expense transactions — include account currency for conversion
     rows_ie = (
-        db.query(Transaction.date, Transaction.type, Transaction.amount, Account.currency, Transaction.is_refund)
+        db.query(Transaction.date, Transaction.type, Transaction.amount, Account.currency, Transaction.is_refund,
+                 Category.slug)
         .join(Account, Transaction.account_id == Account.id)
+        .outerjoin(Category, Transaction.category_id == Category.id)
         .filter(*base_filter, Transaction.type.in_([TransactionType.INCOME, TransactionType.EXPENSE]))
         .all()
     )
@@ -191,25 +198,33 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
         fig = go.Figure()
         fig.add_trace(go.Bar(name="Ingresos", x=month_labels, y=[0] * len(month_labels)))
         fig.add_trace(go.Bar(name="Egresos", x=month_labels, y=[0] * len(month_labels)))
+        fig.add_trace(go.Bar(name="Extraordinarios", x=month_labels, y=[0] * len(month_labels), visible=False))
         fig.update_layout(barmode="group", title="Ingresos vs Egresos")
         return fig.to_dict()
 
     income_by_month: dict[str, float] = {lbl: 0.0 for lbl in month_labels}
     expense_by_month: dict[str, float] = {lbl: 0.0 for lbl in month_labels}
+    # Parte de los gastos que es extraordinaria (Viajes / Vacaciones)
+    extraordinary_by_month: dict[str, float] = {lbl: 0.0 for lbl in month_labels}
 
-    for tx_date, tx_type, tx_amount, acc_currency, is_refund in rows_ie:
+    for tx_date, tx_type, tx_amount, acc_currency, is_refund, cat_slug in rows_ie:
         lbl = tx_date.strftime("%Y-%m")
         if lbl not in income_by_month:
             continue
         acc_cur = acc_currency.value if hasattr(acc_currency, 'value') else str(acc_currency)
         rate = _rate(db, user.id, acc_cur, target_currency, tx_date)
         converted = float(Decimal(str(tx_amount)) * rate)
+        extraordinary = (cat_slug or "") in EXTRAORDINARY_CATEGORY_SLUGS
         if tx_type == TransactionType.INCOME and is_refund:
             expense_by_month[lbl] -= converted   # reintegro: resta del gasto
+            if extraordinary:
+                extraordinary_by_month[lbl] -= converted
         elif tx_type == TransactionType.INCOME:
             income_by_month[lbl] += converted
         else:
             expense_by_month[lbl] += converted
+            if extraordinary:
+                extraordinary_by_month[lbl] += converted
 
     for tx_date, tx_amount, tx_commission, ext_acc_id, acc_currency in rows_ext:
         lbl = tx_date.strftime("%Y-%m")
@@ -236,6 +251,9 @@ def income_vs_expenses(db: Session, user: User, months: int = 6, months_ahead: i
     fig = go.Figure()
     fig.add_trace(go.Bar(name="Ingresos", x=month_labels, y=income_vals, marker_color="#22c55e"))
     fig.add_trace(go.Bar(name="Egresos", x=month_labels, y=expense_vals, marker_color="#ef4444"))
+    # Incluidos en Egresos; el frontend los descuenta solo para el índice de Libertad Financiera
+    fig.add_trace(go.Bar(name="Extraordinarios", x=month_labels,
+                         y=[max(extraordinary_by_month[lbl], 0.0) for lbl in month_labels], visible=False))
     fig.update_layout(
         barmode="group",
         title=f"Ingresos vs Egresos (últimos {months} meses)",

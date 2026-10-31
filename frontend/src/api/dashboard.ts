@@ -6,6 +6,8 @@ export interface MonthlyStat {
   month: string   // "2025-01"
   ingresos: number
   gastos: number
+  /** Parte de gastos en Viajes / Vacaciones (ya incluida en gastos) */
+  extraordinarios?: number
   ahorro: number
 }
 
@@ -63,11 +65,14 @@ export const fetchIncomeVsExpenses = async (months = 24, months_ahead = 24, curr
   const labels: string[]   = traces[0].x ?? []
   const ingresos: number[] = traces[0].y ?? []
   const gastos: number[]   = traces[1].y ?? []
+  // Parte de los gastos que es extraordinaria (Viajes / Vacaciones): ya está dentro de gastos
+  const extra: number[]    = traces[2]?.y ?? []
 
   return labels.map((month, i) => ({
     month,
     ingresos: ingresos[i] ?? 0,
     gastos:   gastos[i]   ?? 0,
+    extraordinarios: extra[i] ?? 0,
     ahorro:   (ingresos[i] ?? 0) - (gastos[i] ?? 0),
   }))
 }
