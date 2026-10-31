@@ -12,7 +12,7 @@ from .importacion import Importacion, ReglaCategorias
 from .instalment_plan_models import InstalmentPlan
 from .household_models import Household, HouseholdMember, HouseholdInvite, HouseholdSettlement, SplitType, MemberRole, MemberStatus, InviteStatus
 from .review_models import TransactionReview, ReviewType, ReviewStatus
-from .budget_models import Budget
+from .budget_models import Budget, BudgetCategory
 from .monthly_total_models import MonthlyTotal
 
 __all__ = [
@@ -43,5 +43,6 @@ __all__ = [
     "ReviewType",
     "ReviewStatus",
     "Budget",
+    "BudgetCategory",
     "MonthlyTotal",
 ]

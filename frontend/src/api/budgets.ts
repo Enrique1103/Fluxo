@@ -5,9 +5,13 @@ export interface Budget {
   user_id: string
   category_id: string
   category_name: string
+  extra_category_ids: string[]
+  extra_category_names: string[]
   /** null = presupuesto de toda la categoría (suma todos sus conceptos) */
   concept_id: string | null
   concept_name: string | null
+  /** Nombre personalizado para presupuestos de varias categorías */
+  name: string | null
   month: number
   year: number
   max_amount: number
@@ -17,7 +21,9 @@ export interface Budget {
 
 export interface BudgetCreate {
   category_id: string
+  extra_category_ids?: string[]
   concept_id?: string | null
+  name?: string | null
   month: number
   year: number
   max_amount: number
@@ -49,7 +55,9 @@ export const deleteBudget = async (id: string): Promise<void> => {
 
 export interface BudgetBulkItem {
   category_id: string
+  extra_category_ids?: string[]
   concept_id: string | null
+  name?: string | null
   max_amount: number
   currency: string
 }

@@ -1,9 +1,9 @@
 import uuid
 from decimal import Decimal
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from app.crud import budget_crud
-from app.models.budget_models import Budget
+from app.models.budget_models import Budget, BudgetCategory
 from app.models.transactions_models import Transaction, TransactionType
 from app.models.accounts_models import Account
 from app.models.categories_models import Category
@@ -17,13 +17,16 @@ from app.exceptions.budget_exceptions import (
 
 
 def _compute_spent(db: Session, budget: Budget) -> Decimal:
-    # Presupuesto de concepto: solo ese concepto. De categoría: todos los conceptos
-    # de la categoría (los movimientos guardan su categoría, así que se filtra por ella).
-    scope = (
-        Transaction.concept_id == budget.concept_id
-        if budget.concept_id is not None
-        else Transaction.category_id == budget.category_id
-    )
+    # Presupuesto de concepto: solo ese concepto. De categoría(s): todos los conceptos
+    # de la(s) categoría(s).
+    if budget.concept_id is not None:
+        scope = Transaction.concept_id == budget.concept_id
+    else:
+        cat_ids = budget.category_ids
+        if len(cat_ids) == 1:
+            scope = Transaction.category_id == cat_ids[0]
+        else:
+            scope = Transaction.category_id.in_(cat_ids)
 
     def _sum(*type_filter) -> Decimal:
         result = (
@@ -51,6 +54,12 @@ def _compute_spent(db: Session, budget: Budget) -> Decimal:
 
 def _to_response(db: Session, budget: Budget) -> BudgetResponse:
     category_name = db.query(Category.name).filter(Category.id == budget.category_id).scalar() or ""
+    extra_ids = [x.category_id for x in budget.extra_categories]
+    extra_names: list[str] = []
+    if extra_ids:
+        rows = db.query(Category.id, Category.name).filter(Category.id.in_(extra_ids)).all()
+        name_map = {r.id: r.name for r in rows}
+        extra_names = [name_map.get(cid, "") for cid in extra_ids]
     concept_name = (
         db.query(Concept.name).filter(Concept.id == budget.concept_id).scalar()
         if budget.concept_id is not None else None
@@ -61,8 +70,11 @@ def _to_response(db: Session, budget: Budget) -> BudgetResponse:
         user_id=budget.user_id,
         category_id=budget.category_id,
         category_name=category_name,
+        extra_category_ids=extra_ids,
+        extra_category_names=extra_names,
         concept_id=budget.concept_id,
         concept_name=concept_name,
+        name=budget.name,
         month=budget.month,
         year=budget.year,
         max_amount=budget.max_amount,
@@ -89,19 +101,58 @@ def _resolve_target(
     return cat.id
 
 
+def _resolve_extras(db: Session, user_id: uuid.UUID, extra_ids: list[uuid.UUID]) -> list[uuid.UUID]:
+    """Valida que todas las categorías extra sean del usuario."""
+    if not extra_ids:
+        return []
+    found = db.query(Category.id).filter(Category.id.in_(extra_ids), Category.user_id == user_id).all()
+    found_ids = {r.id for r in found}
+    missing = [cid for cid in extra_ids if cid not in found_ids]
+    if missing:
+        from app.exceptions.category_exceptions import CategoryNotFound
+        raise CategoryNotFound("Categoría no encontrada")
+    return list(dict.fromkeys(cid for cid in extra_ids))  # dedup preserving order
+
+
+def _check_cat_budget_overlap(
+    db: Session, user_id: uuid.UUID, all_cat_ids: set[uuid.UUID],
+    month: int, year: int, currency: str, exclude_id: uuid.UUID | None = None,
+) -> None:
+    """Impide que haya dos presupuestos de categoría cuyo conjunto de categorías se solape."""
+    q = db.query(Budget).filter(
+        Budget.user_id == user_id, Budget.month == month, Budget.year == year,
+        Budget.currency == currency, Budget.concept_id.is_(None),
+        or_(
+            Budget.category_id.in_(all_cat_ids),
+            Budget.extra_categories.any(BudgetCategory.category_id.in_(all_cat_ids)),
+        ),
+    )
+    if exclude_id:
+        q = q.filter(Budget.id != exclude_id)
+    dup = q.first()
+    if dup:
+        raise BudgetAlreadyExists("Ya hay un presupuesto en ese período que incluye alguna de esas categorías")
+
+
 def create(db: Session, user_id: uuid.UUID, payload: BudgetCreate) -> BudgetResponse:
     category_id = _resolve_target(db, user_id, payload.category_id, payload.concept_id)
+    extras = _resolve_extras(db, user_id, [c for c in payload.extra_category_ids if c != category_id])
 
     # Check duplicate
-    if budget_crud.get_duplicate(db, user_id, category_id, payload.month, payload.year,
-                                 payload.currency, payload.concept_id):
-        what = "este concepto" if payload.concept_id else "esta categoría"
-        raise BudgetAlreadyExists(f"Ya existe un presupuesto para {what} en este período")
+    if payload.concept_id:
+        if budget_crud.get_duplicate(db, user_id, category_id, payload.month, payload.year,
+                                     payload.currency, payload.concept_id):
+            raise BudgetAlreadyExists("Ya existe un presupuesto para este concepto en este período")
+    else:
+        all_cats = {category_id} | set(extras)
+        _check_cat_budget_overlap(db, user_id, all_cats, payload.month, payload.year, payload.currency)
 
     budget = Budget(
         user_id=user_id,
         category_id=category_id,
         concept_id=payload.concept_id,
+        name=payload.name if extras else None,
+        extra_categories=[BudgetCategory(category_id=cid) for cid in extras],
         month=payload.month,
         year=payload.year,
         max_amount=payload.max_amount,
@@ -126,7 +177,9 @@ def save_bulk(db: Session, user_id: uuid.UUID, payload: BudgetBulkSave) -> list[
     try:
         for item in payload.items:
             category_id = _resolve_target(db, user_id, item.category_id, item.concept_id)
-            key = (category_id if item.concept_id is None else None, item.concept_id, item.currency)
+            extras = _resolve_extras(db, user_id, [c for c in item.extra_category_ids if c != category_id])
+            key = (category_id if item.concept_id is None else None, item.concept_id,
+                   tuple(sorted(str(c) for c in extras)), item.currency)
             if key in seen:
                 continue
             seen.add(key)
@@ -134,12 +187,17 @@ def save_bulk(db: Session, user_id: uuid.UUID, payload: BudgetBulkSave) -> list[
                                                  item.currency, item.concept_id)
             if existing:
                 budget_crud.update(db, existing, item.max_amount)
+                # Update extras
+                existing.extra_categories = [BudgetCategory(category_id=cid) for cid in extras]
+                existing.name = item.name if extras else None
                 saved.append(existing)
             else:
                 budget = Budget(
                     user_id=user_id,
                     category_id=category_id,
                     concept_id=item.concept_id,
+                    name=item.name if extras else None,
+                    extra_categories=[BudgetCategory(category_id=cid) for cid in extras],
                     month=payload.month,
                     year=payload.year,
                     max_amount=item.max_amount,

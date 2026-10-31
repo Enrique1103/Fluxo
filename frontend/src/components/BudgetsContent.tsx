@@ -36,9 +36,11 @@ const inputCls = 'w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py
 
 function AddForm({ onDone, currency, initialMonth, initialYear }: AddFormProps) {
   const qc = useQueryClient()
-  const [categoryId, setCategoryId] = useState('')
-  const [scope,      setScope]      = useState<'category' | 'concept'>('category')
-  const [conceptId,  setConceptId]  = useState('')
+  const [categoryId,     setCategoryId]     = useState('')
+  const [extraCatIds,    setExtraCatIds]    = useState<string[]>([])
+  const [scope,          setScope]          = useState<'category' | 'concept'>('category')
+  const [conceptId,      setConceptId]      = useState('')
+  const [budgetName,     setBudgetName]     = useState('')
   const [month,      setMonth]      = useState(initialMonth)
   const [year,       setYear]       = useState(initialYear)
   const [amount,     setAmount]     = useState('')
@@ -56,7 +58,9 @@ function AddForm({ onDone, currency, initialMonth, initialYear }: AddFormProps) 
   const mutation = useMutation({
     mutationFn: () => createBudget({
       category_id: categoryId,
+      extra_category_ids: scope === 'category' ? extraCatIds : [],
       concept_id: scope === 'concept' ? conceptId : null,
+      name: scope === 'category' && extraCatIds.length > 0 ? (budgetName || null) : null,
       month, year,
       max_amount: parseFloat(amount),
       currency: cur,
@@ -76,10 +80,10 @@ function AddForm({ onDone, currency, initialMonth, initialYear }: AddFormProps) 
 
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
-          <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Categoría</label>
+          <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Categoría principal</label>
           <select
             value={categoryId}
-            onChange={e => { setCategoryId(e.target.value); setConceptId('') }}
+            onChange={e => { setCategoryId(e.target.value); setConceptId(''); setExtraCatIds([]) }}
             className={inputCls}
           >
             <option value="">Seleccioná una categoría</option>
@@ -92,11 +96,11 @@ function AddForm({ onDone, currency, initialMonth, initialYear }: AddFormProps) 
         <div className="col-span-2">
           <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Aplicar a</label>
           <div className="grid grid-cols-2 gap-1 p-1 bg-slate-900 border border-slate-700 rounded-xl">
-            {([['category', 'Toda la categoría'], ['concept', 'Un concepto']] as const).map(([v, label]) => (
+            {([['category', 'Categoría(s)'], ['concept', 'Un concepto']] as const).map(([v, label]) => (
               <button
                 key={v}
                 type="button"
-                onClick={() => setScope(v)}
+                onClick={() => { setScope(v); if (v === 'concept') setExtraCatIds([]) }}
                 className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   scope === v ? 'bg-indigo-500/25 text-indigo-200' : 'text-slate-500 hover:text-slate-300'
                 }`}
@@ -107,10 +111,48 @@ function AddForm({ onDone, currency, initialMonth, initialYear }: AddFormProps) 
           </div>
           <p className="text-[10px] text-slate-500 mt-1">
             {scope === 'category'
-              ? 'Un solo límite que suma todo lo que gastes en sus conceptos.'
+              ? 'Un solo límite que suma todo lo que gastes en sus conceptos. Podés sumar varias categorías.'
               : 'Límite solo para ese concepto (ej: Supermercado).'}
           </p>
         </div>
+
+        {scope === 'category' && categoryId && expenseCategories.length > 1 && (
+          <div className="col-span-2">
+            <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">
+              Agregar más categorías <span className="normal-case text-slate-600">(opcional)</span>
+            </label>
+            <div className="space-y-1 rounded-xl bg-slate-900 border border-slate-700 p-2 max-h-36 overflow-y-auto">
+              {expenseCategories.filter(c => c.id !== categoryId).map(c => (
+                <label key={c.id} className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer hover:text-slate-100">
+                  <input
+                    type="checkbox"
+                    checked={extraCatIds.includes(c.id)}
+                    onChange={e => setExtraCatIds(prev =>
+                      e.target.checked ? [...prev, c.id] : prev.filter(x => x !== c.id)
+                    )}
+                    className="accent-indigo-500"
+                  />
+                  {c.name}
+                </label>
+              ))}
+            </div>
+            {extraCatIds.length > 0 && (
+              <div className="mt-1.5">
+                <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">
+                  Nombre del grupo <span className="normal-case text-slate-600">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={budgetName}
+                  onChange={e => setBudgetName(e.target.value)}
+                  placeholder={`${expenseCategories.find(c => c.id === categoryId)?.name ?? ''} + ${extraCatIds.length} más`}
+                  maxLength={60}
+                  className={inputCls}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {scope === 'concept' && (
           <div className="col-span-2">
@@ -220,10 +262,15 @@ function BudgetRow({ budget, nested = false }: { budget: Budget; nested?: boolea
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="min-w-0">
           <p className={`font-medium truncate ${nested ? 'text-xs text-slate-300' : 'text-sm text-slate-200'}`}>
-            {budget.concept_name ?? budget.category_name}
+            {budget.concept_name ?? budget.name ?? budgetDisplayName(budget)}
           </p>
           <p className="text-[10px] text-slate-500">
-            {budget.concept_id ? 'Concepto' : 'Toda la categoría'} · {budget.currency}
+            {budget.concept_id
+              ? 'Concepto'
+              : (budget.extra_category_ids?.length > 0
+                  ? `${1 + budget.extra_category_ids.length} categorías`
+                  : 'Toda la categoría')
+            } · {budget.currency}
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -282,7 +329,9 @@ function BudgetRow({ budget, nested = false }: { budget: Budget; nested?: boolea
 interface DraftRow {
   key: string
   category_id: string
+  extra_category_ids: string[]
   concept_id: string | null
+  name: string | null
   label: string
   sub: string
   currency: string
@@ -314,20 +363,29 @@ function CopyPanel({ month, year, existing, onDone }: {
     enabled:  !sameMonth,
   })
 
+  const budgetKey = (b: Budget | DraftRow) => {
+    const catKey = b.concept_id
+      ? `con:${b.concept_id}`
+      : `cats:${[b.category_id, ...(b.extra_category_ids ?? [])].sort().join(',')}`
+    return `${catKey}|${b.currency}`
+  }
+
   const existingKeys = useMemo(
-    () => new Set(existing.map(b => `${b.concept_id ?? 'cat:' + b.category_id}|${b.currency}`)),
+    () => new Set(existing.map(budgetKey)),
     [existing],
   )
 
   const rows: DraftRow[] = useMemo(() => sortBudgets(source).map(b => {
-    const key = `${b.concept_id ?? 'cat:' + b.category_id}|${b.currency}`
+    const key = budgetKey(b)
     const e = edits[key] ?? {}
     return {
       key,
       category_id: b.category_id,
+      extra_category_ids: b.extra_category_ids ?? [],
       concept_id:  b.concept_id,
-      label:  b.concept_name ?? b.category_name,
-      sub:    b.concept_id ? 'Concepto' : 'Toda la categoría',
+      name: b.name,
+      label:  b.concept_name ?? b.name ?? budgetDisplayName(b),
+      sub:    b.concept_id ? 'Concepto' : (b.extra_category_ids?.length > 0 ? `${1 + b.extra_category_ids.length} categorías` : 'Toda la categoría'),
       currency: b.currency,
       spent:  Number(b.spent),
       amount: e.amount ?? String(Number(b.max_amount)),
@@ -346,7 +404,9 @@ function CopyPanel({ month, year, existing, onDone }: {
   const mutation = useMutation({
     mutationFn: () => saveBudgetsBulk(month, year, chosen.map(r => ({
       category_id: r.category_id,
+      extra_category_ids: r.extra_category_ids,
       concept_id:  r.concept_id,
+      name: r.name,
       max_amount:  parseFloat(r.amount),
       currency:    r.currency,
     }))),
@@ -430,6 +490,11 @@ function CopyPanel({ month, year, existing, onDone }: {
       </div>
     </div>
   )
+}
+
+function budgetDisplayName(b: Budget): string {
+  const names = [b.category_name, ...b.extra_category_names]
+  return names.join(' + ')
 }
 
 /** Orden: por categoría; primero el presupuesto de la categoría y debajo los de sus conceptos */

@@ -5,8 +5,12 @@ from pydantic import BaseModel, field_validator
 
 class BudgetCreate(BaseModel):
     category_id: uuid.UUID
+    # Categorías adicionales para presupuesto agrupado (ej: Alimentación + Hogar)
+    extra_category_ids: list[uuid.UUID] = []
     # Opcional: sin concepto el presupuesto es de toda la categoría (suma todos sus conceptos)
     concept_id: uuid.UUID | None = None
+    # Nombre personalizado (solo para presupuestos de varias categorías)
+    name: str | None = None
     month: int
     year: int
     max_amount: Decimal
@@ -55,7 +59,9 @@ class BudgetUpdate(BaseModel):
 
 class BudgetBulkItem(BaseModel):
     category_id: uuid.UUID
+    extra_category_ids: list[uuid.UUID] = []
     concept_id: uuid.UUID | None = None
+    name: str | None = None
     max_amount: Decimal
     currency: str
 
@@ -82,8 +88,11 @@ class BudgetResponse(BaseModel):
     user_id: uuid.UUID
     category_id: uuid.UUID
     category_name: str
+    extra_category_ids: list[uuid.UUID] = []
+    extra_category_names: list[str] = []
     concept_id: uuid.UUID | None = None
     concept_name: str | None = None
+    name: str | None = None
     month: int
     year: int
     max_amount: Decimal
