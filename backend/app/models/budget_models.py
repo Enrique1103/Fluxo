@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from sqlalchemy import String, DateTime, Numeric, ForeignKey, Integer, UniqueConstraint, CheckConstraint
+from sqlalchemy import String, DateTime, Numeric, ForeignKey, Integer, Index, CheckConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
@@ -10,7 +10,14 @@ from .base import Base
 class Budget(Base):
     __tablename__ = "budgets"
     __table_args__ = (
-        UniqueConstraint("user_id", "category_id", "month", "year", "currency", name="uq_budget_user_cat_period"),
+        # Un presupuesto puede ser de la categoría entera (concept_id NULL: suma todos sus
+        # conceptos) o de un concepto puntual. Uno de cada por período y moneda.
+        Index("uq_budget_user_cat_period", "user_id", "category_id", "month", "year", "currency",
+              unique=True,
+              postgresql_where=text("concept_id IS NULL"), sqlite_where=text("concept_id IS NULL")),
+        Index("uq_budget_user_concept_period", "user_id", "concept_id", "month", "year", "currency",
+              unique=True,
+              postgresql_where=text("concept_id IS NOT NULL"), sqlite_where=text("concept_id IS NOT NULL")),
         CheckConstraint("max_amount > 0", name="check_budget_positive"),
         CheckConstraint("month BETWEEN 1 AND 12", name="check_budget_month"),
         CheckConstraint("year >= 2000", name="check_budget_year"),
@@ -25,6 +32,10 @@ class Budget(Base):
     category_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("categories.id", ondelete="CASCADE"), nullable=False
     )
+    # NULL = presupuesto de toda la categoría. Con valor = solo ese concepto.
+    concept_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="CASCADE"), nullable=True
+    )
     month: Mapped[int] = mapped_column(Integer, nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     max_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
@@ -36,3 +47,4 @@ class Budget(Base):
 
     user     = relationship("User",     back_populates="budgets")
     category = relationship("Category", back_populates="budgets")
+    concept  = relationship("Concept")

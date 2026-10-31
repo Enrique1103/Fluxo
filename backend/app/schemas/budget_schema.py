@@ -5,6 +5,8 @@ from pydantic import BaseModel, field_validator
 
 class BudgetCreate(BaseModel):
     category_id: uuid.UUID
+    # Opcional: sin concepto el presupuesto es de toda la categoría (suma todos sus conceptos)
+    concept_id: uuid.UUID | None = None
     month: int
     year: int
     max_amount: Decimal
@@ -51,6 +53,27 @@ class BudgetUpdate(BaseModel):
         return v
 
 
+class BudgetBulkItem(BaseModel):
+    category_id: uuid.UUID
+    concept_id: uuid.UUID | None = None
+    max_amount: Decimal
+    currency: str
+
+    _amount = field_validator("max_amount")(BudgetUpdate.validate_amount.__func__)
+    _currency = field_validator("currency")(BudgetCreate.validate_currency.__func__)
+
+
+class BudgetBulkSave(BaseModel):
+    """Guarda varios presupuestos de un mes de una vez (ej: copia editada del mes anterior).
+    Si ya existe el mismo presupuesto en ese mes, se actualiza el monto."""
+    month: int
+    year: int
+    items: list[BudgetBulkItem]
+
+    _month = field_validator("month")(BudgetCreate.validate_month.__func__)
+    _year = field_validator("year")(BudgetCreate.validate_year.__func__)
+
+
 class BudgetResponse(BaseModel):
     class Config:
         from_attributes = True
@@ -59,6 +82,8 @@ class BudgetResponse(BaseModel):
     user_id: uuid.UUID
     category_id: uuid.UUID
     category_name: str
+    concept_id: uuid.UUID | None = None
+    concept_name: str | None = None
     month: int
     year: int
     max_amount: Decimal

@@ -37,14 +37,19 @@ def get_duplicate(
     month: int,
     year: int,
     currency: str,
+    concept_id: uuid.UUID | None = None,
 ) -> Budget | None:
-    return db.query(Budget).filter(
+    q = db.query(Budget).filter(
         Budget.user_id   == user_id,
-        Budget.category_id == category_id,
         Budget.month     == month,
         Budget.year      == year,
         Budget.currency  == currency,
-    ).first()
+    )
+    if concept_id is None:
+        q = q.filter(Budget.category_id == category_id, Budget.concept_id.is_(None))
+    else:
+        q = q.filter(Budget.concept_id == concept_id)
+    return q.first()
 
 
 def update(db: Session, budget: Budget, max_amount) -> Budget:
