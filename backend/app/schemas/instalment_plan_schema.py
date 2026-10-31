@@ -16,8 +16,9 @@ class PaymentMethod(str, Enum):
 
 class InstalmentPlanCreate(BaseModel):
     account_id: uuid.UUID
+    # Obligatorio; la categoría sale del concepto (category_id se ignora, queda por compatibilidad)
     concept_id: uuid.UUID | None = None
-    category_id: uuid.UUID
+    category_id: uuid.UUID | None = None
     description: str | None = Field(default=None, max_length=100)
     total_amount: Decimal = Field(..., gt=0)
     n_cuotas: int = Field(..., ge=2, le=60)

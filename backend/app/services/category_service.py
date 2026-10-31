@@ -40,6 +40,7 @@ def create(db: Session, user: User, category_in: CategoryCreate) -> Category:
         icon=category_in.icon,
         color=category_in.color,
         is_system=False,
+        kind=category_in.kind,
     )
     db.commit()
     db.refresh(db_cat)
@@ -77,6 +78,9 @@ def update(db: Session, user: User, category_id: uuid.UUID, category_update: Cat
     if category_update.color is not None:
         fields["color"] = category_update.color
 
+    if category_update.kind is not None:
+        fields["kind"] = category_update.kind
+
     if fields:
         category_crud.update(db, cat, fields)
         db.commit()
@@ -97,19 +101,14 @@ def delete(db: Session, user: User, category_id: uuid.UUID) -> None:
         )
 
     # Lo que todavía apunta a la categoría (conceptos, movimientos ya borrados, planes
-    # de cuotas cancelados) se reasigna antes de borrarla, para no romper la base.
+    # de cuotas cancelados) se pasa a "Sin clasificar" antes de borrarla, para no romper la base.
     from app.models.concepts_models import Concept
     from app.models.instalment_plan_models import InstalmentPlan
     from app.models.transactions_models import Transaction
+    fallback = get_or_create_fallback(db, user.id, exclude_id=cat.id)
     db.query(Concept).filter(Concept.category_id == cat.id).update(
-        {"category_id": None}, synchronize_session=False
+        {"category_id": fallback.id}, synchronize_session=False
     )
-    fallback = category_crud.get_by_slug_and_user(db, "sin-clasificar", user.id)
-    if fallback is None or fallback.id == cat.id:
-        fallback = category_crud.create(
-            db, user_id=user.id, name="Sin clasificar", slug="sin-clasificar",
-            icon="help-circle", color="#6B7280", is_system=True,
-        )
     db.query(Transaction).filter(Transaction.category_id == cat.id).update(
         {"category_id": fallback.id}, synchronize_session=False
     )
@@ -119,3 +118,14 @@ def delete(db: Session, user: User, category_id: uuid.UUID) -> None:
 
     category_crud.delete(db, cat)
     db.commit()
+
+
+def get_or_create_fallback(db: Session, user_id: uuid.UUID, exclude_id: uuid.UUID | None = None) -> Category:
+    """Categoría "Sin clasificar" del usuario (la crea si no existe)."""
+    fallback = category_crud.get_by_slug_and_user(db, "sin-clasificar", user_id)
+    if fallback is None or fallback.id == exclude_id:
+        fallback = category_crud.create(
+            db, user_id=user_id, name="Sin clasificar", slug="sin-clasificar",
+            icon="help-circle", color="#6B7280", is_system=True, kind="any",
+        )
+    return fallback

@@ -8,7 +8,7 @@ from decimal import Decimal
 
 import pytest
 
-from tests.conftest import BASE
+from tests.conftest import BASE, any_concept
 from tests.test_households import _register_and_login
 
 HH = f"{BASE}/households"
@@ -18,7 +18,7 @@ TODAY = date.today()
 
 def _user(c, h, income: str):
     acc = c.post(f"{BASE}/accounts", json={"name": "Caja", "type": "cash", "currency": "UYU", "balance": "100000"}, headers=h).json()
-    concept = c.get(f"{BASE}/concepts", headers=h).json()[0]
+    concept = any_concept(c, h)
     if Decimal(income) > 0:
         r = c.post(TX, json={"account_id": acc["id"], "concept_id": concept["id"], "category_id": concept["category_id"],
                              "amount": income, "type": "income", "date": str(TODAY)}, headers=h)

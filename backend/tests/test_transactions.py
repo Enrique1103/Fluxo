@@ -96,14 +96,56 @@ class TestCreateTransaction:
         }, headers=h)
         assert r.status_code == 422
 
-    def test_missing_category_id_422(self, tx_setup):
-        """category_id es requerido — el test anterior del script original lo omitía."""
-        c, h, acc_id, cid, _ = tx_setup
+    def test_category_comes_from_concept(self, tx_setup):
+        """Solo se elige el concepto: la categoría se completa con la del concepto."""
+        c, h, acc_id, cid, cat_id = tx_setup
         r = c.post(f"{BASE}/transactions", json={
             "account_id": acc_id, "concept_id": cid,
             "amount": "100.00", "type": "expense", "date": TODAY,
         }, headers=h)
+        assert r.status_code == 201, r.text
+        assert r.json()["category_id"] == cat_id
+
+    def test_category_id_sent_is_ignored(self, tx_setup):
+        """Una categoría distinta a la del concepto no se respeta (manda el concepto)."""
+        c, h, acc_id, cid, cat_id = tx_setup
+        other = next(x["id"] for x in c.get(f"{BASE}/categories", headers=h).json() if x["id"] != cat_id)
+        r = c.post(f"{BASE}/transactions", json={
+            "account_id": acc_id, "concept_id": cid, "category_id": other,
+            "amount": "100.00", "type": "expense", "date": TODAY,
+        }, headers=h)
+        assert r.status_code == 201, r.text
+        assert r.json()["category_id"] == cat_id
+
+    def test_missing_concept_422(self, tx_setup):
+        c, h, acc_id, _, cat_id = tx_setup
+        r = c.post(f"{BASE}/transactions", json={
+            "account_id": acc_id, "category_id": cat_id,
+            "amount": "100.00", "type": "expense", "date": TODAY,
+        }, headers=h)
         assert r.status_code == 422
+
+    def test_expense_concept_rejected_for_income(self, tx_setup):
+        """Un concepto de gastos (Supermercado) no se puede usar en un ingreso."""
+        c, h, acc_id, _, _ = tx_setup
+        sup = next(x for x in c.get(f"{BASE}/concepts", headers=h).json() if x["name"] == "Supermercado")
+        r = c.post(f"{BASE}/transactions", json={
+            "account_id": acc_id, "concept_id": sup["id"],
+            "amount": "100.00", "type": "income", "date": TODAY,
+        }, headers=h)
+        assert r.status_code == 422
+        assert "Supermercado" in r.json()["detail"]
+
+    def test_edit_concept_moves_category(self, tx_setup):
+        c, h, acc_id, cid, cat_id = tx_setup
+        t = c.post(f"{BASE}/transactions", json={
+            "account_id": acc_id, "concept_id": cid,
+            "amount": "100.00", "type": "expense", "date": TODAY,
+        }, headers=h).json()
+        sup = next(x for x in c.get(f"{BASE}/concepts", headers=h).json() if x["name"] == "Supermercado")
+        r = c.patch(f"{BASE}/transactions/{t['id']}", json={"concept_id": sup["id"]}, headers=h)
+        assert r.status_code == 200, r.text
+        assert r.json()["category_id"] == sup["category_id"]
 
     def test_zero_amount_422(self, tx_setup):
         c, h, acc_id, cid, cat_id = tx_setup

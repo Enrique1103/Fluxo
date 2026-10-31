@@ -1,12 +1,14 @@
 # Categorías y conceptos que se crean automáticamente al registrar un nuevo usuario.
 # is_system=True → no se puede borrar ni renombrar la categoría.
 # "Transacciones" agrupa transferencias, ajustes y pagos de tarjeta.
+# kind: para qué tipo de movimiento se ofrecen sus conceptos (expense/income/transfer/any).
 # "Sin clasificar" es el fallback de los movimientos importados que no se pudieron clasificar.
 
 INITIAL_USER_CATEGORIES = [
     {
         "name": "Sueldo",
         "slug": "sueldo",
+        "kind": "income",
         "icon": "briefcase",
         "color": "#06B6D4",
         "is_system": False,
@@ -15,6 +17,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Alimentación",
         "slug": "alimentacion",
+        "kind": "expense",
         "icon": "shopping-cart",
         "color": "#22C55E",
         "is_system": False,
@@ -23,6 +26,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Aseo",
         "slug": "aseo",
+        "kind": "expense",
         "icon": "sparkles",
         "color": "#A855F7",
         "is_system": False,
@@ -31,6 +35,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Educación",
         "slug": "educacion",
+        "kind": "expense",
         "icon": "graduation-cap",
         "color": "#3B82F6",
         "is_system": False,
@@ -39,6 +44,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Salud",
         "slug": "salud",
+        "kind": "expense",
         "icon": "heart-pulse",
         "color": "#EF4444",
         "is_system": False,
@@ -47,6 +53,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Extracción de Dinero",
         "slug": "extraccion-de-dinero",
+        "kind": "transfer",
         "icon": "banknote",
         "color": "#84CC16",
         "is_system": False,
@@ -55,6 +62,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Inversión",
         "slug": "inversion",
+        "kind": "any",
         "icon": "trending-up",
         "color": "#10B981",
         "is_system": False,
@@ -63,6 +71,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Ocio",
         "slug": "ocio",
+        "kind": "expense",
         "icon": "party-popper",
         "color": "#F97316",
         "is_system": False,
@@ -71,6 +80,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Regalos",
         "slug": "regalos",
+        "kind": "any",
         "icon": "gift",
         "color": "#EC4899",
         "is_system": False,
@@ -79,6 +89,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Suscripciones",
         "slug": "suscripciones",
+        "kind": "expense",
         "icon": "repeat",
         "color": "#8B5CF6",
         "is_system": False,
@@ -87,6 +98,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Trámites legales",
         "slug": "tramites-legales",
+        "kind": "expense",
         "icon": "file-text",
         "color": "#64748B",
         "is_system": False,
@@ -95,6 +107,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Transporte",
         "slug": "transporte",
+        "kind": "expense",
         "icon": "bus",
         "color": "#F59E0B",
         "is_system": False,
@@ -103,6 +116,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Vacaciones",
         "slug": "vacaciones",
+        "kind": "expense",
         "icon": "plane",
         "color": "#0EA5E9",
         "is_system": False,
@@ -111,6 +125,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Vestimenta",
         "slug": "vestimenta",
+        "kind": "expense",
         "icon": "shirt",
         "color": "#D946EF",
         "is_system": False,
@@ -119,6 +134,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Gastos asociados al Hogar",
         "slug": "gastos-asociados-al-hogar",
+        "kind": "expense",
         "icon": "home",
         "color": "#14B8A6",
         "is_system": False,
@@ -127,6 +143,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Transacciones",
         "slug": "transacciones",
+        "kind": "transfer",
         "icon": "arrow-left-right",
         "color": "#94A3B8",
         "is_system": True,
@@ -135,6 +152,7 @@ INITIAL_USER_CATEGORIES = [
     {
         "name": "Sin clasificar",
         "slug": "sin-clasificar",
+        "kind": "any",
         "icon": "help-circle",
         "color": "#6B7280",
         "is_system": True,

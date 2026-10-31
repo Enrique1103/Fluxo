@@ -15,7 +15,11 @@ import {
   createCategory,
   createConcept,
   fetchExchangeRates,
+  conceptsForType,
+  CATEGORY_KIND_LABELS,
   type Account,
+  type Category,
+  type CategoryKind,
   type PaymentMethod,
 } from '../api/dashboard'
 import { fetchHouseholds } from '../api/households'
@@ -66,22 +70,31 @@ function parseErr(err: unknown, fallback: string): string {
 // ─── Mini inline form for quick concept/category creation ───────────────────
 
 interface QuickCreateConceptProps {
+  /** Categorías que sirven para el tipo de movimiento actual */
+  categories: Category[]
+  /** Tipo de categoría sugerido si se crea una nueva desde acá */
+  defaultKind: CategoryKind
   onCreated: (id: string) => void
   onCancel: () => void
 }
 
-function QuickCreateConcept({ onCreated, onCancel }: QuickCreateConceptProps) {
+// Todo concepto nuevo se crea dentro de una categoría: después, al elegirlo,
+// la categoría del movimiento se completa sola.
+function QuickCreateConcept({ categories, defaultKind, onCreated, onCancel }: QuickCreateConceptProps) {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [showNewCategory, setShowNewCategory] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async () => {
     const trimmed = name.trim()
     if (trimmed.length < 2) { setError('Mínimo 2 caracteres'); return }
+    if (!categoryId) { setError('Elegí a qué categoría pertenece'); return }
     setSaving(true); setError(null)
     try {
-      const created = await createConcept({ name: trimmed })
+      const created = await createConcept({ name: trimmed, category_id: categoryId })
       await queryClient.invalidateQueries({ queryKey: ['concepts'] })
       onCreated(created.id)
     } catch (err) {
@@ -102,6 +115,29 @@ function QuickCreateConcept({ onCreated, onCancel }: QuickCreateConceptProps) {
         placeholder="NOMBRE DEL CONCEPTO"
         className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500/60 transition-colors w-full font-mono tracking-wide"
       />
+      <div className="flex gap-2">
+        <select
+          value={categoryId}
+          onChange={e => setCategoryId(e.target.value)}
+          className="flex-1 min-w-0 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500/60"
+        >
+          <option value="">Categoría…</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <button
+          onClick={() => setShowNewCategory(v => !v)}
+          className="shrink-0 flex items-center gap-1 px-2 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
+        >
+          <Plus className="w-3 h-3" /> Nueva
+        </button>
+      </div>
+      {showNewCategory && (
+        <QuickCreateCategory
+          defaultKind={defaultKind}
+          onCreated={id => { setCategoryId(id); setShowNewCategory(false) }}
+          onCancel={() => setShowNewCategory(false)}
+        />
+      )}
       {error && <p className="text-rose-400 text-[10px]">{error}</p>}
       <div className="flex gap-2">
         <button
@@ -124,14 +160,16 @@ function QuickCreateConcept({ onCreated, onCancel }: QuickCreateConceptProps) {
 }
 
 interface QuickCreateCategoryProps {
+  defaultKind: CategoryKind
   onCreated: (id: string) => void
   onCancel: () => void
 }
 
-function QuickCreateCategory({ onCreated, onCancel }: QuickCreateCategoryProps) {
+function QuickCreateCategory({ defaultKind, onCreated, onCancel }: QuickCreateCategoryProps) {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [color, setColor] = useState(PRESET_COLORS[0])
+  const [kind, setKind] = useState<CategoryKind>(defaultKind)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -140,7 +178,7 @@ function QuickCreateCategory({ onCreated, onCancel }: QuickCreateCategoryProps) 
     if (trimmed.length < 2) { setError('Mínimo 2 caracteres'); return }
     setSaving(true); setError(null)
     try {
-      const created = await createCategory({ name: trimmed, color })
+      const created = await createCategory({ name: trimmed, color, kind })
       await queryClient.invalidateQueries({ queryKey: ['categories'] })
       onCreated(created.id)
     } catch (err) {
@@ -164,6 +202,18 @@ function QuickCreateCategory({ onCreated, onCancel }: QuickCreateCategoryProps) 
         placeholder="Nombre de la categoría"
         className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500/60 transition-colors w-full"
       />
+      <div className="flex gap-1 flex-wrap">
+        <span className="text-[10px] text-slate-500 self-center mr-1">Se usa para:</span>
+        {(Object.keys(CATEGORY_KIND_LABELS) as CategoryKind[]).map(k => (
+          <button
+            key={k}
+            onClick={() => setKind(k)}
+            className={`px-2 py-0.5 rounded-md text-[10px] border transition-colors ${kind === k ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300' : 'border-slate-600 text-slate-400 hover:text-slate-200'}`}
+          >
+            {CATEGORY_KIND_LABELS[k]}
+          </button>
+        ))}
+      </div>
       <div className="flex gap-1.5 flex-wrap">
         {PRESET_COLORS.map(c => (
           <button
@@ -214,7 +264,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
 
   const [accountId,   setAccountId]   = useState('')
   const [conceptId,   setConceptId]   = useState('')
-  const [categoryId,  setCategoryId]  = useState('')
+  const [conceptSearch, setConceptSearch] = useState('')
   const [amount,      setAmount]      = useState('')
   const [date,        setDate]        = useState(today())
   const [description, setDescription] = useState('')
@@ -239,7 +289,6 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
 
   // Quick-create panels
   const [showNewConcept,  setShowNewConcept]  = useState(false)
-  const [showNewCategory, setShowNewCategory] = useState(false)
 
   const [openDd, setOpenDd] = useState<string | null>(null)
   const closeDd = () => setTimeout(() => setOpenDd(null), 150)
@@ -283,7 +332,6 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
     setTxType(editTx.type)
     setAccountId(editTx.account_id)
     setConceptId(editTx.concept_id)
-    setCategoryId(editTx.category_id)
     setAmount(String(editTx.amount))
     setDate(editTx.date)
     setDescription(editTx.description ?? '')
@@ -307,13 +355,43 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
   const crossRate    = crossCurrency ? findRate(rates, srcAccount!.currency, destAccount!.currency, date) : null
   const estDestAmount = crossRate !== null && parseFloat(amount) > 0 ? (parseFloat(amount) * crossRate).toFixed(2) : null
 
+  // Concepto → categoría: solo se elige el concepto; la categoría se completa sola.
+  // Los conceptos se filtran por el tipo de movimiento (sin "Supermercado" en un ingreso).
+  const kindForType: CategoryKind = isMove ? 'transfer' : txType
+  const typeConcepts = conceptsForType(concepts, categories, txType)
+  const selectedConcept = concepts.find(c => c.id === conceptId)
+  const selectedCategory = selectedConcept ? categories.find(c => c.id === selectedConcept.category_id) : undefined
+  // Al editar un movimiento viejo cuyo concepto no corresponde al tipo, se sigue mostrando
+  const visibleConcepts = selectedConcept && !typeConcepts.some(c => c.id === selectedConcept.id)
+    ? [selectedConcept, ...typeConcepts] : typeConcepts
+  const typeCategories = categories.filter(c => c.kind === kindForType || c.kind === 'any')
+  const search = conceptSearch.trim().toLowerCase()
+  const conceptGroups = categories
+    .map(cat => ({
+      cat,
+      items: visibleConcepts
+        .filter(c => c.category_id === cat.id)
+        .filter(c => !search || c.name.toLowerCase().includes(search) || cat.name.toLowerCase().includes(search)),
+    }))
+    .filter(g => g.items.length > 0)
+    // Primero las categorías propias del tipo (ej: Sueldo en un ingreso), después las de "Todos";
+    // dentro de cada grupo, las que tienen conceptos más usados
+    .sort((a, b) =>
+      Number(b.cat.kind === kindForType) - Number(a.cat.kind === kindForType)
+      || Math.max(...b.items.map(c => c.frequency_score)) - Math.max(...a.items.map(c => c.frequency_score)))
+
+  // Si cambia el tipo y el concepto elegido ya no sirve, se limpia (solo al crear)
+  useEffect(() => {
+    if (!isEditing && conceptId && concepts.length > 0 && !typeConcepts.some(c => c.id === conceptId)) setConceptId('')
+  }, [txType, concepts, categories])
+
   useEffect(() => {
     if (!open) {
       setTxType('expense')
-      setAccountId(''); setConceptId(''); setCategoryId('')
+      setAccountId(''); setConceptId(''); setConceptSearch('')
       setAmount(''); setDate(today()); setDescription('')
       setDestAccountId(''); setServerError(null)
-      setShowNewConcept(false); setShowNewCategory(false)
+      setShowNewConcept(false)
       setAcctName(''); setAcctType('cash'); setAcctCurrency(homeCurrency)
       setAcctBalance(''); setAcctLimit(''); setAcctError(null)
       setMetodoPago('efectivo')
@@ -351,7 +429,8 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
 
   const handleSubmit = async () => {
     setServerError(null)
-    if (!categoryId) { setServerError('Seleccioná una categoría'); return }
+    // Concepto obligatorio (en transferencias y retiros, si no se elige, se usa "Transferencia")
+    if (!conceptId && !isMove) { setServerError('Elegí un concepto'); return }
     const amt = parseFloat(amount)
     if (isNaN(amt) || amt <= 0) { setServerError('El monto debe ser mayor a 0'); return }
     if (!date) { setServerError('La fecha es requerida'); return }
@@ -376,15 +455,13 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
           date,
           description:  description.trim() || null,
           concept_id:   conceptId || undefined,
-          category_id:  categoryId,
           ...(txType === 'expense' ? { metodo_pago: metodoPago, household_ids: selectedHouseholdIds } : {}),
         })
         queryClient.removeQueries({ queryKey: ['tx', editTxId] })
       } else if (enCuotas && txType === 'expense') {
         await createInstalmentPlan({
           account_id:   accountId,
-          concept_id:   conceptId || null,
-          category_id:  categoryId,
+          concept_id:   conceptId,
           total_amount: amt,
           n_cuotas:     parseInt(nCuotas),
           fecha_inicio: date,
@@ -395,7 +472,6 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
         await createTransaction({
           account_id:  accountId,
           concept_id:  conceptId || null,
-          category_id: categoryId,
           amount:      amt,
           type:        isMove ? 'transfer' : txType,
           date,
@@ -700,12 +776,14 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               </div>
             )}
 
-            {/* Concepto (opcional) */}
+            {/* Concepto (obligatorio) → la categoría se completa sola */}
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className={labelClass + ' mb-0'}>Concepto <span className="text-slate-600">(opcional)</span></label>
+                <label className={labelClass + ' mb-0'}>
+                  Concepto {isMove && <span className="text-slate-600">(opcional)</span>}
+                </label>
                 <button
-                  onClick={() => { setShowNewConcept(v => !v); setShowNewCategory(false) }}
+                  onClick={() => setShowNewConcept(v => !v)}
                   className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
                 >
                   <Plus className="w-3 h-3" /> Nuevo
@@ -713,73 +791,66 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               </div>
               <div className="relative">
                 <button
-                  onClick={() => setOpenDd(openDd === 'concept' ? null : 'concept')}
-                  onBlur={closeDd}
+                  onClick={() => { setOpenDd(openDd === 'concept' ? null : 'concept'); setConceptSearch('') }}
                   className={`${ddBtn} ${conceptId ? 'text-slate-200' : 'text-slate-500'}`}
                 >
-                  <span className="truncate">{conceptId ? concepts.find(c => c.id === conceptId)?.name ?? 'Sin concepto' : 'Sin concepto'}</span>
+                  <span className="truncate">
+                    {selectedConcept ? selectedConcept.name : isMove ? 'Transferencia' : 'Elegí un concepto'}
+                  </span>
                   <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
                 </button>
                 {openDd === 'concept' && (
-                  <div className={ddPanel}>
-                    <button onMouseDown={e => e.preventDefault()} onClick={() => { setConceptId(''); setOpenDd(null) }}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${!conceptId ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
-                      Sin concepto {!conceptId && <span className="text-emerald-400 text-[10px]">✓</span>}
-                    </button>
-                    {concepts.map(c => (
-                      <button key={c.id} onMouseDown={e => e.preventDefault()} onClick={() => { setConceptId(c.id); setOpenDd(null) }}
-                        className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${conceptId === c.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
-                        <span className="truncate">{c.name}</span>
-                        {conceptId === c.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
-                      </button>
+                  <div className={ddPanel + ' max-h-72'}>
+                    <div className="px-2 pb-1 pt-0.5 sticky top-0 bg-slate-900">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={conceptSearch}
+                        onChange={e => setConceptSearch(e.target.value)}
+                        onBlur={closeDd}
+                        onKeyDown={e => { if (e.key === 'Escape') setOpenDd(null) }}
+                        placeholder="Buscar concepto…"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/60"
+                      />
+                    </div>
+                    {conceptGroups.length === 0 && (
+                      <p className="px-4 py-3 text-xs text-slate-500">
+                        {search ? 'Ningún concepto coincide.' : 'No hay conceptos para este tipo de movimiento.'} Creá uno con “Nuevo”.
+                      </p>
+                    )}
+                    {conceptGroups.map(({ cat, items }) => (
+                      <div key={cat.id}>
+                        <p className="px-4 pt-2 pb-0.5 text-[10px] uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cat.color ?? '#64748b' }} />
+                          {cat.name}
+                        </p>
+                        {items.map(c => (
+                          <button key={c.id} onMouseDown={e => e.preventDefault()} onClick={() => { setConceptId(c.id); setOpenDd(null) }}
+                            className={`w-full text-left pl-7 pr-4 py-1.5 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${conceptId === c.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                            <span className="truncate">{c.name}</span>
+                            {conceptId === c.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
+                          </button>
+                        ))}
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
+              {selectedCategory && (
+                <p className="mt-1.5 text-[11px] text-slate-500 flex items-center gap-1.5">
+                  Categoría:
+                  <span className="inline-flex items-center gap-1 text-slate-300">
+                    <span className="w-2 h-2 rounded-full" style={{ background: selectedCategory.color ?? '#64748b' }} />
+                    {selectedCategory.name}
+                  </span>
+                </p>
+              )}
               {showNewConcept && (
                 <QuickCreateConcept
+                  categories={typeCategories}
+                  defaultKind={kindForType}
                   onCreated={id => { setConceptId(id); setShowNewConcept(false) }}
                   onCancel={() => setShowNewConcept(false)}
-                />
-              )}
-            </div>
-
-            {/* Categoría */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className={labelClass + ' mb-0'}>Categoría</label>
-                <button
-                  onClick={() => { setShowNewCategory(v => !v); setShowNewConcept(false) }}
-                  className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
-                >
-                  <Plus className="w-3 h-3" /> Nueva
-                </button>
-              </div>
-              <div className="relative">
-                <button
-                  onClick={() => setOpenDd(openDd === 'category' ? null : 'category')}
-                  onBlur={closeDd}
-                  className={`${ddBtn} ${categoryId ? 'text-slate-200' : 'text-slate-500'}`}
-                >
-                  <span className="truncate">{categoryId ? categories.find(c => c.id === categoryId)?.name ?? 'Seleccioná una categoría' : 'Seleccioná una categoría'}</span>
-                  <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
-                </button>
-                {openDd === 'category' && (
-                  <div className={ddPanel}>
-                    {categories.map(cat => (
-                      <button key={cat.id} onMouseDown={e => e.preventDefault()} onClick={() => { setCategoryId(cat.id); setOpenDd(null) }}
-                        className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-800 flex items-center justify-between ${categoryId === cat.id ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
-                        <span className="truncate">{cat.name}</span>
-                        {categoryId === cat.id && <span className="text-emerald-400 text-[10px] shrink-0 ml-2">✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {showNewCategory && (
-                <QuickCreateCategory
-                  onCreated={id => { setCategoryId(id); setShowNewCategory(false) }}
-                  onCancel={() => setShowNewCategory(false)}
                 />
               )}
             </div>

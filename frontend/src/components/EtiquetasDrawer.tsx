@@ -10,9 +10,42 @@ import {
   createConcept,
   updateConcept,
   deleteConcept,
+  CATEGORY_KIND_LABELS,
   type Category,
+  type CategoryKind,
   type Concept,
 } from '../api/dashboard'
+import { invalidateFinancialData } from '../lib/queryClient'
+
+const KIND_STYLES: Record<CategoryKind, string> = {
+  expense:  'text-rose-300 border-rose-400/30 bg-rose-400/10',
+  income:   'text-cyan-300 border-cyan-400/30 bg-cyan-400/10',
+  transfer: 'text-amber-300 border-amber-400/30 bg-amber-400/10',
+  any:      'text-slate-300 border-slate-500/40 bg-slate-500/10',
+}
+
+function KindBadge({ kind }: { kind: CategoryKind }) {
+  return (
+    <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded-md border ${KIND_STYLES[kind] ?? KIND_STYLES.any}`}>
+      {CATEGORY_KIND_LABELS[kind] ?? kind}
+    </span>
+  )
+}
+
+/** Selector de "para qué movimientos se usa" la categoría */
+function KindPicker({ value, onChange }: { value: CategoryKind; onChange: (k: CategoryKind) => void }) {
+  return (
+    <div className="flex gap-1 flex-wrap items-center">
+      <span className="text-[10px] text-slate-500 mr-1">Se usa para:</span>
+      {(Object.keys(CATEGORY_KIND_LABELS) as CategoryKind[]).map(k => (
+        <button key={k} onClick={() => onChange(k)}
+          className={`px-2 py-0.5 rounded-md text-[10px] border transition-colors ${value === k ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300' : 'border-slate-600 text-slate-400 hover:text-slate-200'}`}>
+          {CATEGORY_KIND_LABELS[k]}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 const PRESET_COLORS = [
   '#22d3ee', '#34d399', '#a78bfa', '#f43f5e', '#fb923c',
@@ -37,6 +70,7 @@ function CategoryRow({ cat, onSaved, onDeleted }: {
   const [editing,       setEditing]       = useState(false)
   const [name,          setName]          = useState(cat.name)
   const [color,         setColor]         = useState(cat.color ?? PRESET_COLORS[0])
+  const [kind,          setKind]          = useState<CategoryKind>(cat.kind ?? 'expense')
   const [saving,        setSaving]        = useState(false)
   const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -46,7 +80,7 @@ function CategoryRow({ cat, onSaved, onDeleted }: {
     if (name.trim().length < 2) { setError('Mínimo 2 caracteres'); return }
     setSaving(true); setError(null)
     try {
-      await updateCategory(cat.id, { name: name.trim(), color })
+      await updateCategory(cat.id, { name: name.trim(), color, kind })
       onSaved(); setEditing(false)
     } catch (err) { setError(parseErr(err, 'No se pudo actualizar')) }
     finally { setSaving(false) }
@@ -58,7 +92,7 @@ function CategoryRow({ cat, onSaved, onDeleted }: {
     catch (err) { setError(parseErr(err, 'No se pudo eliminar')); setDeleting(false) }
   }
 
-  const handleCancel = () => { setName(cat.name); setColor(cat.color ?? PRESET_COLORS[0]); setError(null); setEditing(false) }
+  const handleCancel = () => { setName(cat.name); setColor(cat.color ?? PRESET_COLORS[0]); setKind(cat.kind ?? 'expense'); setError(null); setEditing(false) }
 
   return (
     <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 space-y-2">
@@ -71,7 +105,10 @@ function CategoryRow({ cat, onSaved, onDeleted }: {
             className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-200 outline-none focus:border-emerald-500/60 transition-colors"
           />
         ) : (
-          <span className="flex-1 text-sm text-slate-200 truncate">{cat.name}</span>
+          <>
+            <span className="flex-1 text-sm text-slate-200 truncate">{cat.name}</span>
+            <KindBadge kind={cat.kind ?? 'expense'} />
+          </>
         )}
         {cat.is_system ? (
           <Lock className="w-3.5 h-3.5 text-slate-600 shrink-0" />
@@ -110,11 +147,14 @@ function CategoryRow({ cat, onSaved, onDeleted }: {
         )}
       </div>
       {editing && (
-        <div className="flex gap-1.5 flex-wrap pl-5">
-          {PRESET_COLORS.map(c => (
-            <button key={c} onClick={() => setColor(c)} className="w-5 h-5 rounded-full transition-all"
-              style={{ background: c, outline: color === c ? `2px solid ${c}` : undefined, outlineOffset: color === c ? '2px' : undefined, opacity: color === c ? 1 : 0.45 }} />
-          ))}
+        <div className="space-y-2 pl-5">
+          <div className="flex gap-1.5 flex-wrap">
+            {PRESET_COLORS.map(c => (
+              <button key={c} onClick={() => setColor(c)} className="w-5 h-5 rounded-full transition-all"
+                style={{ background: c, outline: color === c ? `2px solid ${c}` : undefined, outlineOffset: color === c ? '2px' : undefined, opacity: color === c ? 1 : 0.45 }} />
+            ))}
+          </div>
+          <KindPicker value={kind} onChange={setKind} />
         </div>
       )}
       {error && <p className="text-rose-400 text-[10px] pl-5">{error}</p>}
@@ -124,11 +164,12 @@ function CategoryRow({ cat, onSaved, onDeleted }: {
 
 // ─── Concept row ─────────────────────────────────────────────────────────────
 
-function ConceptRow({ concept, onSaved, onDeleted }: {
-  concept: Concept; onSaved: () => void; onDeleted: () => void
+function ConceptRow({ concept, categories, onSaved, onDeleted }: {
+  concept: Concept; categories: Category[]; onSaved: () => void; onDeleted: () => void
 }) {
   const [editing,       setEditing]       = useState(false)
   const [name,          setName]          = useState(concept.name)
+  const [categoryId,    setCategoryId]    = useState(concept.category_id)
   const [saving,        setSaving]        = useState(false)
   const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -137,7 +178,13 @@ function ConceptRow({ concept, onSaved, onDeleted }: {
   const handleSave = async () => {
     if (name.trim().length < 2) { setError('Mínimo 2 caracteres'); return }
     setSaving(true); setError(null)
-    try { await updateConcept(concept.id, { name: name.trim() }); onSaved(); setEditing(false) }
+    try {
+      await updateConcept(concept.id, {
+        name: name.trim(),
+        ...(categoryId !== concept.category_id ? { category_id: categoryId } : {}),
+      })
+      onSaved(); setEditing(false)
+    }
     catch (err) { setError(parseErr(err, 'No se pudo actualizar')) }
     finally { setSaving(false) }
   }
@@ -148,7 +195,7 @@ function ConceptRow({ concept, onSaved, onDeleted }: {
     catch (err) { setError(parseErr(err, 'No se pudo eliminar')); setDeleting(false) }
   }
 
-  const handleCancel = () => { setName(concept.name); setError(null); setEditing(false) }
+  const handleCancel = () => { setName(concept.name); setCategoryId(concept.category_id); setError(null); setEditing(false) }
 
   return (
     <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3">
@@ -198,6 +245,17 @@ function ConceptRow({ concept, onSaved, onDeleted }: {
           </div>
         )}
       </div>
+      {editing && (
+        <div className="mt-2 pl-5 space-y-1">
+          <select value={categoryId} onChange={e => setCategoryId(e.target.value)}
+            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/60">
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name} · {CATEGORY_KIND_LABELS[c.kind] ?? c.kind}</option>)}
+          </select>
+          {categoryId !== concept.category_id && (
+            <p className="text-[10px] text-amber-400">Los movimientos con este concepto también pasan a la nueva categoría.</p>
+          )}
+        </div>
+      )}
       {error && <p className="text-rose-400 text-[10px] mt-1">{error}</p>}
     </div>
   )
@@ -210,6 +268,7 @@ function CreateCategoryForm({ onCreated }: { onCreated: () => void }) {
   const [open,   setOpen]   = useState(false)
   const [name,   setName]   = useState('')
   const [color,  setColor]  = useState(PRESET_COLORS[0])
+  const [kind,   setKind]   = useState<CategoryKind>('expense')
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
 
@@ -217,9 +276,9 @@ function CreateCategoryForm({ onCreated }: { onCreated: () => void }) {
     if (name.trim().length < 2) { setError('Mínimo 2 caracteres'); return }
     setSaving(true); setError(null)
     try {
-      await createCategory({ name: name.trim(), color })
+      await createCategory({ name: name.trim(), color, kind })
       await queryClient.invalidateQueries({ queryKey: ['categories'] })
-      setName(''); setColor(PRESET_COLORS[0]); setOpen(false); onCreated()
+      setName(''); setColor(PRESET_COLORS[0]); setKind('expense'); setOpen(false); onCreated()
     } catch (err) { setError(parseErr(err, 'No se pudo crear')) }
     finally { setSaving(false) }
   }
@@ -246,6 +305,7 @@ function CreateCategoryForm({ onCreated }: { onCreated: () => void }) {
             style={{ background: c, outline: color === c ? `2px solid ${c}` : undefined, outlineOffset: color === c ? '2px' : undefined, opacity: color === c ? 1 : 0.45 }} />
         ))}
       </div>
+      <KindPicker value={kind} onChange={setKind} />
       {error && <p className="text-rose-400 text-[10px]">{error}</p>}
       <div className="flex gap-2">
         <button onClick={handleSubmit} disabled={saving}
@@ -261,20 +321,22 @@ function CreateCategoryForm({ onCreated }: { onCreated: () => void }) {
   )
 }
 
-function CreateConceptForm({ onCreated }: { onCreated: () => void }) {
+function CreateConceptForm({ categories, onCreated }: { categories: Category[]; onCreated: () => void }) {
   const queryClient = useQueryClient()
   const [open,   setOpen]   = useState(false)
   const [name,   setName]   = useState('')
+  const [categoryId, setCategoryId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
 
   const handleSubmit = async () => {
     if (name.trim().length < 2) { setError('Mínimo 2 caracteres'); return }
+    if (!categoryId) { setError('Elegí a qué categoría pertenece'); return }
     setSaving(true); setError(null)
     try {
-      await createConcept({ name: name.trim() })
+      await createConcept({ name: name.trim(), category_id: categoryId })
       await queryClient.invalidateQueries({ queryKey: ['concepts'] })
-      setName(''); setOpen(false); onCreated()
+      setName(''); setCategoryId(''); setOpen(false); onCreated()
     } catch (err) { setError(parseErr(err, 'No se pudo crear')) }
     finally { setSaving(false) }
   }
@@ -294,6 +356,11 @@ function CreateConceptForm({ onCreated }: { onCreated: () => void }) {
         placeholder="NOMBRE DEL CONCEPTO"
         className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/60 transition-colors font-mono tracking-wide"
       />
+      <select value={categoryId} onChange={e => setCategoryId(e.target.value)}
+        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/60">
+        <option value="">¿A qué categoría pertenece?</option>
+        {categories.map(c => <option key={c.id} value={c.id}>{c.name} · {CATEGORY_KIND_LABELS[c.kind] ?? c.kind}</option>)}
+      </select>
       {error && <p className="text-rose-400 text-[10px]">{error}</p>}
       <div className="flex gap-2">
         <button onClick={handleSubmit} disabled={saving}
@@ -326,6 +393,11 @@ export default function EtiquetasContent() {
 
   const invalidateCats     = () => queryClient.invalidateQueries({ queryKey: ['categories'] })
   const invalidateConcepts = () => queryClient.invalidateQueries({ queryKey: ['concepts'] })
+  // Mover un concepto de categoría mueve sus movimientos: refrescar gráficas e historial
+  const afterConceptSaved = () => { invalidateConcepts(); invalidateFinancialData(queryClient) }
+  const conceptGroups = categories
+    .map(cat => ({ cat, items: concepts.filter(c => c.category_id === cat.id) }))
+    .filter(g => g.items.length > 0)
 
   return (
     <div className="flex flex-col h-full">
@@ -380,13 +452,23 @@ export default function EtiquetasContent() {
             ) : (
               <>
                 {concepts.length === 0 && <p className="text-center text-xs text-slate-600 py-6">No hay conceptos aún</p>}
-                {concepts.map(concept => (
-                  <ConceptRow key={concept.id} concept={concept} onSaved={invalidateConcepts} onDeleted={invalidateConcepts} />
+                {conceptGroups.map(({ cat, items }) => (
+                  <div key={cat.id} className="space-y-1.5 pb-1">
+                    <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500 pt-1">
+                      <span className="w-2 h-2 rounded-full" style={{ background: cat.color ?? '#6B7280' }} />
+                      {cat.name}
+                      <KindBadge kind={cat.kind ?? 'expense'} />
+                    </p>
+                    {items.map(concept => (
+                      <ConceptRow key={concept.id} concept={concept} categories={categories}
+                        onSaved={afterConceptSaved} onDeleted={invalidateConcepts} />
+                    ))}
+                  </div>
                 ))}
               </>
             )}
             <div className="pt-2">
-              <CreateConceptForm onCreated={invalidateConcepts} />
+              <CreateConceptForm categories={categories} onCreated={invalidateConcepts} />
             </div>
           </>
         )}

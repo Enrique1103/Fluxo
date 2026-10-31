@@ -21,7 +21,6 @@ from app.exceptions.transaction_exceptions import (
     InvalidScopeOperation,
 )
 from app.exceptions.account_exceptions import UnauthorizedAccountAccess
-from app.exceptions.category_exceptions import CategoryNotFound
 from app.exceptions.exchange_rate_exceptions import ExchangeRateMissing
 from app.models.accounts_models import Account, AccountType
 from app.models.transactions_models import Transaction, TransactionHousehold, TransactionType, TransferRole, PaymentMethod
@@ -187,18 +186,11 @@ def _destination_amount(
 
 
 def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
-    # 1. Validate concept ownership (optional — None is allowed)
-    concept = None
-    if tx_in.concept_id is not None:
-        concept = concept_crud.get_by_id(db, tx_in.concept_id)
-        if not concept or concept.user_id != user.id:
-            raise ConceptNotBelongsToUser("El concepto no pertenece al usuario")
-
-    # 2. Validate category ownership (independent from concept)
-    category = category_crud.get_by_id(db, tx_in.category_id)
-    if not category or category.user_id != user.id:
-        raise CategoryNotFound("La categoría no existe o no pertenece al usuario")
-    category_id = tx_in.category_id
+    # 1. Concepto obligatorio (las transferencias sin concepto usan "Transferencia").
+    #    La categoría NO se elige: es la categoría del concepto.
+    from app.services import concept_service
+    concept = concept_service.resolve_for_transaction(db, user, tx_in.concept_id, tx_in.type)
+    category_id = concept.category_id
 
     # 3. Validate source account
     source_account = _get_account(db, tx_in.account_id, user.id)
@@ -222,7 +214,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
                 user_id=user.id,
                 account_id=source_account.id,
                 category_id=category_id,
-                concept_id=concept.id if concept else None,
+                concept_id=concept.id,
                 amount=tx_in.amount,
                 transaction_type=TransactionType.TRANSFER,
                 date=tx_in.date,
@@ -231,9 +223,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
                 external_account_id=tx_in.external_account_id,
                 commission=tx_in.commission,
             )
-            if concept:
-                concept_crud.increment_frequency(db, concept)
-                concept_crud.update_category(db, concept, category_id)
+            concept_crud.increment_frequency(db, concept)
             db.commit()
             db.refresh(source_tx)
             return source_tx
@@ -261,7 +251,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
             user_id=user.id,
             account_id=source_account.id,
             category_id=category_id,
-            concept_id=concept.id if concept else None,
+            concept_id=concept.id,
             amount=tx_in.amount,
             transaction_type=TransactionType.TRANSFER,
             date=tx_in.date,
@@ -277,7 +267,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
             user_id=user.id,
             account_id=dest_account.id,
             category_id=category_id,
-            concept_id=concept.id if concept else None,
+            concept_id=concept.id,
             amount=dest_amount,
             transaction_type=TransactionType.TRANSFER,
             date=tx_in.date,
@@ -290,9 +280,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         source_tx.transfer_id = dest_tx.id
         db.flush()
 
-        if concept:
-            concept_crud.increment_frequency(db, concept)
-            concept_crud.update_category(db, concept, category_id)
+        concept_crud.increment_frequency(db, concept)
         db.commit()
         db.refresh(source_tx)
         return source_tx
@@ -325,7 +313,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
         user_id=user.id,
         account_id=source_account.id,
         category_id=category_id,
-        concept_id=concept.id if concept else None,
+        concept_id=concept.id,
         amount=tx_in.amount,
         transaction_type=tx_in.type,
         date=tx_in.date,
@@ -338,9 +326,7 @@ def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
     for hh_id in resolved_ids:
         db.add(TransactionHousehold(transaction_id=db_tx.id, household_id=hh_id))
 
-    if concept:
-        concept_crud.increment_frequency(db, concept)
-        concept_crud.update_category(db, concept, category_id)
+    concept_crud.increment_frequency(db, concept)
     db.commit()
     db.refresh(db_tx)
     return db_tx
@@ -435,23 +421,17 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
                 _reverse_income(account, -delta)
         fields["amount"] = new_amount
 
-    # Handle concept change (frequency only — category is independent)
+    # Cambio de concepto: la categoría del movimiento pasa a ser la del nuevo concepto.
+    # (category_id ya no se edita por separado: siempre sale del concepto.)
     if tx_update.concept_id is not None and tx_update.concept_id != tx.concept_id:
-        new_concept = concept_crud.get_by_id(db, tx_update.concept_id)
-        if not new_concept or new_concept.user_id != user.id:
-            raise ConceptNotBelongsToUser("El concepto no pertenece al usuario")
-        old_concept = concept_crud.get_by_id(db, tx.concept_id)
+        from app.services import concept_service
+        new_concept = concept_service.resolve_for_transaction(db, user, tx_update.concept_id, tx.type)
+        old_concept = concept_crud.get_by_id(db, tx.concept_id) if tx.concept_id else None
         if old_concept:
             concept_crud.decrement_frequency(db, old_concept)
         concept_crud.increment_frequency(db, new_concept)
         fields["concept_id"] = new_concept.id
-
-    # Handle category change independently
-    if tx_update.category_id is not None and tx_update.category_id != tx.category_id:
-        cat = category_crud.get_by_id(db, tx_update.category_id)
-        if not cat or cat.user_id != user.id:
-            raise CategoryNotFound("La categoría no existe o no pertenece al usuario")
-        fields["category_id"] = tx_update.category_id
+        fields["category_id"] = new_concept.category_id
 
     # description se puede vaciar enviando null explícitamente
     if "description" in tx_update.model_fields_set:

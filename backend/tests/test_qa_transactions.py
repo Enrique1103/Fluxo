@@ -11,7 +11,7 @@ from datetime import date
 
 import pytest
 
-from tests.conftest import BASE, REG, LOG, next_email
+from tests.conftest import BASE, REG, LOG, next_email, any_concept
 
 TX = f"{BASE}/transactions"
 ACC = f"{BASE}/accounts"
@@ -81,7 +81,7 @@ def user_b(client):
     _ok(client.post(REG, json=data))
     r = client.post(LOG, data={"username": data["email"], "password": data["password"]})
     h = {"Authorization": f"Bearer {r.json()['access_token']}"}
-    cid = client.get(f"{BASE}/concepts", headers=h).json()[0]["id"]
+    cid = any_concept(client, h)["id"]
     cat = client.get(f"{BASE}/categories", headers=h).json()[0]["id"]
     acc = _acc(client, h, "Cuenta B", balance="1000.00")
     return h, cid, cat, acc
@@ -97,9 +97,17 @@ class TestBasicFlows:
         _ok(_tx(c, h, a, cat, 250.50, "income", cid))
         assert _bal(c, h, a) == pytest.approx(9250.50)
 
-    def test_expense_without_concept(self, ctx, cash_account):
+    def test_expense_without_concept_422(self, ctx, cash_account, db):
+        """El concepto es obligatorio: sin concepto no se registra (y el saldo no cambia)."""
         c, h, _, cat = ctx
-        _ok(_tx(c, h, cash_account["id"], cat, 10, "expense"))
+        _fail(db, _tx(c, h, cash_account["id"], cat, 10, "expense"), 422)
+        assert _bal(c, h, cash_account["id"]) == pytest.approx(10000)
+
+    def test_transfer_without_concept_uses_transferencia(self, ctx, cash_account, debit_account):
+        c, h, _, cat = ctx
+        t = _ok(_tx(c, h, cash_account["id"], cat, 10, "transfer", transfer_to_account_id=debit_account["id"]))
+        concepts = {x["id"]: x for x in c.get(f"{BASE}/concepts", headers=h).json()}
+        assert concepts[t["concept_id"]]["name"] == "Transferencia"
 
     def test_edit_expense_amount_up_and_down(self, ctx, cash_account):
         c, h, cid, cat = ctx
@@ -455,7 +463,7 @@ class TestOwnership:
         _fail(db, _tx(c, hb, acc_b["id"], cat_b, 100, "transfer", cid_b, transfer_to_account_id=a), 403, 404)
         _fail(db, _tx(c, hb, a, cat_b, 100, "transfer", cid_b, transfer_to_account_id=acc_b["id"]), 403, 404)
         # B usa categoría / concepto de A
-        _fail(db, _tx(c, hb, acc_b["id"], cat, 100, "expense", cid_b), 403, 404)
+        # (la categoría ya no se elige: sale del concepto, así que no se puede "usar" la de A)
         _fail(db, _tx(c, hb, acc_b["id"], cat_b, 100, "expense", cid), 403, 404)
         assert _bal(c, h, a) == pytest.approx(10000)
         assert _bal(c, hb, acc_b["id"]) == pytest.approx(1000)
@@ -489,7 +497,8 @@ class TestOwnership:
         c, h, cid, cat = ctx
         hb, cid_b, cat_b, _ = user_b
         e = _ok(_tx(c, h, cash_account["id"], cat, 100, "expense", cid))
-        _fail(db, c.patch(f"{TX}/{e['id']}", json={"category_id": cat_b}, headers=h), 403, 404)
+        # category_id ya no se edita (sale del concepto): se ignora
+        _ok(c.patch(f"{TX}/{e['id']}", json={"category_id": cat_b}, headers=h), 200)
         _fail(db, c.patch(f"{TX}/{e['id']}", json={"concept_id": cid_b}, headers=h), 403, 404)
         got = c.get(f"{TX}/{e['id']}", headers=h).json()
         assert got["category_id"] == cat and got["concept_id"] == cid

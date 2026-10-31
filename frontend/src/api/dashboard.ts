@@ -191,11 +191,35 @@ export const createAccount = async (payload: {
 }
 
 // --- Categories & Concepts ---
+/** Para qué movimientos se ofrecen los conceptos de la categoría */
+export type CategoryKind = 'expense' | 'income' | 'transfer' | 'any'
+export const CATEGORY_KIND_LABELS: Record<CategoryKind, string> = {
+  expense: 'Gastos', income: 'Ingresos', transfer: 'Transferencias', any: 'Todos',
+}
 export interface Category {
   id: string; name: string; color: string | null; icon: string | null; is_system: boolean
+  kind: CategoryKind
 }
+/** Todo concepto pertenece a una categoría: al elegir el concepto, la categoría se completa sola */
 export interface Concept {
-  id: string; name: string; category_id: string | null; frequency_score: number; is_system: boolean
+  id: string; name: string; category_id: string; frequency_score: number; is_system: boolean
+}
+
+/**
+ * Conceptos que sirven para un tipo de movimiento (según el tipo de su categoría).
+ * Así "Supermercado" no aparece al cargar un ingreso. Los retiros cuentan como transferencias.
+ */
+export function conceptsForType(
+  concepts: Concept[],
+  categories: Category[],
+  type: 'income' | 'expense' | 'transfer' | 'withdrawal',
+): Concept[] {
+  const want = type === 'withdrawal' ? 'transfer' : type
+  const kindOf = new Map(categories.map(c => [c.id, c.kind ?? 'expense']))
+  return concepts.filter(c => {
+    const k = kindOf.get(c.category_id)
+    return k === want || k === 'any'
+  })
 }
 
 export const fetchCategories = async (): Promise<Category[]> => {
@@ -210,7 +234,8 @@ export const fetchConcepts = async (): Promise<Concept[]> => {
 
 // --- Transactions ---
 export const createTransaction = async (payload: {
-  account_id: string; concept_id?: string | null; category_id: string; amount: number
+  /** Obligatorio en ingresos y gastos; la categoría sale del concepto */
+  account_id: string; concept_id?: string | null; amount: number
   type: 'income' | 'expense' | 'transfer'; date: string; description?: string
   transfer_to_account_id?: string; external_account_id?: string
   commission?: number
@@ -226,7 +251,7 @@ export const cancelInstalmentPlan = async (planId: string): Promise<void> => {
 }
 
 export const createInstalmentPlan = async (payload: {
-  account_id: string; concept_id?: string | null; category_id: string
+  account_id: string; concept_id: string
   total_amount: number; n_cuotas: number; fecha_inicio: string
   description?: string; metodo_pago: PaymentMethod
 }): Promise<void> => {
@@ -325,7 +350,8 @@ export const fetchTransaction = async (id: string): Promise<TransactionDetail> =
 
 export const updateTransaction = async (id: string, payload: {
   amount?: number; description?: string | null; date?: string
-  concept_id?: string; category_id?: string; metodo_pago?: PaymentMethod
+  /** Cambiar el concepto cambia también la categoría */
+  concept_id?: string; metodo_pago?: PaymentMethod
   household_id?: string | null
   household_ids?: string[]
 }): Promise<void> => {
@@ -338,7 +364,7 @@ export const deleteTransaction = async (id: string, scope: 'personal' | 'househo
 
 // --- Category management ---
 export interface CategoryCreate {
-  name: string; icon?: string; color?: string
+  name: string; icon?: string; color?: string; kind?: CategoryKind
 }
 export const createCategory = async (payload: CategoryCreate): Promise<Category> => {
   const { data } = await client.post<Category>('/v1/categories', payload)
@@ -353,11 +379,12 @@ export const deleteCategory = async (id: string): Promise<void> => {
 }
 
 // --- Concept management ---
-export const createConcept = async (payload: { name: string }): Promise<Concept> => {
+export const createConcept = async (payload: { name: string; category_id: string }): Promise<Concept> => {
   const { data } = await client.post<Concept>('/v1/concepts', payload)
   return data
 }
-export const updateConcept = async (id: string, payload: { name: string }): Promise<Concept> => {
+/** Cambiar category_id mueve también los movimientos de ese concepto a la nueva categoría */
+export const updateConcept = async (id: string, payload: { name?: string; category_id?: string }): Promise<Concept> => {
   const { data } = await client.patch<Concept>(`/v1/concepts/${id}`, payload)
   return data
 }
