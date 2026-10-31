@@ -32,10 +32,12 @@ def get_all_by_user(
         # Los reintegros solo se ofrecen en ingresos, sea cual sea el tipo de su categoría
         from sqlalchemy import or_, and_
         q = q.join(Category, Category.id == Concept.category_id)
+        # Una categoría puede servir para varios tipos ("expense,income"): se busca el tipo dentro
+        kind_ok = or_(*[Category.kind == k if k == "any" else Category.kind.contains(k) for k in kinds])
         if "income" in kinds:
-            q = q.filter(or_(Concept.is_refund == True, Category.kind.in_(kinds)))  # noqa: E712
+            q = q.filter(or_(Concept.is_refund == True, kind_ok))  # noqa: E712
         else:
-            q = q.filter(Concept.is_refund == False, Category.kind.in_(kinds))  # noqa: E712
+            q = q.filter(Concept.is_refund == False, kind_ok)  # noqa: E712
     return q.order_by(Concept.frequency_score.desc(), Concept.name).all()
 
 

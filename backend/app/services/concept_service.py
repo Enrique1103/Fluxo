@@ -13,7 +13,7 @@ from app.exceptions.concept_exceptions import (
     ConceptTypeMismatch,
 )
 from app.exceptions.category_exceptions import CategoryNotFound
-from app.models.categories_models import Category, TX_TYPE_TO_KINDS
+from app.models.categories_models import Category, TX_TYPE_TO_KINDS, kind_allows
 from app.models.concepts_models import Concept
 from app.models.users_models import User
 from app.schemas.concept_schema import ConceptCreate, ConceptUpdate
@@ -188,9 +188,8 @@ def check_type(concept: Concept, tx_type: str) -> None:
                 f"{concept.category.name})."
             )
         return
-    allowed = TX_TYPE_TO_KINDS.get(tx_type)
     kind = concept.category.kind if concept.category else "any"
-    if allowed and kind not in allowed:
+    if tx_type in TX_TYPE_TO_KINDS and not kind_allows(kind, tx_type):
         raise ConceptTypeMismatch(
             f"El concepto {concept.name} es de la categoría {concept.category.name}, "
             f"que no se usa para {_TYPE_LABELS.get(tx_type, tx_type)}. "
