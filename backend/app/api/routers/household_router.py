@@ -208,6 +208,34 @@ def list_members(
         _handle(e)
 
 
+@router.get("/{household_id}/members/accounts")
+def get_all_member_accounts(
+    household_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Devuelve las cuentas activas de todos los miembros activos en una sola query."""
+    from app.crud import account_crud, household_crud
+    hh = household_crud.get_by_id(db, household_id)
+    if not hh or hh.is_deleted:
+        raise HTTPException(status_code=404, detail="Hogar no encontrado")
+    caller = household_crud.get_member(db, household_id, current_user.id)
+    if not caller or caller.status.value != "active":
+        raise HTTPException(status_code=403, detail="No sos miembro activo")
+    all_members = household_crud.get_active_members(db, household_id)
+    result = []
+    for m in all_members:
+        accts = account_crud.get_all_by_user(db, m.user_id)
+        result.append({
+            "user_id": str(m.user_id),
+            "accounts": [
+                {"id": str(a.id), "name": a.name, "type": a.type, "currency": a.currency, "balance": float(a.balance)}
+                for a in accts if not a.is_deleted and not a.is_archived
+            ],
+        })
+    return result
+
+
 @router.get("/{household_id}/members/{user_id}/accounts")
 def get_member_accounts(
     household_id: uuid.UUID,

@@ -11,7 +11,7 @@ import { useHouseholdEvents } from '../hooks/useHouseholdEvents'
 import { useAuthStore } from '../store/authStore'
 import {
   fetchHouseholds, generateInvite, fetchMembers, approveMember, removeMember,
-  fetchHouseholdAnalytics,
+  fetchHouseholdAnalytics, fetchAllMemberAccounts,
 } from '../api/households'
 import { fetchFinGoals, fetchIncomeVsExpenses, fetchPatrimonio, fetchSummary, fetchMonthlyBreakdown, type FinGoal } from '../api/dashboard'
 import MonthlyChart, { fmtMoney } from '../components/MonthlyChart'
@@ -118,6 +118,14 @@ export default function HouseholdPage() {
 
   const showGoals  = household?.analysis_level === 'expenses_and_goals' || household?.analysis_level === 'full'
   const showFull   = household?.analysis_level === 'full'
+
+  // Pre-carga cuentas de todos los miembros en nivel FULL para que el modal no espere
+  const { data: allMemberAccounts = [] } = useQuery({
+    queryKey: ['all-member-accounts', household?.id],
+    queryFn:  () => fetchAllMemberAccounts(household!.id),
+    enabled:  !!household && showFull,
+    staleTime: 60_000,
+  })
 
   const { data: finGoals = [], isLoading: goalsLoading } = useQuery({
     queryKey: ['fin-goals'],
@@ -1695,6 +1703,7 @@ export default function HouseholdPage() {
           activeMembers={activeMembers.map(m => ({ user_id: m.user_id, user_name: m.user_name }))}
           defaultCurrency={household.base_currency}
           analysisLevel={household.analysis_level}
+          preloadedMemberAccounts={allMemberAccounts}
         />
       )}
       {household && editTransfer && (

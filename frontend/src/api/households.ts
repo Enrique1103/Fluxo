@@ -332,3 +332,14 @@ export const fetchMemberAccounts = async (householdId: string, userId: string): 
   const { data } = await client.get(`/v1/households/${householdId}/members/${userId}/accounts`)
   return data
 }
+
+export interface MemberAccountsEntry {
+  user_id: string
+  accounts: { id: string; name: string; type: string; currency: string; balance: number }[]
+}
+
+/** Devuelve las cuentas activas de TODOS los miembros activos en una sola llamada */
+export const fetchAllMemberAccounts = async (householdId: string): Promise<MemberAccountsEntry[]> => {
+  const { data } = await client.get<MemberAccountsEntry[]>(`/v1/households/${householdId}/members/accounts`)
+  return data
+}
