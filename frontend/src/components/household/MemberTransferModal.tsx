@@ -3,7 +3,7 @@ import { X, Loader2, ChevronDown } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import DatePicker from '../DatePicker'
 import { fetchAccounts, withoutArchived } from '../../api/dashboard'
-import { createPendingMemberTransfer, createMemberTransfer } from '../../api/households'
+import { createPendingMemberTransfer, createMemberTransfer, fetchMemberAccounts } from '../../api/households'
 import type { MemberAccountsEntry } from '../../api/households'
 import { invalidateFinancialData } from '../../lib/queryClient'
 
@@ -60,7 +60,14 @@ export default function MemberTransferModal({
     queryKey: ['accounts'], queryFn: fetchAccounts, enabled: open, select: withoutArchived,
   })
 
-  const theirAccounts = preloadedMemberAccounts.find(e => e.user_id === toUserId)?.accounts ?? []
+  const preloaded = preloadedMemberAccounts.find(e => e.user_id === toUserId)?.accounts
+  const needsFetch = open && isFull && !!toUserId && !preloaded
+  const { data: fetchedAccounts = [] } = useQuery({
+    queryKey: ['member-accounts', householdId, toUserId],
+    queryFn: () => fetchMemberAccounts(householdId, toUserId),
+    enabled: needsFetch,
+  })
+  const theirAccounts = preloaded ?? fetchedAccounts
 
   useEffect(() => {
     if (open) {

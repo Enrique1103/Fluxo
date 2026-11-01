@@ -614,6 +614,136 @@ export default function HouseholdPage() {
 
             </div>
 
+            {/* ── Transferencias (independiente de analytics) ───────────── */}
+            {showFull && household && (
+              <div className="space-y-3">
+                {/* PENDIENTES */}
+                {pendingTransfers.length > 0 && (
+                  <div className="rounded-3xl border overflow-hidden bg-amber-950/30 border-amber-500/20">
+                    <div className="px-5 py-4 border-b border-amber-500/20 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-amber-400 flex items-center gap-2">
+                          Transferencias pendientes
+                          <span className="bg-amber-500/20 text-amber-400 text-[11px] font-bold px-2 py-0.5 rounded-full">
+                            {pendingTransfers.filter(p => p.to_user_id === currentUserId).length > 0
+                              ? `${pendingTransfers.filter(p => p.to_user_id === currentUserId).length} para vos`
+                              : pendingTransfers.length}
+                          </span>
+                        </p>
+                        <p className="text-xs text-amber-500/60 mt-0.5">El receptor elige la cuenta de destino</p>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-amber-500/10">
+                      {pendingTransfers.map(p => {
+                        const isRecipient = p.to_user_id === currentUserId
+                        const isSender    = p.from_user_id === currentUserId
+                        return (
+                          <div key={p.id} className="flex items-center justify-between px-5 py-3 gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-slate-200 truncate">
+                                <span className="font-semibold">{p.from_user_name}</span>
+                                <span className="text-slate-500 mx-1.5">→</span>
+                                <span className="font-semibold">{p.to_user_name}</span>
+                              </p>
+                              {p.description && <p className="text-xs text-slate-500 truncate mt-0.5">{p.description}</p>}
+                              <p className="text-[11px] text-slate-600">{p.date}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div className="text-right mr-1">
+                                <p className="text-sm font-bold tabular-nums text-amber-400">
+                                  {Number(p.amount).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                                <p className="text-[11px] text-slate-500">{p.currency}</p>
+                              </div>
+                              {isRecipient && (
+                                <button
+                                  onClick={() => setAcceptPending(p)}
+                                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-semibold transition-all"
+                                >
+                                  Aceptar
+                                </button>
+                              )}
+                              {(isRecipient || isSender) && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await cancelPendingMemberTransfer(household.id, p.id)
+                                      qc.invalidateQueries({ queryKey: ['pending-transfers', household.id] })
+                                    } catch { /* ignore */ }
+                                  }}
+                                  className="p-1.5 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                  title="Cancelar"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* TRANSFERENCIAS ENTRE MIEMBROS */}
+                <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                  <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-200">Transferencias entre miembros</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{MONTH_NAMES[month - 1]} {year}</p>
+                    </div>
+                    <button
+                      onClick={() => setTransferOpen(true)}
+                      className="shrink-0 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-semibold transition-all"
+                    >
+                      + Nueva
+                    </button>
+                  </div>
+                  {analyticsLoading ? (
+                    <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-slate-600" /></div>
+                  ) : analytics?.member_transfers && analytics.member_transfers.length > 0 ? (
+                    <div className="divide-y divide-slate-800/50">
+                      {analytics.member_transfers.map(t => {
+                        const isMe = t.from_user_id === currentUserId
+                        return (
+                          <div key={t.id} className="flex items-center justify-between px-5 py-3 gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-slate-200 truncate">
+                                <span className="font-semibold">{t.from_user_name}</span>
+                                <span className="text-slate-500 mx-1.5">→</span>
+                                <span className="font-semibold">{t.to_user_name}</span>
+                              </p>
+                              {t.description && <p className="text-xs text-slate-500 truncate mt-0.5">{t.description}</p>}
+                              <p className="text-[11px] text-slate-600">{t.date}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {isMe && (
+                                <button
+                                  onClick={() => setEditTransfer(t)}
+                                  className="p-1.5 text-slate-600 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
+                                  aria-label="Editar transferencia"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <div className="text-right">
+                                <p className={`text-sm font-bold tabular-nums ${isMe ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                  {isMe ? '−' : '+'}{Number(t.amount).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                                <p className="text-[11px] text-slate-500">{t.currency}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-center py-6 text-slate-500">Sin transferencias este mes</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* ── Analytics ─────────────────────────────────────────────── */}
             {analyticsLoading ? (
               <div className="flex justify-center py-10">
@@ -1108,133 +1238,6 @@ export default function HouseholdPage() {
                         </div>
                       </div>
                     )}
-
-                    {/* ══════════════════════════════════════════════════ */}
-                    {/* 1d. TRANSFERENCIAS PENDIENTES                      */}
-                    {/* ══════════════════════════════════════════════════ */}
-                    {pendingTransfers.length > 0 && (
-                      <div className="rounded-3xl border overflow-hidden bg-amber-950/30 border-amber-500/20">
-                        <div className="px-5 py-4 border-b border-amber-500/20 flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-amber-400 flex items-center gap-2">
-                              Transferencias pendientes
-                              <span className="bg-amber-500/20 text-amber-400 text-[11px] font-bold px-2 py-0.5 rounded-full">
-                                {pendingTransfers.filter(p => p.to_user_id === currentUserId).length > 0
-                                  ? `${pendingTransfers.filter(p => p.to_user_id === currentUserId).length} para vos`
-                                  : pendingTransfers.length}
-                              </span>
-                            </p>
-                            <p className="text-xs text-amber-500/60 mt-0.5">El receptor elige la cuenta de destino</p>
-                          </div>
-                        </div>
-                        <div className="divide-y divide-amber-500/10">
-                          {pendingTransfers.map(p => {
-                            const isRecipient = p.to_user_id === currentUserId
-                            const isSender    = p.from_user_id === currentUserId
-                            return (
-                              <div key={p.id} className="flex items-center justify-between px-5 py-3 gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm text-slate-200 truncate">
-                                    <span className="font-semibold">{p.from_user_name}</span>
-                                    <span className="text-slate-500 mx-1.5">→</span>
-                                    <span className="font-semibold">{p.to_user_name}</span>
-                                  </p>
-                                  {p.description && <p className="text-xs text-slate-500 truncate mt-0.5">{p.description}</p>}
-                                  <p className="text-[11px] text-slate-600">{p.date}</p>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <div className="text-right mr-1">
-                                    <p className="text-sm font-bold tabular-nums text-amber-400">
-                                      {Number(p.amount).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </p>
-                                    <p className="text-[11px] text-slate-500">{p.currency}</p>
-                                  </div>
-                                  {isRecipient && (
-                                    <button
-                                      onClick={() => setAcceptPending(p)}
-                                      className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-semibold transition-all"
-                                    >
-                                      Aceptar
-                                    </button>
-                                  )}
-                                  {(isRecipient || isSender) && (
-                                    <button
-                                      onClick={async () => {
-                                        try {
-                                          await cancelPendingMemberTransfer(household!.id, p.id)
-                                          qc.invalidateQueries({ queryKey: ['pending-transfers', household!.id] })
-                                        } catch { /* ignore */ }
-                                      }}
-                                      className="p-1.5 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                                      title="Cancelar"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ══════════════════════════════════════════════════ */}
-                    {/* 1e. TRANSFERENCIAS ENTRE MIEMBROS                 */}
-                    {/* ══════════════════════════════════════════════════ */}
-                    <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
-                        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
-                          <div>
-                            <p className={sectionTitle}>Transferencias entre miembros</p>
-                            <p className="text-xs text-slate-500 mt-0.5">{MONTH_NAMES[month - 1]} {year}</p>
-                          </div>
-                          <button
-                            onClick={() => setTransferOpen(true)}
-                            className="shrink-0 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-semibold transition-all"
-                          >
-                            + Nueva
-                          </button>
-                        </div>
-                        {analytics.member_transfers && analytics.member_transfers.length > 0 ? (
-                          <div className="divide-y divide-slate-800/50">
-                            {analytics.member_transfers.map(t => {
-                              const isMe = t.from_user_id === currentUserId
-                              return (
-                                <div key={t.id} className="flex items-center justify-between px-5 py-3 gap-3">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm text-slate-200 truncate">
-                                      <span className="font-semibold">{t.from_user_name}</span>
-                                      <span className="text-slate-500 mx-1.5">→</span>
-                                      <span className="font-semibold">{t.to_user_name}</span>
-                                    </p>
-                                    {t.description && <p className="text-xs text-slate-500 truncate mt-0.5">{t.description}</p>}
-                                    <p className="text-[11px] text-slate-600">{t.date}</p>
-                                  </div>
-                                  <div className="flex items-center gap-2 shrink-0">
-                                    {isMe && (
-                                      <button
-                                        onClick={() => setEditTransfer(t)}
-                                        className="p-1.5 text-slate-600 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
-                                        aria-label="Editar transferencia"
-                                      >
-                                        <Pencil className="w-3.5 h-3.5" />
-                                      </button>
-                                    )}
-                                    <div className="text-right">
-                                      <p className={`text-sm font-bold tabular-nums ${isMe ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                        {isMe ? '−' : '+'}{Number(t.amount).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                      </p>
-                                      <p className="text-[11px] text-slate-500">{t.currency}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-center py-6 text-slate-500">Sin transferencias este mes</p>
-                        )}
-                    </div>
 
                     {/* ══════════════════════════════════════════════════ */}
                     {/* 2. ANÁLISIS POR MIEMBRO                           */}
