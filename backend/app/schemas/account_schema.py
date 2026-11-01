@@ -18,7 +18,7 @@ class AccountCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     type: AccountType
     currency: str = Field(..., pattern=_CURRENCY_PATTERN)
-    balance: Decimal = Field(default=Decimal("0.00"), ge=0)
+    balance: Decimal = Field(default=Decimal("0.00"))
     credit_limit: Decimal | None = Field(None, gt=0)
 
     @model_validator(mode="after")
@@ -26,8 +26,12 @@ class AccountCreate(BaseModel):
         if self.type == AccountType.CREDIT:
             if self.credit_limit is None:
                 raise ValueError("credit_limit es obligatorio para cuentas de tipo CREDIT")
-            # Las cuentas de crédito siempre inician con balance 0 — ignorar lo que venga
-            self.balance = Decimal("0.00")
+        elif self.type == AccountType.INVESTMENT:
+            pass  # Inversión admite saldo negativo (posición apalancada / margen)
+        else:
+            # Efectivo y débito no pueden iniciar con saldo negativo
+            if self.balance < 0:
+                raise ValueError("El saldo inicial no puede ser negativo para este tipo de cuenta")
         if self.type != AccountType.CREDIT and self.credit_limit is not None:
             raise ValueError("credit_limit solo aplica para cuentas de tipo CREDIT")
         return self

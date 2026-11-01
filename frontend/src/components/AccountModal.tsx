@@ -53,7 +53,10 @@ export default function AccountModal({ open, onClose }: Props) {
   const handleSubmit = async () => {
     if (!name.trim()) { setError('El nombre es requerido'); return }
     const bal = balance === '' ? 0 : parseFloat(balance)
-    if (isNaN(bal) || bal < 0) { setError('El saldo inicial debe ser un número ≥ 0'); return }
+    if (isNaN(bal)) { setError('El saldo inicial debe ser un número válido'); return }
+    if (type !== 'credit' && type !== 'investment' && bal < 0) {
+      setError('El saldo inicial no puede ser negativo para este tipo de cuenta'); return
+    }
     if (type === 'credit') {
       const lim = parseFloat(creditLimit)
       if (isNaN(lim) || lim <= 0) { setError('El límite de crédito debe ser mayor a 0'); return }
@@ -131,21 +134,19 @@ export default function AccountModal({ open, onClose }: Props) {
             </div>
           </div>
 
-          {/* Saldo inicial — oculto para cuentas de crédito (siempre inician en 0) */}
-          {type !== 'credit' && (
-            <div>
-              <label className={labelClass}>Saldo inicial</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={balance}
-                onChange={e => setBalance(e.target.value)}
-                placeholder="0.00"
-                className={inputClass}
-              />
-            </div>
-          )}
+          {/* Saldo inicial */}
+          <div>
+            <label className={labelClass}>Saldo inicial</label>
+            <input
+              type="number"
+              step="0.01"
+              {...(type !== 'credit' && type !== 'investment' ? { min: '0' } : {})}
+              value={balance}
+              onChange={e => setBalance(e.target.value)}
+              placeholder="0.00"
+              className={inputClass}
+            />
+          </div>
 
           {/* Límite de crédito — solo para cuentas credit */}
           {type === 'credit' && (
