@@ -1694,6 +1694,7 @@ export default function HouseholdPage() {
           currentUserId={currentUserId ?? ''}
           activeMembers={activeMembers.map(m => ({ user_id: m.user_id, user_name: m.user_name }))}
           defaultCurrency={household.base_currency}
+          analysisLevel={household.analysis_level}
         />
       )}
       {household && editTransfer && (
