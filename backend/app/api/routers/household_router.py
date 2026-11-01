@@ -21,7 +21,7 @@ from app.schemas.household_schema import (
     HouseholdCreate, HouseholdUpdate, HouseholdResponse,
     MemberResponse, InviteResponse, JoinRequest,
     HouseholdAnalyticsResponse, SettlementPayIn, SettlementConfirmIn,
-    MemberTransferIn, MemberTransferOut,
+    MemberTransferIn, MemberTransferOut, MemberTransferUpdate,
 )
 from app.services import household_service, household_analytics_service, household_settlement_service, member_transfer_service
 
@@ -353,6 +353,42 @@ def create_member_transfer(
             from_user_name=from_name,
             to_user_id=t.to_user_id,
             to_user_name=to_name,
+            amount=t.amount,
+            currency=t.currency,
+            date=str(t.date),
+            description=t.description,
+            created_at=str(t.created_at),
+        )
+    except Exception as e:
+        _handle(e)
+
+
+@router.patch("/{household_id}/member-transfers/{transfer_id}", response_model=MemberTransferOut)
+def update_member_transfer(
+    household_id: uuid.UUID,
+    transfer_id: uuid.UUID,
+    data: MemberTransferUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Edita monto, moneda, fecha o descripción de una transferencia entre miembros."""
+    try:
+        t = member_transfer_service.update(
+            db, current_user, household_id, transfer_id,
+            amount=data.amount,
+            currency=data.currency,
+            date=data.date,
+            description=data.description,
+        )
+        from app.crud import user_crud
+        to_user = user_crud.get_by_id(db, t.to_user_id)
+        return MemberTransferOut(
+            id=t.id,
+            household_id=t.household_id,
+            from_user_id=t.from_user_id,
+            from_user_name=current_user.name,
+            to_user_id=t.to_user_id,
+            to_user_name=to_user.name if to_user else "",
             amount=t.amount,
             currency=t.currency,
             date=str(t.date),

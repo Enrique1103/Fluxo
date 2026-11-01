@@ -258,6 +258,17 @@ export const createMemberTransfer = async (householdId: string, payload: {
   return data
 }
 
+/** Edita monto, moneda, fecha o descripción de una transferencia entre miembros */
+export const updateMemberTransfer = async (householdId: string, transferId: string, payload: {
+  amount?: number
+  currency?: string
+  date?: string
+  description?: string
+}): Promise<MemberTransfer> => {
+  const { data } = await client.patch<MemberTransfer>(`/v1/households/${householdId}/member-transfers/${transferId}`, payload)
+  return data
+}
+
 /** Elimina una transferencia entre miembros y sus transacciones */
 export const deleteMemberTransfer = async (householdId: string, transferId: string): Promise<void> => {
   await client.delete(`/v1/households/${householdId}/member-transfers/${transferId}`)

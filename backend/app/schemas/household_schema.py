@@ -203,6 +203,14 @@ class MemberTransferIn(BaseModel):
     description: str | None = Field(default=None, max_length=200)
 
 
+class MemberTransferUpdate(BaseModel):
+    """Campos editables de una transferencia entre miembros."""
+    amount: Decimal | None = Field(default=None, gt=0)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
+    date: PyDate | None = None
+    description: str | None = Field(default=None, max_length=200)
+
+
 class MemberTransferOut(BaseModel):
     id: uuid.UUID
     household_id: uuid.UUID

@@ -127,6 +127,59 @@ def create(
     return transfer
 
 
+def update(
+    db: Session,
+    actor: User,
+    household_id: uuid.UUID,
+    transfer_id: uuid.UUID,
+    amount: Decimal | None,
+    currency: str | None,
+    date: PyDate | None,
+    description: str | None,
+) -> MemberTransfer:
+    _check_member(db, household_id, actor.id)
+    t = db.query(MemberTransfer).filter(
+        MemberTransfer.id == transfer_id,
+        MemberTransfer.household_id == household_id,
+    ).first()
+    if not t:
+        from app.exceptions.household_exceptions import SettlementNotFound
+        raise SettlementNotFound("Transferencia no encontrada")
+    if t.from_user_id != actor.id:
+        raise SettlementNotAllowed("Solo quien envió la transferencia puede editarla")
+
+    from app.models.transactions_models import Transaction
+    if amount is not None:
+        t.amount = amount
+        for tx_id in [t.from_tx_id, t.to_tx_id]:
+            if tx_id:
+                tx = db.query(Transaction).filter(Transaction.id == tx_id).first()
+                if tx and not tx.is_deleted:
+                    tx.amount = amount
+    if currency is not None:
+        t.currency = currency
+    if date is not None:
+        t.date = date
+        for tx_id in [t.from_tx_id, t.to_tx_id]:
+            if tx_id:
+                tx = db.query(Transaction).filter(Transaction.id == tx_id).first()
+                if tx and not tx.is_deleted:
+                    tx.date = date
+    if description is not None:
+        t.description = description if description.strip() else None
+        if t.from_tx_id:
+            tx = db.query(Transaction).filter(Transaction.id == t.from_tx_id).first()
+            if tx and not tx.is_deleted and description.strip():
+                tx.description = description.strip()[:100]
+        if t.to_tx_id:
+            tx = db.query(Transaction).filter(Transaction.id == t.to_tx_id).first()
+            if tx and not tx.is_deleted and description.strip():
+                tx.description = description.strip()[:100]
+    db.commit()
+    db.refresh(t)
+    return t
+
+
 def list_for_period(
     db: Session, household_id: uuid.UUID, year: int, month: int
 ) -> list[MemberTransfer]:
