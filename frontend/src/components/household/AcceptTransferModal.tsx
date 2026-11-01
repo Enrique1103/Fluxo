@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { X, Loader2, ChevronDown } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchAccounts, withoutArchived } from '../../api/dashboard'
-import { acceptPendingMemberTransfer, PendingMemberTransfer } from '../../api/households'
+import { acceptPendingMemberTransfer } from '../../api/households'
+import type { PendingMemberTransfer } from '../../api/households'
 import { invalidateFinancialData } from '../../lib/queryClient'
 
 interface Props {
