@@ -60,14 +60,16 @@ export default function MemberTransferModal({
     queryKey: ['accounts'], queryFn: fetchAccounts, enabled: open, select: withoutArchived,
   })
 
-  const preloaded = preloadedMemberAccounts.find(e => e.user_id === toUserId)?.accounts
-  const needsFetch = open && isFull && !!toUserId && !preloaded
-  const { data: fetchedAccounts = [] } = useQuery({
+  // Siempre fetcha cuando el modal está abierto en modo FULL; usa pre-cargado si ya tiene cuentas
+  const { data: fetchedAccounts = [], isLoading: fetchingAccounts } = useQuery({
     queryKey: ['member-accounts', householdId, toUserId],
     queryFn: () => fetchMemberAccounts(householdId, toUserId),
-    enabled: needsFetch,
+    enabled: open && isFull && !!toUserId,
+    staleTime: 60_000,
   })
-  const theirAccounts = preloaded ?? fetchedAccounts
+  const preloadedAccounts = preloadedMemberAccounts.find(e => e.user_id === toUserId)?.accounts ?? []
+  const theirAccounts = preloadedAccounts.length > 0 ? preloadedAccounts : fetchedAccounts
+  const loadingTheirAccounts = isFull && fetchingAccounts && theirAccounts.length === 0
 
   useEffect(() => {
     if (open) {
@@ -239,7 +241,9 @@ export default function MemberTransferModal({
                   <span className="truncate">
                     {selectedTo
                       ? `${selectedTo.name} · ${selectedTo.currency}`
-                      : theirAccounts.length === 0 ? 'Cargando cuentas…' : 'Elegí una cuenta'}
+                      : loadingTheirAccounts ? 'Cargando cuentas…'
+                      : theirAccounts.length === 0 ? 'Sin cuentas disponibles'
+                      : 'Elegí una cuenta'}
                   </span>
                   <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
                 </button>
