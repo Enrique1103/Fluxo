@@ -615,7 +615,7 @@ export default function HouseholdPage() {
             </div>
 
             {/* ── Transferencias (independiente de analytics) ───────────── */}
-            {showFull && household && (
+            {household && (
               <div className="space-y-3">
                 {/* PENDIENTES */}
                 {pendingTransfers.length > 0 && (
@@ -686,61 +686,78 @@ export default function HouseholdPage() {
                 )}
 
                 {/* TRANSFERENCIAS ENTRE MIEMBROS */}
-                <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
-                  <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-200">Transferencias entre miembros</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{MONTH_NAMES[month - 1]} {year}</p>
+                {showFull ? (
+                  <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                    <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-200">Transferencias entre miembros</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{MONTH_NAMES[month - 1]} {year}</p>
+                      </div>
+                      <button
+                        onClick={() => setTransferOpen(true)}
+                        className="shrink-0 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-semibold transition-all"
+                      >
+                        + Nueva
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setTransferOpen(true)}
-                      className="shrink-0 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-semibold transition-all"
-                    >
-                      + Nueva
-                    </button>
-                  </div>
-                  {analyticsLoading ? (
-                    <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-slate-600" /></div>
-                  ) : analytics?.member_transfers && analytics.member_transfers.length > 0 ? (
-                    <div className="divide-y divide-slate-800/50">
-                      {analytics.member_transfers.map(t => {
-                        const isMe = t.from_user_id === currentUserId
-                        return (
-                          <div key={t.id} className="flex items-center justify-between px-5 py-3 gap-3">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-slate-200 truncate">
-                                <span className="font-semibold">{t.from_user_name}</span>
-                                <span className="text-slate-500 mx-1.5">→</span>
-                                <span className="font-semibold">{t.to_user_name}</span>
-                              </p>
-                              {t.description && <p className="text-xs text-slate-500 truncate mt-0.5">{t.description}</p>}
-                              <p className="text-[11px] text-slate-600">{t.date}</p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {isMe && (
-                                <button
-                                  onClick={() => setEditTransfer(t)}
-                                  className="p-1.5 text-slate-600 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
-                                  aria-label="Editar transferencia"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                              <div className="text-right">
-                                <p className={`text-sm font-bold tabular-nums ${isMe ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                  {isMe ? '−' : '+'}{Number(t.amount).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {analyticsLoading ? (
+                      <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-slate-600" /></div>
+                    ) : analytics?.member_transfers && analytics.member_transfers.length > 0 ? (
+                      <div className="divide-y divide-slate-800/50">
+                        {analytics.member_transfers.map(t => {
+                          const isMe = t.from_user_id === currentUserId
+                          return (
+                            <div key={t.id} className="flex items-center justify-between px-5 py-3 gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-slate-200 truncate">
+                                  <span className="font-semibold">{t.from_user_name}</span>
+                                  <span className="text-slate-500 mx-1.5">→</span>
+                                  <span className="font-semibold">{t.to_user_name}</span>
                                 </p>
-                                <p className="text-[11px] text-slate-500">{t.currency}</p>
+                                {t.description && <p className="text-xs text-slate-500 truncate mt-0.5">{t.description}</p>}
+                                <p className="text-[11px] text-slate-600">{t.date}</p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {isMe && (
+                                  <button
+                                    onClick={() => setEditTransfer(t)}
+                                    className="p-1.5 text-slate-600 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
+                                    aria-label="Editar transferencia"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                <div className="text-right">
+                                  <p className={`text-sm font-bold tabular-nums ${isMe ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                    {isMe ? '−' : '+'}{Number(t.amount).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </p>
+                                  <p className="text-[11px] text-slate-500">{t.currency}</p>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-center py-6 text-slate-500">Sin transferencias este mes</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                    <div className="px-5 py-4 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-200">Transferencias entre miembros</p>
+                        <p className="text-xs text-slate-500 mt-0.5">El receptor elige la cuenta de destino</p>
+                      </div>
+                      <button
+                        onClick={() => setTransferOpen(true)}
+                        className="shrink-0 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-semibold transition-all"
+                      >
+                        + Nueva
+                      </button>
                     </div>
-                  ) : (
-                    <p className="text-sm text-center py-6 text-slate-500">Sin transferencias este mes</p>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
 
