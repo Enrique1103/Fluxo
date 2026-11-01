@@ -584,7 +584,7 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
                   <p className="text-sm font-medium text-slate-200 truncate">{acct.name}</p>
                   {acct.type === 'credit' && acct.credit_limit != null ? (
                     <p className="text-[11px] text-slate-500">
-                      crédito · {acct.currency} · Deuda: {Math.abs(Number(acct.balance)).toLocaleString()} · Disponible: {(Number(acct.credit_limit) + Number(acct.balance)).toLocaleString()}
+                      crédito · {acct.currency} · Deuda: {Math.abs(Number(acct.balance)).toLocaleString()} · Crédito: {(Number(acct.credit_limit) + Number(acct.balance)).toLocaleString()}
                     </p>
                   ) : (
                     <p className="text-[11px] text-slate-500">{acct.type} · {acct.currency} · {Number(acct.balance).toLocaleString()}</p>
