@@ -10,7 +10,7 @@ from app.exceptions.household_exceptions import (
 )
 from app.models.household_models import (
     Household, HouseholdMember, HouseholdInvite,
-    SplitType, MemberRole, MemberStatus, InviteStatus, AnalysisLevel,
+    SplitType, MemberRole, MemberStatus, InviteStatus,
 )
 from app.models.users_models import User
 from app.schemas.household_schema import (
@@ -90,23 +90,10 @@ def get_one(db: Session, user: User, household_id: uuid.UUID) -> HouseholdRespon
     return HouseholdResponse.model_validate(h)
 
 
-_LEVEL_ORDER = [
-    AnalysisLevel.EXPENSES_ONLY,
-    AnalysisLevel.EXPENSES_AND_GOALS,
-    AnalysisLevel.FULL,
-]
-
-
 def update(db: Session, user: User, household_id: uuid.UUID, data: HouseholdUpdate) -> HouseholdResponse:
     h = _get_household(db, household_id)
     _require_admin(db, household_id, user.id)
     fields = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
-    if "analysis_level" in fields:
-        current = h.analysis_level or AnalysisLevel.EXPENSES_ONLY
-        new_level = fields["analysis_level"]
-        if _LEVEL_ORDER.index(new_level) < _LEVEL_ORDER.index(current):
-            from fastapi import HTTPException
-            raise HTTPException(status_code=400, detail="No se puede reducir el nivel de análisis de un hogar")
     if fields:
         household_crud.update(db, h, fields)
     db.commit()
