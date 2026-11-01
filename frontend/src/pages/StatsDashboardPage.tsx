@@ -42,7 +42,7 @@ const MONTH_SHORT: Record<string, string> = {
 function fmtMoney(n: number, currency = 'UYU', privacy = false) {
   if (privacy) return '****'
   return new Intl.NumberFormat('es-UY', {
-    style: 'currency', currency, maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol',
+    style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2, currencyDisplay: 'narrowSymbol',
   }).format(n)
 }
 
@@ -421,7 +421,7 @@ function TxTable({
                   >
                     <span>
                       {PAYMENT_METHOD_LABELS[m]}
-                      {!privacy && <span className="ml-1.5 opacity-50">${Math.round(expenseTotals[m]!).toLocaleString()}</span>}
+                      {!privacy && <span className="ml-1.5 opacity-50">${expenseTotals[m]!.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
                     </span>
                     {methodFilter === m && <span className="text-emerald-400 text-[10px]">✓</span>}
                   </button>
