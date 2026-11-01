@@ -20,17 +20,30 @@ const ANALYSIS_LABELS: Record<AnalysisLevel, string> = {
   full:               'Análisis completo',
 }
 
+const LEVEL_ORDER: AnalysisLevel[] = ['expenses_only', 'expenses_and_goals', 'full']
+
+const ANALYSIS_UPGRADE_OPTIONS: { value: AnalysisLevel; label: string; desc: string }[] = [
+  { value: 'expenses_only',      label: 'Solo gastos',         desc: 'Gastos compartidos y balanceo.' },
+  { value: 'expenses_and_goals', label: 'Gastos + metas',      desc: 'Agrega metas financieras del hogar.' },
+  { value: 'full',               label: 'Análisis completo',   desc: 'Ingresos, ahorro neto y transferencias entre miembros.' },
+]
+
 export default function EditModal({ household, onClose }: Props) {
   const qc = useQueryClient()
   const [name,          setName]          = useState(household.name)
   const [currency,      setCurrency]      = useState(household.base_currency)
+  const [analysisLevel, setAnalysisLevel] = useState<AnalysisLevel>(household.analysis_level ?? 'expenses_only')
   const [error,         setError]         = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  const currentIdx = LEVEL_ORDER.indexOf(household.analysis_level ?? 'expenses_only')
+  const levelChanged = analysisLevel !== (household.analysis_level ?? 'expenses_only')
+
   const updateMutation = useMutation({
     mutationFn: () => updateHousehold(household.id, {
-      name:          name.trim(),
-      base_currency: currency,
+      name:           name.trim(),
+      base_currency:  currency,
+      ...(levelChanged ? { analysis_level: analysisLevel } : {}),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['households'] })
@@ -76,24 +89,48 @@ export default function EditModal({ household, onClose }: Props) {
             </div>
           </div>
 
-          {/* Configuración inmutable — badges de solo lectura */}
+          {/* Contrato del hogar */}
           <div className="space-y-1.5">
             <p className="text-[10px] uppercase tracking-widest text-slate-500">Contrato del hogar</p>
+            {/* División de gastos — inmutable */}
             <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
               <span className="text-xs text-slate-400">División de gastos</span>
               <span className="text-xs font-semibold text-slate-300">
                 {SPLIT_LABELS[household.split_type]}
               </span>
             </div>
-            <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50">
-              <span className="text-xs text-slate-400">Nivel de análisis</span>
-              <span className="text-xs font-semibold text-slate-300">
-                {ANALYSIS_LABELS[household.analysis_level ?? 'expenses_only']}
-              </span>
+            {/* Nivel de análisis — puede subir, no bajar */}
+            <div>
+              <label className={labelClass}>Nivel de análisis</label>
+              <div className="space-y-1.5 mt-1">
+                {ANALYSIS_UPGRADE_OPTIONS.map(opt => {
+                  const optIdx = LEVEL_ORDER.indexOf(opt.value)
+                  const isDisabled = optIdx < currentIdx
+                  const isSelected = analysisLevel === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => !isDisabled && setAnalysisLevel(opt.value)}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all ${
+                        isDisabled
+                          ? 'opacity-30 cursor-not-allowed bg-slate-800/30 border-slate-800'
+                          : isSelected
+                          ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
+                          : 'bg-slate-800/50 border-slate-700/50 text-slate-300 hover:border-slate-600'
+                      }`}
+                    >
+                      <p className="text-xs font-semibold">{opt.label}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">{opt.desc}</p>
+                    </button>
+                  )
+                })}
+              </div>
+              {currentIdx < LEVEL_ORDER.length - 1 && (
+                <p className="text-[10px] text-amber-500/70 mt-1.5">↑ Solo se puede subir de nivel, no bajar.</p>
+              )}
             </div>
-            <p className="text-[10px] text-slate-600 text-center pt-0.5">
-              Para cambiarlos, creá un hogar nuevo.
-            </p>
           </div>
 
           {error && <p className="text-rose-400 text-xs">{error}</p>}
