@@ -1061,7 +1061,7 @@ export default function HouseholdPage() {
                                           {fmt(item.total)}
                                         </span>
                                         <span className="text-sm px-2 py-0.5 rounded-full font-semibold shrink-0 bg-slate-500/15 text-slate-400 border border-slate-500/20">
-                                          {pct < 1 ? pct.toFixed(1) : pct.toFixed(0)}%
+                                          {pct.toFixed(1)}%
                                         </span>
                                       </div>
                                       <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
