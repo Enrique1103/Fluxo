@@ -10,7 +10,7 @@ from .external_account_models import ExternalAccount
 from .exchange_rate_models import ExchangeRate
 from .importacion import Importacion, ReglaCategorias
 from .instalment_plan_models import InstalmentPlan
-from .household_models import Household, HouseholdMember, HouseholdInvite, HouseholdSettlement, SplitType, MemberRole, MemberStatus, InviteStatus
+from .household_models import Household, HouseholdMember, HouseholdInvite, HouseholdSettlement, MemberTransfer, SplitType, MemberRole, MemberStatus, InviteStatus
 from .review_models import TransactionReview, ReviewType, ReviewStatus
 from .budget_models import Budget, BudgetCategory
 from .monthly_total_models import MonthlyTotal

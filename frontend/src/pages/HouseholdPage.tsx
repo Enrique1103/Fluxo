@@ -24,6 +24,7 @@ import JoinModal from '../components/household/JoinModal'
 import EditModal from '../components/household/EditModal'
 import FlagModal from '../components/household/FlagModal'
 import SettlementModal from '../components/household/SettlementModal'
+import MemberTransferModal from '../components/household/MemberTransferModal'
 import ReviewsPanel from '../components/household/ReviewsPanel'
 import type { SharedExpense, SettlementItem, SettlementPayment } from '../api/households'
 import SettingsDrawer from '../components/SettingsDrawer'
@@ -71,6 +72,7 @@ export default function HouseholdPage() {
   const [payItem,     setPayItem]     = useState<SettlementItem | null>(null)
   const [confirmItem, setConfirmItem] = useState<SettlementPayment | null>(null)
   const [flagTx, setFlagTx] = useState<SharedExpense | null>(null)
+  const [transferOpen, setTransferOpen] = useState(false)
 
   const [donutGroupBy,      setDonutGroupBy]      = useState<'category' | 'concept'>('category')
   const [donutSelected,     setDonutSelected]     = useState<string | null>(null)
@@ -1086,6 +1088,54 @@ export default function HouseholdPage() {
                     )}
 
                     {/* ══════════════════════════════════════════════════ */}
+                    {/* 1d. TRANSFERENCIAS ENTRE MIEMBROS (solo FULL)     */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {analytics.analysis_level === 'full' && (
+                      <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
+                          <div>
+                            <p className={sectionTitle}>Transferencias entre miembros</p>
+                            <p className="text-xs text-slate-500 mt-0.5">{MONTH_NAMES[month - 1]} {year}</p>
+                          </div>
+                          <button
+                            onClick={() => setTransferOpen(true)}
+                            className="shrink-0 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-semibold transition-all"
+                          >
+                            + Nueva
+                          </button>
+                        </div>
+                        {analytics.member_transfers && analytics.member_transfers.length > 0 ? (
+                          <div className="divide-y divide-slate-800/50">
+                            {analytics.member_transfers.map(t => {
+                              const isMe = t.from_user_id === currentUserId
+                              return (
+                                <div key={t.id} className="flex items-center justify-between px-5 py-3 gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-slate-200 truncate">
+                                      <span className="font-semibold">{t.from_user_name}</span>
+                                      <span className="text-slate-500 mx-1.5">→</span>
+                                      <span className="font-semibold">{t.to_user_name}</span>
+                                    </p>
+                                    {t.description && <p className="text-xs text-slate-500 truncate mt-0.5">{t.description}</p>}
+                                    <p className="text-[11px] text-slate-600">{t.date}</p>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <p className={`text-sm font-bold tabular-nums ${isMe ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                      {isMe ? '−' : '+'}{Number(t.amount).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500">{t.currency}</p>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-center py-6 text-slate-500">Sin transferencias este mes</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ══════════════════════════════════════════════════ */}
                     {/* 2. ANÁLISIS POR MIEMBRO                           */}
                     {/* ══════════════════════════════════════════════════ */}
                     {analytics.members.length > 0 && (
@@ -1543,6 +1593,16 @@ export default function HouseholdPage() {
         />
       )}
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      {household && transferOpen && (
+        <MemberTransferModal
+          open
+          onClose={() => setTransferOpen(false)}
+          householdId={household.id}
+          currentUserId={currentUserId ?? ''}
+          activeMembers={activeMembers.map(m => ({ user_id: m.user_id, user_name: m.user_name }))}
+          defaultCurrency={household.base_currency}
+        />
+      )}
     </div>
   )
 }

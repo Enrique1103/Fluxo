@@ -191,6 +191,31 @@ class SettlementConfirmIn(BaseModel):
     date: PyDate | None = None
 
 
+class MemberTransferIn(BaseModel):
+    """El emisor crea la transferencia eligiendo ambas cuentas."""
+    to_user_id: uuid.UUID
+    from_account_id: uuid.UUID
+    to_account_id: uuid.UUID
+    amount: Decimal = Field(..., gt=0)
+    currency: str = Field(..., min_length=3, max_length=3)
+    date: PyDate
+    description: str | None = Field(default=None, max_length=200)
+
+
+class MemberTransferOut(BaseModel):
+    id: uuid.UUID
+    household_id: uuid.UUID
+    from_user_id: uuid.UUID
+    from_user_name: str
+    to_user_id: uuid.UUID
+    to_user_name: str
+    amount: Decimal
+    currency: str
+    date: str
+    description: str | None
+    created_at: str
+
+
 class HouseholdAnalyticsResponse(BaseModel):
     household_id: uuid.UUID
     period: str                             # "YYYY-MM"
@@ -215,3 +240,4 @@ class HouseholdAnalyticsResponse(BaseModel):
     net_savings: Decimal | None                               # Solo cuando analysis_level=FULL
     total_group_income: Decimal | None                        # Solo cuando analysis_level=FULL
     member_transactions: list[MemberTransaction] | None = None  # Solo cuando analysis_level=FULL
+    member_transfers: list[MemberTransferOut] = []              # Solo cuando analysis_level=FULL
