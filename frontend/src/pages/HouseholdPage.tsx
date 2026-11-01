@@ -5,7 +5,7 @@ import {
   Activity, BarChart2, Upload, Home, Users, Plus, Copy, Check,
   Loader2, X, UserCheck, UserX, ArrowRight, Calendar,
   AlertTriangle, Settings, Crown, Wallet, TrendingDown, TrendingUp,
-  Eye, EyeOff, ChevronLeft, ChevronRight, Search, ChevronDown, DollarSign, Flag,
+  Eye, EyeOff, ChevronLeft, ChevronRight, Search, ChevronDown, DollarSign, Flag, Pencil,
 } from 'lucide-react'
 import { useHouseholdEvents } from '../hooks/useHouseholdEvents'
 import { useAuthStore } from '../store/authStore'
@@ -25,8 +25,9 @@ import EditModal from '../components/household/EditModal'
 import FlagModal from '../components/household/FlagModal'
 import SettlementModal from '../components/household/SettlementModal'
 import MemberTransferModal from '../components/household/MemberTransferModal'
+import EditMemberTransferModal from '../components/household/EditMemberTransferModal'
 import ReviewsPanel from '../components/household/ReviewsPanel'
-import type { SharedExpense, SettlementItem, SettlementPayment } from '../api/households'
+import type { SharedExpense, SettlementItem, SettlementPayment, MemberTransfer } from '../api/households'
 import SettingsDrawer from '../components/SettingsDrawer'
 import MonthYearPicker from '../components/MonthYearPicker'
 import ExportButton from '../components/ExportButton'
@@ -72,7 +73,8 @@ export default function HouseholdPage() {
   const [payItem,     setPayItem]     = useState<SettlementItem | null>(null)
   const [confirmItem, setConfirmItem] = useState<SettlementPayment | null>(null)
   const [flagTx, setFlagTx] = useState<SharedExpense | null>(null)
-  const [transferOpen, setTransferOpen] = useState(false)
+  const [transferOpen,   setTransferOpen]   = useState(false)
+  const [editTransfer,   setEditTransfer]   = useState<MemberTransfer | null>(null)
 
   const [donutGroupBy,      setDonutGroupBy]      = useState<'category' | 'concept'>('category')
   const [donutSelected,     setDonutSelected]     = useState<string | null>(null)
@@ -1118,11 +1120,22 @@ export default function HouseholdPage() {
                                     {t.description && <p className="text-xs text-slate-500 truncate mt-0.5">{t.description}</p>}
                                     <p className="text-[11px] text-slate-600">{t.date}</p>
                                   </div>
-                                  <div className="text-right shrink-0">
-                                    <p className={`text-sm font-bold tabular-nums ${isMe ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                      {isMe ? '−' : '+'}{Number(t.amount).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </p>
-                                    <p className="text-[11px] text-slate-500">{t.currency}</p>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {isMe && (
+                                      <button
+                                        onClick={() => setEditTransfer(t)}
+                                        className="p-1.5 text-slate-600 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
+                                        aria-label="Editar transferencia"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                    <div className="text-right">
+                                      <p className={`text-sm font-bold tabular-nums ${isMe ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                        {isMe ? '−' : '+'}{Number(t.amount).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </p>
+                                      <p className="text-[11px] text-slate-500">{t.currency}</p>
+                                    </div>
                                   </div>
                                 </div>
                               )
@@ -1599,6 +1612,13 @@ export default function HouseholdPage() {
           currentUserId={currentUserId ?? ''}
           activeMembers={activeMembers.map(m => ({ user_id: m.user_id, user_name: m.user_name }))}
           defaultCurrency={household.base_currency}
+        />
+      )}
+      {household && editTransfer && (
+        <EditMemberTransferModal
+          transfer={editTransfer}
+          householdId={household.id}
+          onClose={() => setEditTransfer(null)}
         />
       )}
     </div>
