@@ -6,6 +6,9 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../store/authStore'
 import { login, register, forgotPassword, resetPassword } from '../api/auth'
+import { withServerWake } from '../api/client'
+
+const WAKING_MSG = 'El servidor se está iniciando, puede tardar hasta un minuto. Seguimos intentando…'
 
 // Email de soporte que se muestra en la pantalla de inicio (variable de entorno en Vercel)
 const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL as string | undefined
@@ -157,8 +160,11 @@ export default function LoginPage() {
   const ff = useForm<ForgotForm>  ({ resolver: zodResolver(forgotSchema),   mode: 'onChange' })
   const pf = useForm<ResetForm>   ({ resolver: zodResolver(resetSchema),    mode: 'onChange' })
 
+  const waking = () => setInfo(WAKING_MSG)
+
   function parseError(err: any, fallback: string): string {
-    if (!err?.response) return 'No se pudo conectar con el servidor'
+    setInfo('')
+    if (!err?.response) return 'El servidor no responde. Revisá tu conexión y probá de nuevo en unos segundos.'
     const detail = err.response.data?.detail
     if (!detail) return fallback
     if (typeof detail === 'string') return detail
@@ -167,9 +173,10 @@ export default function LoginPage() {
   }
 
   const onLogin = async (data: LoginForm) => {
-    setError(''); setLoading(true)
+    setError(''); setInfo(''); setLoading(true)
     try {
-      const res = await login({ username: data.email, password: data.password })
+      const res = await withServerWake(() => login({ username: data.email, password: data.password }), waking)
+      setInfo('')
       authLogin(res.access_token, res.is_admin)
       navigate(res.is_admin ? '/admin' : '/', { replace: true })
     } catch (err: any) {
@@ -180,9 +187,10 @@ export default function LoginPage() {
   }
 
   const onRegister = async (data: RegisterForm) => {
-    setError(''); setLoading(true)
+    setError(''); setInfo(''); setLoading(true)
     try {
-      await register({ name: data.name, email: data.email, password: data.password })
+      await withServerWake(() => register({ name: data.name, email: data.email, password: data.password }), waking)
+      setInfo('')
     } catch (err: any) {
       setError(parseError(err, 'Error al crear la cuenta'))
       setLoading(false)
@@ -202,7 +210,7 @@ export default function LoginPage() {
   const onForgot = async (data: ForgotForm) => {
     setError(''); setLoading(true)
     try {
-      await forgotPassword(data.email)
+      await withServerWake(() => forgotPassword(data.email), waking)
       setInfo('Si el email está registrado, te enviamos un enlace para cambiar la contraseña. Revisá también la carpeta de spam.')
     } catch (err: any) {
       setError(parseError(err, 'No se pudo enviar el enlace'))
@@ -214,7 +222,7 @@ export default function LoginPage() {
   const onReset = async (data: ResetForm) => {
     setError(''); setLoading(true)
     try {
-      await resetPassword(resetToken ?? '', data.password)
+      await withServerWake(() => resetPassword(resetToken ?? '', data.password), waking)
       navigate('/login', { replace: true })
       setRecovery(null); setIsLogin(true)
       setInfo('Listo, ya podés iniciar sesión con tu nueva contraseña.')
@@ -358,6 +366,7 @@ export default function LoginPage() {
                 {...rf.register('password')}
               />
               {error && <ErrorMsg msg={error} />}
+              {info && <InfoMsg msg={info} />}
               <SubmitBtn loading={loading} label="Crear mi cuenta" />
             </form>
           )}
