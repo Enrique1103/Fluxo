@@ -57,7 +57,7 @@ export default function DashboardPage() {
   const { theme } = useTheme()
   const isLight = theme === 'light'
   const [privacyMode,   setPrivacyMode]   = useState(() => localStorage.getItem('privacy') === 'true')
-  const [currency,      setCurrency]      = useState('UYU') // synced to home currency below
+  const [currency,      setCurrency]      = useState(() => localStorage.getItem('fluxo-currency') ?? 'UYU')
   const [openCurrencyDd, setOpenCurrencyDd] = useState(false)
   const closeCurrencyDd = () => setTimeout(() => setOpenCurrencyDd(false), 150)
   const [settingsOpen,    setSettingsOpen]    = useState(false)
@@ -99,11 +99,19 @@ export default function DashboardPage() {
   }, [])
   const loadMoreInProgress = useRef(false)
 
+  const [slowServer, setSlowServer] = useState(false)
+
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['summary', currency],
     queryFn:  () => fetchSummary(currency),
     placeholderData: keepPreviousData,
   })
+
+  useEffect(() => {
+    if (!summaryLoading) { setSlowServer(false); return }
+    const t = setTimeout(() => setSlowServer(true), 6_000)
+    return () => clearTimeout(t)
+  }, [summaryLoading])
 
   // How many months back to the first transaction
   const monthsBack = useMemo(() => {
@@ -158,25 +166,24 @@ export default function DashboardPage() {
     queryFn:  fetchMe,
   })
 
-  useEffect(() => { if (me?.currency_default) setCurrency(me.currency_default) }, [me?.currency_default])
+  useEffect(() => {
+    if (me?.currency_default) {
+      setCurrency(me.currency_default)
+      localStorage.setItem('fluxo-currency', me.currency_default)
+    }
+  }, [me?.currency_default])
 
   const { data: patrimonioData = [], isLoading: patrimonioLoading, isError: patrimonioError } = useQuery({
     queryKey: ['patrimonio', monthsBack, monthsAhead, currency],
     queryFn:  () => fetchPatrimonio(monthsBack, monthsAhead, currency),
-    enabled:  !!me,
+    enabled:  !!summary,
     placeholderData: keepPreviousData,
-    retry: 1,
   })
 
   const { data: exchangeRates = [] } = useQuery({
     queryKey: ['exchange-rates'],
     queryFn:  fetchExchangeRates,
   })
-
-  // Initialize currency from user preference
-  useEffect(() => {
-    if (me?.currency_default) setCurrency(me.currency_default)
-  }, [me?.currency_default])
 
   // Close runway picker on outside click
   useEffect(() => {
@@ -400,6 +407,14 @@ export default function DashboardPage() {
           <Upload className="w-4 h-4" /><span className="hidden sm:inline">Importar</span>
         </button>
       </nav>
+
+      {/* BANNER: servidor iniciando */}
+      {slowServer && (
+        <div className="flex items-center gap-2.5 px-4 py-3 mb-4 bg-amber-500/8 border border-amber-500/20 rounded-2xl text-xs text-amber-300">
+          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+          Servidor iniciando… puede tardar hasta un minuto la primera vez.
+        </div>
+      )}
 
       {/* HEADER */}
       <header className="relative z-20 flex flex-row justify-between items-center mb-4 sm:mb-8 gap-3 sm:bg-slate-900/50 px-1 py-1 sm:p-4 sm:rounded-2xl sm:border border-slate-800/50 sm:backdrop-blur-md">
