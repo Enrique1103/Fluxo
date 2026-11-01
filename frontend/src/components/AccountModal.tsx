@@ -52,9 +52,9 @@ export default function AccountModal({ open, onClose }: Props) {
 
   const handleSubmit = async () => {
     if (!name.trim()) { setError('El nombre es requerido'); return }
-    const bal = balance === '' ? 0 : parseFloat(balance)
+    const bal = type === 'credit' ? 0 : (balance === '' ? 0 : parseFloat(balance))
     if (isNaN(bal)) { setError('El saldo inicial debe ser un número válido'); return }
-    if (type !== 'credit' && type !== 'investment' && bal < 0) {
+    if (type !== 'investment' && bal < 0) {
       setError('El saldo inicial no puede ser negativo para este tipo de cuenta'); return
     }
     if (type === 'credit') {
@@ -134,19 +134,21 @@ export default function AccountModal({ open, onClose }: Props) {
             </div>
           </div>
 
-          {/* Saldo inicial */}
-          <div>
-            <label className={labelClass}>Saldo inicial</label>
-            <input
-              type="number"
-              step="0.01"
-              {...(type !== 'credit' && type !== 'investment' ? { min: '0' } : {})}
-              value={balance}
-              onChange={e => setBalance(e.target.value)}
-              placeholder="0.00"
-              className={inputClass}
-            />
-          </div>
+          {/* Saldo inicial — no aplica para crédito (siempre $0 al crear) */}
+          {type !== 'credit' && (
+            <div>
+              <label className={labelClass}>Saldo inicial</label>
+              <input
+                type="number"
+                step="0.01"
+                {...(type !== 'investment' ? { min: '0' } : {})}
+                value={balance}
+                onChange={e => setBalance(e.target.value)}
+                placeholder="0.00"
+                className={inputClass}
+              />
+            </div>
+          )}
 
           {/* Límite de crédito — solo para cuentas credit */}
           {type === 'credit' && (

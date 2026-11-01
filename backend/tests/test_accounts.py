@@ -40,15 +40,14 @@ class TestCreateAccount:
         assert body["is_liability"] is True
         assert body["credit_limit"] == "2000.00"
 
-    def test_create_credit_with_negative_balance(self, authed):
-        """Las cuentas de crédito admiten saldo negativo inicial (deuda preexistente)."""
+    def test_create_credit_with_negative_balance_rejected(self, authed):
+        """Las cuentas de crédito no pueden crearse con saldo negativo — la deuda surge de transacciones."""
         c, h = authed
         r = c.post(f"{BASE}/accounts", json={
             "name": "Visa Deuda", "type": "credit", "currency": "USD",
             "balance": "-500.00", "credit_limit": "2000.00",
         }, headers=h)
-        assert r.status_code == 201
-        assert r.json()["balance"] == "-500.00"
+        assert r.status_code == 422
 
     def test_create_credit_zero_balance(self, authed):
         """Las cuentas de crédito pueden crearse con saldo 0 (sin deuda inicial)."""

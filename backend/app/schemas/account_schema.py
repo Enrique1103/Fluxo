@@ -26,6 +26,8 @@ class AccountCreate(BaseModel):
         if self.type == AccountType.CREDIT:
             if self.credit_limit is None:
                 raise ValueError("credit_limit es obligatorio para cuentas de tipo CREDIT")
+            if self.balance < 0:
+                raise ValueError("El saldo inicial de una cuenta de crédito no puede ser negativo")
         elif self.type == AccountType.INVESTMENT:
             pass  # Inversión admite saldo negativo (posición apalancada / margen)
         else:

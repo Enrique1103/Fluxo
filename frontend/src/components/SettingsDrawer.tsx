@@ -582,7 +582,13 @@ function CuentasSection({ open, onNewAcct }: { open: boolean; onNewAcct: () => v
               <div className="flex items-center justify-between">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-200 truncate">{acct.name}</p>
-                  <p className="text-[11px] text-slate-500">{acct.type} · {acct.currency} · {Number(acct.balance).toLocaleString()}</p>
+                  {acct.type === 'credit' && acct.credit_limit != null ? (
+                    <p className="text-[11px] text-slate-500">
+                      crédito · {acct.currency} · Deuda: {Math.abs(Number(acct.balance)).toLocaleString()} · Disponible: {(Number(acct.credit_limit) + Number(acct.balance)).toLocaleString()}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-slate-500">{acct.type} · {acct.currency} · {Number(acct.balance).toLocaleString()}</p>
+                  )}
                 </div>
                 <div className="flex gap-1 shrink-0 ml-2">
                   <button
