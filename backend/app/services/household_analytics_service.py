@@ -13,7 +13,7 @@ from app.models.users_models import User
 from app.schemas.household_schema import (
     HouseholdAnalyticsResponse, MemberContribution,
     SettlementItem, SettlementPayment, SharedExpense, HouseholdAlert, CategoryBreakdown,
-    ConceptBreakdown, MemberIncome, MemberTransaction,
+    ConceptBreakdown, MemberIncome, MemberTransaction, MemberTransferOut,
 )
 
 
@@ -246,12 +246,18 @@ def get_analytics(
     }
     # Pagos del balanceo ya registrados este mes: el que pagó queda "a favor" por ese
     # monto y el que cobró deja de tenerlo pendiente, así la deuda vuelve a cero.
-    from app.services import household_settlement_service
+    from app.services import household_settlement_service, member_transfer_service
     payments = household_settlement_service.active_for_period(db, household_id, year, month)
     for p in payments:
         if p.from_user_id in balances and p.to_user_id in balances:
             balances[p.from_user_id] += p.amount
             balances[p.to_user_id] -= p.amount
+    # Transferencias entre miembros del mes: el que envió queda "a favor" y el que recibió, "en contra"
+    member_transfers_period = member_transfer_service.list_for_period(db, household_id, year, month)
+    for t in member_transfers_period:
+        if t.from_user_id in balances and t.to_user_id in balances:
+            balances[t.from_user_id] += t.amount
+            balances[t.to_user_id] -= t.amount
     raw_settlement = _simplify_debts(balances)
 
     settlement_list: list[SettlementItem] = [
@@ -468,4 +474,20 @@ def get_analytics(
         net_savings=net_savings,
         total_group_income=total_group_income_out,
         member_transactions=member_transactions_list,
+        member_transfers=[
+            MemberTransferOut(
+                id=t.id,
+                household_id=t.household_id,
+                from_user_id=t.from_user_id,
+                from_user_name=_get_user_name(db, t.from_user_id),
+                to_user_id=t.to_user_id,
+                to_user_name=_get_user_name(db, t.to_user_id),
+                amount=t.amount,
+                currency=t.currency,
+                date=str(t.date),
+                description=t.description,
+                created_at=str(t.created_at),
+            )
+            for t in member_transfers_period
+        ] if effective_level == AnalysisLevel.FULL else [],
     )

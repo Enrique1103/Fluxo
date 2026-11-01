@@ -123,6 +123,20 @@ export interface MemberTransaction {
   description?: string | null
 }
 
+export interface MemberTransfer {
+  id: string
+  household_id: string
+  from_user_id: string
+  from_user_name: string
+  to_user_id: string
+  to_user_name: string
+  amount: number
+  currency: string
+  date: string
+  description: string | null
+  created_at: string
+}
+
 export interface HouseholdAnalytics {
   household_id: string
   period: string
@@ -145,6 +159,7 @@ export interface HouseholdAnalytics {
   net_savings: number | null
   total_group_income: number | null
   member_transactions: MemberTransaction[] | null
+  member_transfers?: MemberTransfer[]
 }
 
 // --- API calls ---
@@ -227,4 +242,31 @@ export const confirmSettlement = async (householdId: string, settlementId: strin
   account_id: string; date?: string
 }): Promise<void> => {
   await client.post(`/v1/households/${householdId}/settlements/${settlementId}/confirm`, payload)
+}
+
+/** Crea una transferencia entre miembros (Nivel 3): egreso en cuenta del emisor + ingreso en cuenta del receptor */
+export const createMemberTransfer = async (householdId: string, payload: {
+  to_user_id: string
+  from_account_id: string
+  to_account_id: string
+  amount: number
+  currency: string
+  date: string
+  description?: string
+}): Promise<MemberTransfer> => {
+  const { data } = await client.post<MemberTransfer>(`/v1/households/${householdId}/member-transfers`, payload)
+  return data
+}
+
+/** Elimina una transferencia entre miembros y sus transacciones */
+export const deleteMemberTransfer = async (householdId: string, transferId: string): Promise<void> => {
+  await client.delete(`/v1/households/${householdId}/member-transfers/${transferId}`)
+}
+
+/** Devuelve las cuentas activas de un miembro del hogar (Nivel 3) */
+export const fetchMemberAccounts = async (householdId: string, userId: string): Promise<{
+  id: string; name: string; type: string; currency: string; balance: number
+}[]> => {
+  const { data } = await client.get(`/v1/households/${householdId}/members/${userId}/accounts`)
+  return data
 }

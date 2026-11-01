@@ -160,3 +160,37 @@ class HouseholdSettlement(Base):
 
     payer_tx    = relationship("Transaction", foreign_keys=[payer_tx_id])
     receiver_tx = relationship("Transaction", foreign_keys=[receiver_tx_id])
+
+
+class MemberTransfer(Base):
+    """
+    Transferencia de dinero entre dos miembros del hogar (Nivel 3).
+    Crea un egreso en la cuenta del emisor y un ingreso en la cuenta del receptor.
+    Se descuenta del balance mensual del hogar para calcular quién le debe a quién.
+    """
+    __tablename__ = "member_transfers"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    household_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("households.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    from_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    to_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    date: Mapped[PyDate] = mapped_column(Date, nullable=False)
+    description: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    from_tx_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True
+    )
+    to_tx_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    from_user  = relationship("User", foreign_keys=[from_user_id])
+    to_user    = relationship("User", foreign_keys=[to_user_id])
+    from_tx    = relationship("Transaction", foreign_keys=[from_tx_id])
+    to_tx      = relationship("Transaction", foreign_keys=[to_tx_id])

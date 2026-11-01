@@ -21,8 +21,9 @@ from app.schemas.household_schema import (
     HouseholdCreate, HouseholdUpdate, HouseholdResponse,
     MemberResponse, InviteResponse, JoinRequest,
     HouseholdAnalyticsResponse, SettlementPayIn, SettlementConfirmIn,
+    MemberTransferIn, MemberTransferOut,
 )
-from app.services import household_service, household_analytics_service, household_settlement_service
+from app.services import household_service, household_analytics_service, household_settlement_service, member_transfer_service
 
 router = APIRouter(prefix="/households", tags=["Households"])
 
@@ -206,6 +207,29 @@ def list_members(
         _handle(e)
 
 
+@router.get("/{household_id}/members/{user_id}/accounts")
+def get_member_accounts(
+    household_id: uuid.UUID,
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Devuelve las cuentas activas de un miembro del hogar (solo para miembros Nivel 3)."""
+    from app.models.household_models import AnalysisLevel
+    from app.crud import account_crud, household_crud
+    hh = household_crud.get_by_id(db, household_id)
+    if not hh or hh.is_deleted:
+        raise HTTPException(status_code=404, detail="Hogar no encontrado")
+    member = household_crud.get_member(db, household_id, current_user.id)
+    if not member or member.status.value != "active":
+        raise HTTPException(status_code=403, detail="No sos miembro activo")
+    if (hh.analysis_level or AnalysisLevel.EXPENSES_ONLY) != AnalysisLevel.FULL:
+        raise HTTPException(status_code=403, detail="Solo disponible en hogares Nivel 3")
+    accounts = account_crud.get_all_by_user(db, user_id)
+    active = [a for a in accounts if not a.is_deleted and not a.is_archived]
+    return [{"id": str(a.id), "name": a.name, "type": a.type, "currency": a.currency, "balance": float(a.balance)} for a in active]
+
+
 @router.post("/{household_id}/members/{user_id}/approve", response_model=MemberResponse)
 async def approve_member(
     household_id: uuid.UUID,
@@ -293,5 +317,61 @@ def confirm_settlement(
     try:
         s = household_settlement_service.confirm(db, current_user, household_id, settlement_id, data)
         return {"id": str(s.id), "confirmed": True}
+    except Exception as e:
+        _handle(e)
+
+
+# ── Transferencias entre miembros (Nivel 3) ──────────────────────────────────
+
+@router.post("/{household_id}/member-transfers", response_model=MemberTransferOut, status_code=status.HTTP_201_CREATED)
+def create_member_transfer(
+    household_id: uuid.UUID,
+    data: MemberTransferIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Crea una transferencia entre miembros del hogar (solo Nivel 3)."""
+    try:
+        t = member_transfer_service.create(
+            db, current_user, household_id,
+            to_user_id=data.to_user_id,
+            from_account_id=data.from_account_id,
+            to_account_id=data.to_account_id,
+            amount=data.amount,
+            currency=data.currency,
+            date=data.date,
+            description=data.description,
+        )
+        from app.crud import user_crud
+        from_name = current_user.name
+        to_user = user_crud.get_by_id(db, t.to_user_id)
+        to_name = to_user.name if to_user else ""
+        return MemberTransferOut(
+            id=t.id,
+            household_id=t.household_id,
+            from_user_id=t.from_user_id,
+            from_user_name=from_name,
+            to_user_id=t.to_user_id,
+            to_user_name=to_name,
+            amount=t.amount,
+            currency=t.currency,
+            date=str(t.date),
+            description=t.description,
+            created_at=str(t.created_at),
+        )
+    except Exception as e:
+        _handle(e)
+
+
+@router.delete("/{household_id}/member-transfers/{transfer_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_member_transfer(
+    household_id: uuid.UUID,
+    transfer_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Elimina una transferencia entre miembros y sus transacciones asociadas."""
+    try:
+        member_transfer_service.delete(db, current_user, household_id, transfer_id)
     except Exception as e:
         _handle(e)
