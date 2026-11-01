@@ -14,12 +14,6 @@ const SPLIT_LABELS: Record<SplitType, string> = {
   proportional: 'Proporcional al ingreso',
 }
 
-const ANALYSIS_LABELS: Record<AnalysisLevel, string> = {
-  expenses_only:      'Solo gastos',
-  expenses_and_goals: 'Gastos + metas',
-  full:               'Análisis completo',
-}
-
 const LEVEL_ORDER: AnalysisLevel[] = ['expenses_only', 'expenses_and_goals', 'full']
 
 const ANALYSIS_UPGRADE_OPTIONS: { value: AnalysisLevel; label: string; desc: string }[] = [
