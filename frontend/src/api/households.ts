@@ -181,7 +181,7 @@ export const createHousehold = async (payload: {
 
 export const updateHousehold = async (
   id: string,
-  payload: { name?: string; base_currency?: string },
+  payload: { name?: string; base_currency?: string; analysis_level?: AnalysisLevel },
 ): Promise<Household> => {
   const { data } = await client.patch<Household>(`/v1/households/${id}`, payload)
   return data
