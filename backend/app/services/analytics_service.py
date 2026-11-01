@@ -594,6 +594,7 @@ def monthly_breakdown(db: Session, user: User, year: int, month: int, display_cu
             type=acc.type.value,
             currency=acc.currency,
             balance=round(float(historical), 2),
+            credit_limit=float(acc.credit_limit) if acc.credit_limit is not None else None,
         ))
 
     return MonthlyBreakdown(

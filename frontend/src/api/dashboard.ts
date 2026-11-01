@@ -144,6 +144,7 @@ export interface AccountBalanceStat {
   type: string
   currency: string
   balance: number
+  credit_limit: number | null
 }
 
 export interface MonthlyBreakdown {

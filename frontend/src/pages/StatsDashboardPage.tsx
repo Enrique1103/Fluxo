@@ -972,10 +972,23 @@ export default function StatsDashboardPage() {
                     <p className="text-sm font-semibold text-slate-200 truncate">{acc.name}</p>
                     <p className="text-xs text-slate-500">{typeDesc[acc.type] ?? 'Cuenta'}</p>
                   </div>
-                  <span className={`text-sm font-bold tabular-nums shrink-0 ${isCredit || acc.balance < 0 ? 'text-rose-400' : 'text-slate-200'}`}>
-                    {privacy ? '••••' : acc.balance.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    <span className="text-xs font-normal text-slate-500 ml-1">{acc.currency}</span>
-                  </span>
+                  {isCredit && acc.credit_limit != null ? (
+                    <div className="text-right shrink-0">
+                      <p className="text-xs text-slate-500 tabular-nums">
+                        {privacy ? '••••' : `Deuda: ${Math.abs(acc.balance).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        <span className="ml-1">{acc.currency}</span>
+                      </p>
+                      <p className="text-xs text-slate-500 tabular-nums">
+                        {privacy ? '••••' : `Crédito: ${(acc.credit_limit + acc.balance).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        <span className="ml-1">{acc.currency}</span>
+                      </p>
+                    </div>
+                  ) : (
+                    <span className={`text-sm font-bold tabular-nums shrink-0 ${acc.balance < 0 ? 'text-rose-400' : 'text-slate-200'}`}>
+                      {privacy ? '••••' : acc.balance.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <span className="text-xs font-normal text-slate-500 ml-1">{acc.currency}</span>
+                    </span>
+                  )}
                 </div>
               )
             })}

@@ -41,6 +41,7 @@ class AccountBalanceStat(BaseModel):
     type: str
     currency: str
     balance: float
+    credit_limit: float | None = None
 
 
 class MonthlyBreakdown(BaseModel):
