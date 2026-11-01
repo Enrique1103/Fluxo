@@ -230,7 +230,7 @@ def get_all_member_accounts(
             "user_id": str(m.user_id),
             "accounts": [
                 {"id": str(a.id), "name": a.name, "type": a.type, "currency": a.currency, "balance": float(a.balance)}
-                for a in accts if not a.is_deleted and not a.is_archived
+                for a in accts if not a.is_deleted
             ],
         })
     return result
@@ -252,8 +252,7 @@ def get_member_accounts(
     if not member or member.status.value != "active":
         raise HTTPException(status_code=403, detail="No sos miembro activo")
     accounts = account_crud.get_all_by_user(db, user_id)
-    active = [a for a in accounts if not a.is_deleted and not a.is_archived]
-    return [{"id": str(a.id), "name": a.name, "type": a.type, "currency": a.currency, "balance": float(a.balance)} for a in active]
+    return [{"id": str(a.id), "name": a.name, "type": a.type, "currency": a.currency, "balance": float(a.balance)} for a in accounts]
 
 
 @router.post("/{household_id}/members/{user_id}/approve", response_model=MemberResponse)
