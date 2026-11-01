@@ -214,8 +214,7 @@ def get_member_accounts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Devuelve las cuentas activas de un miembro del hogar (solo para miembros Nivel 3)."""
-    from app.models.household_models import AnalysisLevel
+    """Devuelve las cuentas activas de un miembro del hogar."""
     from app.crud import account_crud, household_crud
     hh = household_crud.get_by_id(db, household_id)
     if not hh or hh.is_deleted:
@@ -223,8 +222,6 @@ def get_member_accounts(
     member = household_crud.get_member(db, household_id, current_user.id)
     if not member or member.status.value != "active":
         raise HTTPException(status_code=403, detail="No sos miembro activo")
-    if (hh.analysis_level or AnalysisLevel.EXPENSES_ONLY) != AnalysisLevel.FULL:
-        raise HTTPException(status_code=403, detail="Solo disponible en hogares Nivel 3")
     accounts = account_crud.get_all_by_user(db, user_id)
     active = [a for a in accounts if not a.is_deleted and not a.is_archived]
     return [{"id": str(a.id), "name": a.name, "type": a.type, "currency": a.currency, "balance": float(a.balance)} for a in active]
@@ -321,7 +318,7 @@ def confirm_settlement(
         _handle(e)
 
 
-# ── Transferencias entre miembros (Nivel 3) ──────────────────────────────────
+# ── Transferencias entre miembros ────────────────────────────────────────────
 
 @router.post("/{household_id}/member-transfers", response_model=MemberTransferOut, status_code=status.HTTP_201_CREATED)
 def create_member_transfer(
@@ -330,7 +327,7 @@ def create_member_transfer(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Crea una transferencia entre miembros del hogar (solo Nivel 3)."""
+    """Crea una transferencia entre miembros del hogar."""
     try:
         t = member_transfer_service.create(
             db, current_user, household_id,

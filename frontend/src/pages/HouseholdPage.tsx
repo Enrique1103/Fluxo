@@ -1088,10 +1088,9 @@ export default function HouseholdPage() {
                     )}
 
                     {/* ══════════════════════════════════════════════════ */}
-                    {/* 1d. TRANSFERENCIAS ENTRE MIEMBROS (solo FULL)     */}
+                    {/* 1d. TRANSFERENCIAS ENTRE MIEMBROS                 */}
                     {/* ══════════════════════════════════════════════════ */}
-                    {analytics.analysis_level === 'full' && (
-                      <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
+                    <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
                         <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
                           <div>
                             <p className={sectionTitle}>Transferencias entre miembros</p>
@@ -1132,8 +1131,7 @@ export default function HouseholdPage() {
                         ) : (
                           <p className="text-sm text-center py-6 text-slate-500">Sin transferencias este mes</p>
                         )}
-                      </div>
-                    )}
+                    </div>
 
                     {/* ══════════════════════════════════════════════════ */}
                     {/* 2. ANÁLISIS POR MIEMBRO                           */}

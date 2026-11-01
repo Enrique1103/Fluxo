@@ -181,7 +181,7 @@ export const createHousehold = async (payload: {
 
 export const updateHousehold = async (
   id: string,
-  payload: { name?: string; base_currency?: string; analysis_level?: AnalysisLevel },
+  payload: { name?: string; base_currency?: string },
 ): Promise<Household> => {
   const { data } = await client.patch<Household>(`/v1/households/${id}`, payload)
   return data
@@ -244,7 +244,7 @@ export const confirmSettlement = async (householdId: string, settlementId: strin
   await client.post(`/v1/households/${householdId}/settlements/${settlementId}/confirm`, payload)
 }
 
-/** Crea una transferencia entre miembros (Nivel 3): egreso en cuenta del emisor + ingreso en cuenta del receptor */
+/** Crea una transferencia entre miembros: egreso en cuenta del emisor + ingreso en cuenta del receptor */
 export const createMemberTransfer = async (householdId: string, payload: {
   to_user_id: string
   from_account_id: string
@@ -263,7 +263,7 @@ export const deleteMemberTransfer = async (householdId: string, transferId: stri
   await client.delete(`/v1/households/${householdId}/member-transfers/${transferId}`)
 }
 
-/** Devuelve las cuentas activas de un miembro del hogar (Nivel 3) */
+/** Devuelve las cuentas activas de un miembro del hogar */
 export const fetchMemberAccounts = async (householdId: string, userId: string): Promise<{
   id: string; name: string; type: string; currency: string; balance: number
 }[]> => {

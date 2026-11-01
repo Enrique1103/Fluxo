@@ -1,5 +1,5 @@
 """
-Transferencias de dinero entre miembros del hogar (Nivel 3 / FULL).
+Transferencias de dinero entre miembros del hogar.
 
 El que envía elige su cuenta de origen y la cuenta de destino del receptor.
 Se crean dos transacciones inmediatamente:
@@ -20,7 +20,7 @@ from app.exceptions.household_exceptions import (
     SettlementNotAllowed,
     UnauthorizedHouseholdAccess,
 )
-from app.models.household_models import AnalysisLevel, MemberStatus, MemberTransfer
+from app.models.household_models import MemberStatus, MemberTransfer
 from app.models.users_models import User
 from app.schemas.transaction_schema import TransactionCreate
 
@@ -37,9 +37,6 @@ def _check_member(db: Session, household_id: uuid.UUID, user_id: uuid.UUID):
     member = household_crud.get_member(db, household_id, user_id)
     if not member or member.status != MemberStatus.ACTIVE:
         raise UnauthorizedHouseholdAccess("No sos miembro activo de este hogar")
-    level = household.analysis_level or AnalysisLevel.EXPENSES_ONLY
-    if level != AnalysisLevel.FULL:
-        raise SettlementNotAllowed("Las transferencias entre miembros solo están disponibles en hogares de Nivel 3")
     return household
 
 
