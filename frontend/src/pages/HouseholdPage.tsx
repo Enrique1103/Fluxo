@@ -26,8 +26,12 @@ import FlagModal from '../components/household/FlagModal'
 import SettlementModal from '../components/household/SettlementModal'
 import MemberTransferModal from '../components/household/MemberTransferModal'
 import EditMemberTransferModal from '../components/household/EditMemberTransferModal'
+import AcceptTransferModal from '../components/household/AcceptTransferModal'
 import ReviewsPanel from '../components/household/ReviewsPanel'
-import type { SharedExpense, SettlementItem, SettlementPayment, MemberTransfer } from '../api/households'
+import {
+  fetchPendingMemberTransfers, cancelPendingMemberTransfer,
+} from '../api/households'
+import type { SharedExpense, SettlementItem, SettlementPayment, MemberTransfer, PendingMemberTransfer } from '../api/households'
 import SettingsDrawer from '../components/SettingsDrawer'
 import MonthYearPicker from '../components/MonthYearPicker'
 import ExportButton from '../components/ExportButton'
@@ -75,6 +79,7 @@ export default function HouseholdPage() {
   const [flagTx, setFlagTx] = useState<SharedExpense | null>(null)
   const [transferOpen,   setTransferOpen]   = useState(false)
   const [editTransfer,   setEditTransfer]   = useState<MemberTransfer | null>(null)
+  const [acceptPending,  setAcceptPending]  = useState<PendingMemberTransfer | null>(null)
 
   const [donutGroupBy,      setDonutGroupBy]      = useState<'category' | 'concept'>('category')
   const [donutSelected,     setDonutSelected]     = useState<string | null>(null)
@@ -102,6 +107,13 @@ export default function HouseholdPage() {
     queryFn:  () => fetchHouseholdAnalytics(household!.id, year, month),
     enabled:  !!household,
     retry:    false,
+  })
+
+  const { data: pendingTransfers = [] } = useQuery({
+    queryKey: ['pending-transfers', household?.id],
+    queryFn:  () => fetchPendingMemberTransfers(household!.id),
+    enabled:  !!household,
+    refetchInterval: 30_000,
   })
 
   const showGoals  = household?.analysis_level === 'expenses_and_goals' || household?.analysis_level === 'full'
@@ -1090,7 +1102,77 @@ export default function HouseholdPage() {
                     )}
 
                     {/* ══════════════════════════════════════════════════ */}
-                    {/* 1d. TRANSFERENCIAS ENTRE MIEMBROS                 */}
+                    {/* 1d. TRANSFERENCIAS PENDIENTES                      */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {pendingTransfers.length > 0 && (
+                      <div className="rounded-3xl border overflow-hidden bg-amber-950/30 border-amber-500/20">
+                        <div className="px-5 py-4 border-b border-amber-500/20 flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-amber-400 flex items-center gap-2">
+                              Transferencias pendientes
+                              <span className="bg-amber-500/20 text-amber-400 text-[11px] font-bold px-2 py-0.5 rounded-full">
+                                {pendingTransfers.filter(p => p.to_user_id === currentUserId).length > 0
+                                  ? `${pendingTransfers.filter(p => p.to_user_id === currentUserId).length} para vos`
+                                  : pendingTransfers.length}
+                              </span>
+                            </p>
+                            <p className="text-xs text-amber-500/60 mt-0.5">El receptor elige la cuenta de destino</p>
+                          </div>
+                        </div>
+                        <div className="divide-y divide-amber-500/10">
+                          {pendingTransfers.map(p => {
+                            const isRecipient = p.to_user_id === currentUserId
+                            const isSender    = p.from_user_id === currentUserId
+                            return (
+                              <div key={p.id} className="flex items-center justify-between px-5 py-3 gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-slate-200 truncate">
+                                    <span className="font-semibold">{p.from_user_name}</span>
+                                    <span className="text-slate-500 mx-1.5">→</span>
+                                    <span className="font-semibold">{p.to_user_name}</span>
+                                  </p>
+                                  {p.description && <p className="text-xs text-slate-500 truncate mt-0.5">{p.description}</p>}
+                                  <p className="text-[11px] text-slate-600">{p.date}</p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <div className="text-right mr-1">
+                                    <p className="text-sm font-bold tabular-nums text-amber-400">
+                                      {Number(p.amount).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500">{p.currency}</p>
+                                  </div>
+                                  {isRecipient && (
+                                    <button
+                                      onClick={() => setAcceptPending(p)}
+                                      className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-semibold transition-all"
+                                    >
+                                      Aceptar
+                                    </button>
+                                  )}
+                                  {(isRecipient || isSender) && (
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          await cancelPendingMemberTransfer(household!.id, p.id)
+                                          qc.invalidateQueries({ queryKey: ['pending-transfers', household!.id] })
+                                        } catch { /* ignore */ }
+                                      }}
+                                      className="p-1.5 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                      title="Cancelar"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* 1e. TRANSFERENCIAS ENTRE MIEMBROS                 */}
                     {/* ══════════════════════════════════════════════════ */}
                     <div className="rounded-3xl border overflow-hidden bg-slate-900 border-slate-800">
                         <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
@@ -1619,6 +1701,13 @@ export default function HouseholdPage() {
           transfer={editTransfer}
           householdId={household.id}
           onClose={() => setEditTransfer(null)}
+        />
+      )}
+      {household && (
+        <AcceptTransferModal
+          pending={acceptPending}
+          householdId={household.id}
+          onClose={() => setAcceptPending(null)}
         />
       )}
     </div>

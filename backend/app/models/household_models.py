@@ -194,3 +194,30 @@ class MemberTransfer(Base):
     to_user    = relationship("User", foreign_keys=[to_user_id])
     from_tx    = relationship("Transaction", foreign_keys=[from_tx_id])
     to_tx      = relationship("Transaction", foreign_keys=[to_tx_id])
+
+
+class PendingMemberTransfer(Base):
+    """
+    Transferencia entre miembros pendiente de aceptación por el receptor.
+    El emisor la crea sin conocer la cuenta destino; el receptor elige dónde recibir.
+    Al aceptar se crea el MemberTransfer definitivo y se borran estos datos.
+    """
+    __tablename__ = "pending_member_transfers"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    household_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("households.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    from_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    to_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    from_account_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    date: Mapped[PyDate] = mapped_column(Date, nullable=False)
+    description: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    from_user  = relationship("User", foreign_keys=[from_user_id])
+    to_user    = relationship("User", foreign_keys=[to_user_id])

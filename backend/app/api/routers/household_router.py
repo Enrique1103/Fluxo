@@ -22,6 +22,7 @@ from app.schemas.household_schema import (
     MemberResponse, InviteResponse, JoinRequest,
     HouseholdAnalyticsResponse, SettlementPayIn, SettlementConfirmIn,
     MemberTransferIn, MemberTransferOut, MemberTransferUpdate,
+    PendingMemberTransferIn, PendingMemberTransferOut, AcceptPendingTransferIn,
 )
 from app.services import household_service, household_analytics_service, household_settlement_service, member_transfer_service
 
@@ -406,5 +407,110 @@ def delete_member_transfer(
     """Elimina una transferencia entre miembros y sus transacciones asociadas."""
     try:
         member_transfer_service.delete(db, current_user, household_id, transfer_id)
+    except Exception as e:
+        _handle(e)
+
+
+# ---------------------------------------------------------------------------
+# Transferencias pendientes
+# ---------------------------------------------------------------------------
+
+def _pending_out(p) -> PendingMemberTransferOut:
+    from app.crud import user_crud as _uc
+    return PendingMemberTransferOut(
+        id=p.id,
+        household_id=p.household_id,
+        from_user_id=p.from_user_id,
+        from_user_name=p.from_user.name if p.from_user else str(p.from_user_id),
+        to_user_id=p.to_user_id,
+        to_user_name=p.to_user.name if p.to_user else str(p.to_user_id),
+        amount=p.amount,
+        currency=p.currency,
+        date=str(p.date),
+        description=p.description,
+        created_at=p.created_at.isoformat(),
+    )
+
+
+@router.post("/{household_id}/pending-member-transfers", response_model=PendingMemberTransferOut, status_code=status.HTTP_201_CREATED)
+def create_pending_member_transfer(
+    household_id: uuid.UUID,
+    data: PendingMemberTransferIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """El emisor inicia una transferencia sin elegir la cuenta del receptor."""
+    try:
+        p = member_transfer_service.create_pending(
+            db, current_user, household_id,
+            to_user_id=data.to_user_id,
+            from_account_id=data.from_account_id,
+            amount=data.amount,
+            currency=data.currency,
+            date=data.date,
+            description=data.description,
+        )
+        return _pending_out(p)
+    except Exception as e:
+        _handle(e)
+
+
+@router.get("/{household_id}/pending-member-transfers", response_model=list[PendingMemberTransferOut])
+def list_pending_member_transfers(
+    household_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Lista todas las transferencias pendientes del hogar (emisor y receptor las ven)."""
+    try:
+        pending = member_transfer_service.list_pending(db, current_user, household_id)
+        return [_pending_out(p) for p in pending]
+    except Exception as e:
+        _handle(e)
+
+
+@router.post("/{household_id}/pending-member-transfers/{pending_id}/accept", response_model=MemberTransferOut)
+def accept_pending_member_transfer(
+    household_id: uuid.UUID,
+    pending_id: uuid.UUID,
+    data: AcceptPendingTransferIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """El receptor acepta la transferencia eligiendo su cuenta destino."""
+    try:
+        t = member_transfer_service.accept_pending(
+            db, current_user, household_id, pending_id, data.to_account_id
+        )
+        from app.crud import user_crud
+        to_user = user_crud.get_by_id(db, t.to_user_id)
+        from_user = user_crud.get_by_id(db, t.from_user_id)
+        return MemberTransferOut(
+            id=t.id,
+            household_id=t.household_id,
+            from_user_id=t.from_user_id,
+            from_user_name=from_user.name if from_user else str(t.from_user_id),
+            to_user_id=t.to_user_id,
+            to_user_name=to_user.name if to_user else str(t.to_user_id),
+            amount=t.amount,
+            currency=t.currency,
+            date=str(t.date),
+            description=t.description,
+            created_at=t.created_at.isoformat(),
+        )
+    except Exception as e:
+        _handle(e)
+
+
+@router.delete("/{household_id}/pending-member-transfers/{pending_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_pending_member_transfer(
+    household_id: uuid.UUID,
+    pending_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cancela una transferencia pendiente (emisor o receptor)."""
+    try:
+        member_transfer_service.cancel_pending(db, current_user, household_id, pending_id)
     except Exception as e:
         _handle(e)
