@@ -20,7 +20,7 @@ from app.exceptions.household_exceptions import (
     SettlementNotAllowed,
     UnauthorizedHouseholdAccess,
 )
-from app.models.household_models import MemberStatus, MemberTransfer
+from app.models.household_models import MemberStatus, MemberTransfer, PendingMemberTransfer
 from app.models.users_models import User
 from app.schemas.transaction_schema import TransactionCreate
 
@@ -217,4 +217,141 @@ def delete(db: Session, actor: User, household_id: uuid.UUID, transfer_id: uuid.
                 tx.is_deleted = True
                 tx.deleted_at = datetime.now(timezone.utc)
     db.delete(t)
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Transferencias pendientes (el receptor elige la cuenta destino)
+# ---------------------------------------------------------------------------
+
+def create_pending(
+    db: Session,
+    actor: User,
+    household_id: uuid.UUID,
+    to_user_id: uuid.UUID,
+    from_account_id: uuid.UUID,
+    amount: Decimal,
+    currency: str,
+    date: PyDate,
+    description: str | None,
+) -> PendingMemberTransfer:
+    """El emisor crea una transferencia sin elegir la cuenta destino del receptor."""
+    _check_member(db, household_id, actor.id)
+    to_member = household_crud.get_member(db, household_id, to_user_id)
+    if not to_member or to_member.status != MemberStatus.ACTIVE or to_user_id == actor.id:
+        raise SettlementNotAllowed("Esa persona no es miembro activo del hogar")
+
+    pending = PendingMemberTransfer(
+        household_id=household_id,
+        from_user_id=actor.id,
+        to_user_id=to_user_id,
+        from_account_id=from_account_id,
+        amount=amount,
+        currency=currency,
+        date=date,
+        description=description,
+    )
+    db.add(pending)
+    db.commit()
+    db.refresh(pending)
+    return pending
+
+
+def list_pending(
+    db: Session,
+    actor: User,
+    household_id: uuid.UUID,
+) -> list[PendingMemberTransfer]:
+    """Devuelve las transferencias pendientes donde el actor es emisor o receptor."""
+    _check_member(db, household_id, actor.id)
+    return (
+        db.query(PendingMemberTransfer)
+        .filter(
+            PendingMemberTransfer.household_id == household_id,
+        )
+        .order_by(PendingMemberTransfer.created_at.desc())
+        .all()
+    )
+
+
+def accept_pending(
+    db: Session,
+    actor: User,
+    household_id: uuid.UUID,
+    pending_id: uuid.UUID,
+    to_account_id: uuid.UUID,
+) -> MemberTransfer:
+    """El receptor acepta la transferencia eligiendo su cuenta destino."""
+    _check_member(db, household_id, actor.id)
+    pending = db.query(PendingMemberTransfer).filter(
+        PendingMemberTransfer.id == pending_id,
+        PendingMemberTransfer.household_id == household_id,
+    ).first()
+    if not pending:
+        from app.exceptions.household_exceptions import SettlementNotFound
+        raise SettlementNotFound("Transferencia pendiente no encontrada")
+    if pending.to_user_id != actor.id:
+        raise SettlementNotAllowed("Solo el receptor puede aceptar esta transferencia")
+
+    from app.crud import user_crud, account_crud
+    from_user = user_crud.get_by_id(db, pending.from_user_id)
+    to_name = actor.name
+
+    from app.services import transaction_service
+    from_concept = _concept(db, pending.from_user_id, TRANSFER_CONCEPT)
+    from_tx = transaction_service.create(db, from_user, TransactionCreate(
+        account_id=pending.from_account_id,
+        concept_id=from_concept.id,
+        amount=pending.amount,
+        type="expense",
+        date=pending.date,
+        description=(pending.description or f"Transferencia a {to_name}")[:100],
+    ))
+
+    to_concept = _concept(db, actor.id, TRANSFER_CONCEPT)
+    to_tx = transaction_service.create(db, actor, TransactionCreate(
+        account_id=to_account_id,
+        concept_id=to_concept.id,
+        amount=pending.amount,
+        type="income",
+        date=pending.date,
+        description=(pending.description or f"Transferencia de {from_user.name if from_user else 'otro miembro'}")[:100],
+    ))
+
+    transfer = MemberTransfer(
+        household_id=household_id,
+        from_user_id=pending.from_user_id,
+        to_user_id=actor.id,
+        amount=pending.amount,
+        currency=pending.currency,
+        date=pending.date,
+        description=pending.description,
+        from_tx_id=from_tx.id,
+        to_tx_id=to_tx.id,
+    )
+    db.add(transfer)
+    db.delete(pending)
+    db.commit()
+    db.refresh(transfer)
+    return transfer
+
+
+def cancel_pending(
+    db: Session,
+    actor: User,
+    household_id: uuid.UUID,
+    pending_id: uuid.UUID,
+) -> None:
+    """Cancela una transferencia pendiente (emisor o receptor pueden cancelar)."""
+    _check_member(db, household_id, actor.id)
+    pending = db.query(PendingMemberTransfer).filter(
+        PendingMemberTransfer.id == pending_id,
+        PendingMemberTransfer.household_id == household_id,
+    ).first()
+    if not pending:
+        from app.exceptions.household_exceptions import SettlementNotFound
+        raise SettlementNotFound("Transferencia pendiente no encontrada")
+    if pending.from_user_id != actor.id and pending.to_user_id != actor.id:
+        raise SettlementNotAllowed("Solo el emisor o receptor pueden cancelar esta transferencia")
+    db.delete(pending)
     db.commit()

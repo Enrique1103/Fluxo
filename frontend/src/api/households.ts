@@ -258,6 +258,57 @@ export const createMemberTransfer = async (householdId: string, payload: {
   return data
 }
 
+// --- Transferencias pendientes ---
+
+export interface PendingMemberTransfer {
+  id: string
+  household_id: string
+  from_user_id: string
+  from_user_name: string
+  to_user_id: string
+  to_user_name: string
+  amount: number
+  currency: string
+  date: string
+  description: string | null
+  created_at: string
+}
+
+/** El emisor inicia una transferencia sin elegir la cuenta del receptor */
+export const createPendingMemberTransfer = async (householdId: string, payload: {
+  to_user_id: string
+  from_account_id: string
+  amount: number
+  currency: string
+  date: string
+  description?: string
+}): Promise<PendingMemberTransfer> => {
+  const { data } = await client.post<PendingMemberTransfer>(`/v1/households/${householdId}/pending-member-transfers`, payload)
+  return data
+}
+
+/** Lista las transferencias pendientes del hogar (emisor y receptor las ven) */
+export const fetchPendingMemberTransfers = async (householdId: string): Promise<PendingMemberTransfer[]> => {
+  const { data } = await client.get<PendingMemberTransfer[]>(`/v1/households/${householdId}/pending-member-transfers`)
+  return data
+}
+
+/** El receptor acepta eligiendo su cuenta destino */
+export const acceptPendingMemberTransfer = async (
+  householdId: string, pendingId: string, toAccountId: string,
+): Promise<MemberTransfer> => {
+  const { data } = await client.post<MemberTransfer>(
+    `/v1/households/${householdId}/pending-member-transfers/${pendingId}/accept`,
+    { to_account_id: toAccountId },
+  )
+  return data
+}
+
+/** Cancela una transferencia pendiente */
+export const cancelPendingMemberTransfer = async (householdId: string, pendingId: string): Promise<void> => {
+  await client.delete(`/v1/households/${householdId}/pending-member-transfers/${pendingId}`)
+}
+
 /** Edita monto, moneda, fecha o descripción de una transferencia entre miembros */
 export const updateMemberTransfer = async (householdId: string, transferId: string, payload: {
   amount?: number

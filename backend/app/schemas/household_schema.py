@@ -224,6 +224,35 @@ class MemberTransferOut(BaseModel):
     created_at: str
 
 
+class PendingMemberTransferIn(BaseModel):
+    """El emisor crea la transferencia pendiente (sin cuenta destino)."""
+    to_user_id: uuid.UUID
+    from_account_id: uuid.UUID
+    amount: Decimal = Field(..., gt=0)
+    currency: str = Field(..., min_length=3, max_length=3)
+    date: PyDate
+    description: str | None = Field(default=None, max_length=200)
+
+
+class AcceptPendingTransferIn(BaseModel):
+    """El receptor acepta eligiendo a qué cuenta entra el dinero."""
+    to_account_id: uuid.UUID
+
+
+class PendingMemberTransferOut(BaseModel):
+    id: uuid.UUID
+    household_id: uuid.UUID
+    from_user_id: uuid.UUID
+    from_user_name: str
+    to_user_id: uuid.UUID
+    to_user_name: str
+    amount: Decimal
+    currency: str
+    date: str
+    description: str | None
+    created_at: str
+
+
 class HouseholdAnalyticsResponse(BaseModel):
     household_id: uuid.UUID
     period: str                             # "YYYY-MM"
