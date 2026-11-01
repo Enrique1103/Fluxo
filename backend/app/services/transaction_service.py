@@ -187,11 +187,11 @@ def _destination_amount(
     return (tx_in.amount * rate).quantize(Decimal("0.01"))
 
 
-def create(db: Session, user: User, tx_in: TransactionCreate) -> Transaction:
+def create(db: Session, user: User, tx_in: TransactionCreate, skip_concept_type_check: bool = False) -> Transaction:
     # 1. Concepto obligatorio (las transferencias sin concepto usan "Transferencia").
     #    La categoría NO se elige: es la categoría del concepto.
     from app.services import concept_service
-    concept = concept_service.resolve_for_transaction(db, user, tx_in.concept_id, tx_in.type)
+    concept = concept_service.resolve_for_transaction(db, user, tx_in.concept_id, tx_in.type, skip_type_check=skip_concept_type_check)
     category_id = concept.category_id
 
     # 3. Validate source account

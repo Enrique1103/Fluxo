@@ -105,7 +105,7 @@ def create(
         type="income",
         date=date,
         description=(description or f"Transferencia de {actor.name}")[:100],
-    ))
+    ), skip_concept_type_check=True)
 
     transfer = MemberTransfer(
         household_id=household_id,
@@ -316,7 +316,7 @@ def accept_pending(
         type="income",
         date=pending.date,
         description=(pending.description or f"Transferencia de {from_user.name if from_user else 'otro miembro'}")[:100],
-    ))
+    ), skip_concept_type_check=True)
 
     transfer = MemberTransfer(
         household_id=household_id,
