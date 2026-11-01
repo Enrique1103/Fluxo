@@ -157,11 +157,14 @@ def resolve_for_transaction(
     user: User,
     concept_id: uuid.UUID | None,
     tx_type: str,
+    skip_type_check: bool = False,
 ) -> Concept:
     """
     Concepto de un movimiento nuevo (o editado): obligatorio, del usuario y
     compatible con el tipo de movimiento. Para transferencias sin concepto se
     usa "Transferencia". La categoría del movimiento es concept.category_id.
+    skip_type_check=True para movimientos internos del sistema (ej. transferencias
+    entre miembros) donde el tipo de movimiento puede diferir del kind de la categoría.
     """
     tx_type = getattr(tx_type, "value", tx_type)
     if concept_id is None:
@@ -174,7 +177,8 @@ def resolve_for_transaction(
         from app.exceptions.transaction_exceptions import ConceptNotBelongsToUser
         raise ConceptNotBelongsToUser("El concepto no pertenece al usuario")
 
-    check_type(concept, tx_type)
+    if not skip_type_check:
+        check_type(concept, tx_type)
     return concept
 
 
