@@ -336,7 +336,7 @@ def get_analytics(
             currency=base_currency,
             transaction_count=concept_counts[cname],
         )
-        for cname, ctotal in sorted(concept_totals.items(), key=lambda x: x[1], reverse=True)[:5]
+        for cname, ctotal in sorted(concept_totals.items(), key=lambda x: x[1], reverse=True)[:10]
     ]
 
     # ── F01: Expenses by day (heatmap) ───────────────────────────────────────
