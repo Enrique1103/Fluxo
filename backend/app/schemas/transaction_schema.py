@@ -94,6 +94,13 @@ class TransactionUpdate(BaseModel):
     household_ids: list[uuid.UUID] | None = None
 
 
+class TransferUpdate(BaseModel):
+    """Campos editables de una transferencia personal (entre cuentas propias)."""
+    amount: Decimal | None = Field(default=None, gt=0)
+    date: PyDate | None = None
+    description: str | None = Field(default=None, max_length=100)
+
+
 # --- Respuesta al frontend ---
 class TransactionResponse(BaseModel):
     id: uuid.UUID
