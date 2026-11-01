@@ -395,8 +395,8 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
 
   const handleCreateAccount = async () => {
     if (!acctName.trim()) { setAcctError('El nombre es requerido'); return }
-    const bal = acctBalance === '' ? 0 : parseFloat(acctBalance)
-    if (isNaN(bal) || bal < 0) { setAcctError('El saldo inicial debe ser un número válido'); return }
+    const bal = acctType === 'credit' ? 0 : (acctBalance === '' ? 0 : parseFloat(acctBalance))
+    if (isNaN(bal) || (acctType !== 'investment' && bal < 0)) { setAcctError('El saldo inicial debe ser un número válido'); return }
     if (acctType === 'credit') {
       const lim = parseFloat(acctLimit)
       if (isNaN(lim) || lim <= 0) { setAcctError('El límite de crédito debe ser mayor a 0'); return }
@@ -604,7 +604,7 @@ export default function TransactionModal({ open, onClose, editTxId }: Props) {
               {acctType !== 'credit' && (
                 <div>
                   <label className={labelClass}>Saldo inicial</label>
-                  <input type="number" min="0" step="0.01" value={acctBalance}
+                  <input type="number" step="0.01" {...(acctType !== 'investment' ? { min: '0' } : {})} value={acctBalance}
                     onChange={e => setAcctBalance(e.target.value)} placeholder="0.00" className={inputClass} />
                 </div>
               )}
