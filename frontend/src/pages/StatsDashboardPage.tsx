@@ -25,6 +25,7 @@ import type { Budget } from '../api/budgets'
 import SettingsDrawer from '../components/SettingsDrawer'
 import TransactionModal from '../components/TransactionModal'
 import DeleteTransactionModal from '../components/DeleteTransactionModal'
+import EditTransferModal from '../components/EditTransferModal'
 import FAB from '../components/FAB'
 import VoiceExpenseModal from '../components/VoiceExpenseModal'
 import { invalidateFinancialData } from '../lib/queryClient'
@@ -101,7 +102,7 @@ function TxTable({
   privacy: boolean
   currency: string
   onDelete?: (id: string, scope?: 'personal' | 'household') => Promise<void>
-  onEdit?: (id: string) => void
+  onEdit?: (id: string, type?: string) => void
   onConfirmOpenChange?: (open: boolean) => void
   categoryFilter?: string | null
 }) {
@@ -512,7 +513,7 @@ function TxTable({
                   </span>
                   <div className="flex items-center gap-0.5 -mr-1.5">
                     {onEdit && (
-                      <button onClick={() => onEdit(tx.id)} aria-label="Editar"
+                      <button onClick={() => onEdit(tx.id, tx.type)} aria-label="Editar"
                         className="p-1.5 text-slate-500 active:text-emerald-400">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
@@ -575,7 +576,7 @@ function TxTable({
                     <div className="flex items-center justify-end gap-1">
                       {onEdit && (
                         <button
-                          onClick={() => onEdit(tx.id)}
+                          onClick={() => onEdit(tx.id, tx.type)}
                           className="p-1 text-slate-700 hover:text-emerald-400 transition-colors"
                           title="Editar"
                         >
@@ -676,6 +677,7 @@ export default function StatsDashboardPage() {
   const [settingsOpen,      setSettingsOpen]      = useState(false)
   const [txModalOpen,       setTxModalOpen]       = useState(false)
   const [editTxId,          setEditTxId]          = useState<string | undefined>(undefined)
+  const [editTransfer,      setEditTransfer]      = useState<{ id: string; amount: number; date: string; description: string | null; account_name: string; transfer_dest_name: string | null } | null>(null)
   const [voiceOpen,         setVoiceOpen]         = useState(false)
   const [txConfirmOpen,     setTxConfirmOpen]     = useState(false)
   const [selectedCategory,  setSelectedCategory]  = useState<string | null>(null)
@@ -1163,7 +1165,14 @@ export default function StatsDashboardPage() {
             currency={currency}
             categoryFilter={groupBy === 'category' ? selectedCategory : null}
             onConfirmOpenChange={setTxConfirmOpen}
-            onEdit={id => { setEditTxId(id); setTxModalOpen(true) }}
+            onEdit={(id, type) => {
+              if (type === 'transfer') {
+                const tx = breakdown?.transactions.find(t => t.id === id)
+                if (tx) setEditTransfer({ id: tx.id, amount: tx.amount, date: tx.date, description: tx.description, account_name: tx.account_name, transfer_dest_name: tx.transfer_dest_name })
+              } else {
+                setEditTxId(id); setTxModalOpen(true)
+              }
+            }}
             onDelete={async (id, scope = 'personal') => {
               await deleteTransaction(id, scope)
               await invalidateFinancialData(queryClient)
@@ -1192,6 +1201,7 @@ export default function StatsDashboardPage() {
       onClose={() => { setTxModalOpen(false); setEditTxId(undefined) }}
     />
     <VoiceExpenseModal open={voiceOpen} onClose={() => setVoiceOpen(false)} />
+    <EditTransferModal transfer={editTransfer} onClose={() => setEditTransfer(null)} />
     </>
   )
 }

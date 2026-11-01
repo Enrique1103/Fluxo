@@ -466,6 +466,61 @@ def update(db: Session, user: User, tx_id: uuid.UUID, tx_update: TransactionUpda
     return tx
 
 
+def update_transfer(
+    db: Session,
+    user: User,
+    tx_id: uuid.UUID,
+    amount: Decimal | None = None,
+    date: PyDate | None = None,
+    description: str | None = None,
+) -> Transaction:
+    """Edita monto, fecha o descripción de una transferencia personal entre cuentas propias."""
+    source_tx = _get_owned_tx(db, tx_id, user.id)
+    if source_tx.transfer_role != TransferRole.SOURCE:
+        raise TransferEditNotAllowed("Solo se puede editar la transferencia desde la pata de origen")
+
+    dest_tx = None
+    if source_tx.transfer_id:
+        dest_tx = (
+            db.query(Transaction)
+            .filter(Transaction.id == source_tx.transfer_id, Transaction.is_deleted == False)  # noqa: E712
+            .first()
+        )
+
+    if amount is not None and amount != source_tx.amount:
+        source_account = account_crud.get_by_id(db, source_tx.account_id)
+        delta = amount - source_tx.amount
+        if delta > 0:
+            _apply_expense(source_account, delta)
+        else:
+            _reverse_expense(source_account, -delta)
+        source_tx.amount = amount
+
+        if dest_tx:
+            dest_account = account_crud.get_by_id(db, dest_tx.account_id)
+            old_dest = dest_tx.amount
+            dest_delta = amount - old_dest
+            if dest_delta > 0:
+                _apply_income(dest_account, dest_delta)
+            else:
+                _reverse_income(dest_account, -dest_delta)
+            dest_tx.amount = amount
+
+    if date is not None:
+        source_tx.date = date
+        if dest_tx:
+            dest_tx.date = date
+
+    if description is not None:
+        source_tx.description = description.strip()[:100] if description.strip() else None
+        if dest_tx:
+            dest_tx.description = source_tx.description
+
+    db.commit()
+    db.refresh(source_tx)
+    return source_tx
+
+
 def _set_households(db: Session, user: User, tx: Transaction, requested: list[uuid.UUID]) -> None:
     """Sincroniza la tabla junction con los hogares pedidos (solo hogares donde el usuario es miembro activo)."""
     from app.crud import household_crud
