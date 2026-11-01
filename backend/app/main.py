@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -116,9 +117,12 @@ _DEFAULT_ORIGINS = "https://fluxo-sage.vercel.app,http://localhost:5173,http://l
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip()]
 
 
-@app.get("/health")
+# GET y HEAD: los monitores gratuitos (cron-job.org, UptimeRobot) suelen usar HEAD.
+# También se publica en /api/v1/health para que el frontend lo llame con su misma base.
+@app.api_route("/health", methods=["GET", "HEAD"])
+@app.api_route("/api/v1/health", methods=["GET", "HEAD"])
 def health_check():
-    """Ping a la DB para mantener Supabase activo."""
+    """Ping a la DB para mantener Supabase activo y despertar el backend de Render."""
     db = next(get_db())
     try:
         db.execute(text("SELECT 1"))
@@ -126,11 +130,13 @@ def health_check():
     finally:
         db.close()
 
+# Las vistas previas de Vercel (fluxo-xxxx.vercel.app) también son del proyecto
+CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", r"https://fluxo-[a-z0-9-]+\.vercel\.app")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    # Las vistas previas de Vercel (fluxo-xxxx.vercel.app) también son del proyecto
-    allow_origin_regex=os.getenv("CORS_ORIGIN_REGEX", r"https://fluxo-[a-z0-9-]+\.vercel\.app"),
+    allow_origin_regex=CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
@@ -154,10 +160,18 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     from fastapi.responses import JSONResponse
     # El detalle va al log; al usuario no se le muestra nada interno
     logging.getLogger("fluxo").exception("Error no controlado en %s %s", request.method, request.url.path)
-    return JSONResponse(
+    response = JSONResponse(
         status_code=500,
         content={"detail": "Error interno del servidor. Probá de nuevo en un momento."},
     )
+    # Este handler corre por fuera del middleware de CORS: sin estos headers el navegador
+    # descarta la respuesta y el frontend muestra "No se pudo conectar con el servidor".
+    origin = request.headers.get("origin")
+    if origin and (origin in CORS_ORIGINS or re.fullmatch(CORS_ORIGIN_REGEX, origin)):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Vary"] = "Origin"
+    return response
 
 # ---------------------------------------------------------------------------
 # Exception handlers
