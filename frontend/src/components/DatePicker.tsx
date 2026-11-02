@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 
 interface DatePickerProps {
@@ -24,6 +25,8 @@ function toISO(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+interface PopupPos { top?: number; bottom?: number; left: number; width: number }
+
 export default function DatePicker({
   value,
   onChange,
@@ -37,8 +40,9 @@ export default function DatePicker({
   const [open, setOpen] = useState(false)
   const [viewYear,  setViewYear]  = useState(selected?.getFullYear()  ?? today.getFullYear())
   const [viewMonth, setViewMonth] = useState(selected?.getMonth()     ?? today.getMonth())
-  const ref     = useRef<HTMLDivElement>(null)
-  const [flipUp, setFlipUp] = useState(false)
+  const [pos, setPos] = useState<PopupPos>({ top: 0, left: 0, width: 288 })
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const popupRef   = useRef<HTMLDivElement>(null)
 
   // Sync view when value changes externally
   useEffect(() => {
@@ -52,11 +56,28 @@ export default function DatePicker({
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (
+        triggerRef.current && !triggerRef.current.contains(e.target as Node) &&
+        popupRef.current   && !popupRef.current.contains(e.target as Node)
+      ) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
+
+  const calcPos = () => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const popupH = 320
+    const spaceBelow = window.innerHeight - rect.bottom
+    const newPos: PopupPos = { left: rect.left, width: Math.max(rect.width, 288) }
+    if (spaceBelow >= popupH || spaceBelow >= rect.top) {
+      newPos.top = rect.bottom + 6
+    } else {
+      newPos.bottom = window.innerHeight - rect.top + 6
+    }
+    setPos(newPos)
+  }
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
@@ -99,16 +120,93 @@ export default function DatePicker({
     today.getMonth()    === viewMonth &&
     today.getDate()     === day
 
+  const popup = open ? (
+    <div
+      ref={popupRef}
+      className="fixed z-[9999] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4"
+      style={{
+        top:    pos.top    !== undefined ? pos.top    : undefined,
+        bottom: pos.bottom !== undefined ? pos.bottom : undefined,
+        left:   pos.left,
+        width:  pos.width,
+        minWidth: 288,
+      }}
+    >
+      {/* Month/year navigation */}
+      <div className="flex items-center justify-between mb-3">
+        <button type="button" onClick={prevMonth}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-sm font-semibold text-slate-200">
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </span>
+        <button type="button" onClick={nextMonth}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Day names */}
+      <div className="grid grid-cols-7 mb-1">
+        {DAY_NAMES.map(d => (
+          <div key={d} className="text-center text-[10px] font-semibold text-slate-600 py-1 uppercase tracking-wide">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Days */}
+      <div className="grid grid-cols-7 gap-y-0.5">
+        {Array.from({ length: startOffset }).map((_, i) => <div key={`pad-${i}`} />)}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1
+          const sel = isSel(day)
+          const tod = isTod(day)
+          return (
+            <button
+              key={day}
+              type="button"
+              onClick={() => handleDay(day)}
+              className={`
+                w-full aspect-square flex items-center justify-center rounded-lg text-xs font-medium transition-all
+                ${sel
+                  ? 'bg-emerald-500 text-white font-bold shadow-md shadow-emerald-500/30'
+                  : tod
+                  ? 'ring-1 ring-emerald-500/60 text-emerald-500 font-semibold'
+                  : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                }
+              `}
+            >
+              {day}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-3 pt-3 border-t border-slate-800 flex justify-between items-center">
+        <button type="button" onClick={handleToday}
+          className="text-xs text-emerald-400 hover:text-emerald-300 font-medium transition-colors">
+          Hoy
+        </button>
+        {value && (
+          <button type="button" onClick={() => { onChange(''); setOpen(false) }}
+            className="text-xs text-slate-600 hover:text-slate-400 transition-colors">
+            Limpiar
+          </button>
+        )}
+      </div>
+    </div>
+  ) : null
+
   return (
-    <div ref={ref} className={`relative ${className}`}>
-      {/* Trigger */}
+    <div className={`relative ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => {
-          if (!open && ref.current) {
-            const rect = ref.current.getBoundingClientRect()
-            setFlipUp(rect.bottom + 320 > window.innerHeight)
-          }
+          if (!open) calcPos()
           setOpen(o => !o)
         }}
         className="w-full flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-emerald-500/60 hover:border-slate-600 transition-colors text-left text-slate-200"
@@ -119,78 +217,7 @@ export default function DatePicker({
         </span>
       </button>
 
-      {/* Calendar popup */}
-      {open && (
-        <div className="absolute z-50 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4"
-          style={flipUp ? { bottom: 'calc(100% + 6px)', left: 0 } : { top: 'calc(100% + 6px)', left: 0 }}>
-
-          {/* Month/year navigation */}
-          <div className="flex items-center justify-between mb-3">
-            <button type="button" onClick={prevMonth}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-sm font-semibold text-slate-200">
-              {MONTH_NAMES[viewMonth]} {viewYear}
-            </span>
-            <button type="button" onClick={nextMonth}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Day names */}
-          <div className="grid grid-cols-7 mb-1">
-            {DAY_NAMES.map(d => (
-              <div key={d} className="text-center text-[10px] font-semibold text-slate-600 py-1 uppercase tracking-wide">
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Days */}
-          <div className="grid grid-cols-7 gap-y-0.5">
-            {Array.from({ length: startOffset }).map((_, i) => <div key={`pad-${i}`} />)}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1
-              const sel = isSel(day)
-              const tod = isTod(day)
-              return (
-                <button
-                  key={day}
-                  type="button"
-                  onClick={() => handleDay(day)}
-                  className={`
-                    w-full aspect-square flex items-center justify-center rounded-lg text-xs font-medium transition-all
-                    ${sel
-                      ? 'bg-emerald-500 text-white font-bold shadow-md shadow-emerald-500/30'
-                      : tod
-                      ? 'ring-1 ring-emerald-500/60 text-emerald-500 font-semibold'
-                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                    }
-                  `}
-                >
-                  {day}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Footer */}
-          <div className="mt-3 pt-3 border-t border-slate-800 flex justify-between items-center">
-            <button type="button" onClick={handleToday}
-              className="text-xs text-emerald-400 hover:text-emerald-300 font-medium transition-colors">
-              Hoy
-            </button>
-            {value && (
-              <button type="button" onClick={() => { onChange(''); setOpen(false) }}
-                className="text-xs text-slate-600 hover:text-slate-400 transition-colors">
-                Limpiar
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {typeof document !== 'undefined' && createPortal(popup, document.body)}
     </div>
   )
 }
