@@ -13,7 +13,7 @@ interface Props {
 }
 
 const fmt = (n: number, currency: string) =>
-  `${currency} ${n.toLocaleString('es-UY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  `${currency} ${n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 function parseErr(err: unknown, fallback: string): string {
   const e = err as { response?: { data?: { detail?: unknown } } }

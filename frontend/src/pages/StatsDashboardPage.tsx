@@ -29,6 +29,7 @@ import EditTransferModal from '../components/EditTransferModal'
 import FAB from '../components/FAB'
 import VoiceExpenseModal from '../components/VoiceExpenseModal'
 import { invalidateFinancialData } from '../lib/queryClient'
+import { exportTransactionsCSV } from '../lib/exportCSV'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ const MONTH_SHORT: Record<string, string> = {
 function fmtMoney(n: number, currency = 'UYU', privacy = false) {
   if (privacy) return '****'
   return new Intl.NumberFormat('es-UY', {
-    style: 'currency', currency, maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol',
+    style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2, currencyDisplay: 'narrowSymbol',
   }).format(n)
 }
 
@@ -96,7 +97,7 @@ const ALL_PAYMENT_METHODS: PaymentMethod[] = [
 ]
 
 function TxTable({
-  transactions, privacy, currency, onDelete, onEdit, onConfirmOpenChange, categoryFilter,
+  transactions, privacy, currency, onDelete, onEdit, onConfirmOpenChange, categoryFilter, year, month,
 }: {
   transactions: MonthlyBreakdown['transactions']
   privacy: boolean
@@ -105,6 +106,8 @@ function TxTable({
   onEdit?: (id: string, type?: string) => void
   onConfirmOpenChange?: (open: boolean) => void
   categoryFilter?: string | null
+  year?: number
+  month?: number
 }) {
   const queryClient = useQueryClient()
   const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all')
@@ -461,6 +464,16 @@ function TxTable({
         )}
 
         <span className="ml-auto text-sm text-slate-600 self-center">{filtered.length} movimientos</span>
+        {year && month && filtered.length > 0 && (
+          <button
+            onClick={() => exportTransactionsCSV(filtered, year, month)}
+            title="Exportar a Excel/CSV"
+            className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            Excel
+          </button>
+        )}
       </div>
 
       {/* Búsqueda */}
@@ -1164,6 +1177,8 @@ export default function StatsDashboardPage() {
             privacy={privacy}
             currency={currency}
             categoryFilter={groupBy === 'category' ? selectedCategory : null}
+            year={year}
+            month={month}
             onConfirmOpenChange={setTxConfirmOpen}
             onEdit={(id, type) => {
               if (type === 'transfer') {

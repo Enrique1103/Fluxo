@@ -36,6 +36,7 @@ import SettingsDrawer from '../components/SettingsDrawer'
 import MonthYearPicker from '../components/MonthYearPicker'
 import ExportButton from '../components/ExportButton'
 import { exportHouseholdPDF } from '../lib/exportPDF'
+import { exportSharedExpensesCSV, exportMemberTransfersCSV } from '../lib/exportCSV'
 import { useHomeCurrency } from '../hooks/useHomeCurrency'
 import {
   MONTH_NAMES, DONUT_COLORS, avatarPalette, fmtNum,
@@ -236,7 +237,7 @@ export default function HouseholdPage() {
   const GOAL_COLORS = ['bg-indigo-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-sky-500']
   const fmtGoalAmount = (goal: FinGoal, n: number) =>
     privacy ? '••••' : new Intl.NumberFormat('es-UY', {
-      style: 'currency', currency: goal.currency, maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol',
+      style: 'currency', currency: goal.currency, minimumFractionDigits: 2, maximumFractionDigits: 2, currencyDisplay: 'narrowSymbol',
     }).format(n)
 
   const now = new Date()
@@ -693,12 +694,24 @@ export default function HouseholdPage() {
                         <p className="text-sm font-semibold text-slate-200">Transferencias entre miembros</p>
                         <p className="text-xs text-slate-500 mt-0.5">{MONTH_NAMES[month - 1]} {year}</p>
                       </div>
-                      <button
-                        onClick={() => setTransferOpen(true)}
-                        className="shrink-0 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-semibold transition-all"
-                      >
-                        + Nueva
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {analytics?.member_transfers && analytics.member_transfers.length > 0 && (
+                          <button
+                            onClick={() => exportMemberTransfersCSV(analytics.member_transfers, year, month, household.name)}
+                            title="Exportar a Excel/CSV"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-emerald-400 rounded-xl text-xs font-semibold transition-all"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                            Excel
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setTransferOpen(true)}
+                          className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-semibold transition-all"
+                        >
+                          + Nueva
+                        </button>
+                      </div>
                     </div>
                     {analyticsLoading ? (
                       <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-slate-600" /></div>
@@ -1451,6 +1464,16 @@ export default function HouseholdPage() {
                                   ({displayed.length}{(filterMember || filterCategory || filterSearch || filterAmount) ? ` de ${analytics.shared_expenses.length}` : ''})
                                 </span>
                               </p>
+                              {displayed.length > 0 && (
+                                <button
+                                  onClick={() => exportSharedExpensesCSV(displayed, year, month, household.name)}
+                                  title="Exportar a Excel/CSV"
+                                  className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                                  Excel
+                                </button>
+                              )}
                             </div>
 
                             {/* Dropdowns: Miembro + Categoría */}
