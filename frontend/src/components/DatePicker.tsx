@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 
@@ -71,13 +71,19 @@ export default function DatePicker({
     const popupH = 320
     const spaceBelow = window.innerHeight - rect.bottom
     const newPos: PopupPos = { left: rect.left, width: Math.max(rect.width, 288) }
-    if (spaceBelow >= popupH || spaceBelow >= rect.top) {
+    if (spaceBelow >= popupH) {
       newPos.top = rect.bottom + 6
     } else {
       newPos.bottom = window.innerHeight - rect.top + 6
     }
     setPos(newPos)
   }
+
+  // Recalculate after render so the element has its final layout position
+  useLayoutEffect(() => {
+    if (open) calcPos()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
@@ -205,10 +211,7 @@ export default function DatePicker({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => {
-          if (!open) calcPos()
-          setOpen(o => !o)
-        }}
+        onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-emerald-500/60 hover:border-slate-600 transition-colors text-left text-slate-200"
       >
         <CalendarDays className="w-4 h-4 text-slate-500 shrink-0" />
