@@ -27,7 +27,7 @@ export function avatarPalette(name: string) {
 }
 
 export function fmtNum(n: number) {
-  return n.toLocaleString('es-UY', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+  return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export function parseErr(err: unknown, fallback: string): string {

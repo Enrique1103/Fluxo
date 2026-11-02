@@ -38,7 +38,7 @@ export default function FlagModal({ householdId, transaction, onClose }: Props) 
   })
 
   const fmt = (n: number) =>
-    n.toLocaleString('es-UY', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

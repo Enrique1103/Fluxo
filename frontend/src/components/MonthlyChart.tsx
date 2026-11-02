@@ -19,7 +19,7 @@ function fmtMonth(iso: string) {
 function fmtMoney(n: number, currency = 'UYU', privacy = false) {
   if (privacy) return '****'
   return new Intl.NumberFormat('es-UY', {
-    style: 'currency', currency, maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol',
+    style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2, currencyDisplay: 'narrowSymbol',
   }).format(n)
 }
 

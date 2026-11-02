@@ -24,7 +24,7 @@ type Props =
       otherName: string; amount: number; currency: string
     }
 
-const fmt = (n: number) => n.toLocaleString('es-UY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+const fmt = (n: number) => n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const today = () => new Date().toLocaleDateString('en-CA')
 
 function parseErr(err: unknown, fallback: string): string {

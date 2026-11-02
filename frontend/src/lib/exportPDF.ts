@@ -65,7 +65,7 @@ const C = {
 function fmt(n: number, currency = 'UYU') {
   return new Intl.NumberFormat('es-UY', {
     style: 'currency', currency,
-    maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol',
+    minimumFractionDigits: 2, maximumFractionDigits: 2, currencyDisplay: 'narrowSymbol',
   }).format(n)
 }
 
