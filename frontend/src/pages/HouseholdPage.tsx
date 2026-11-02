@@ -697,7 +697,7 @@ export default function HouseholdPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         {analytics?.member_transfers && analytics.member_transfers.length > 0 && (
                           <button
-                            onClick={() => exportMemberTransfersCSV(analytics.member_transfers, year, month, household.name)}
+                            onClick={() => exportMemberTransfersCSV(analytics.member_transfers ?? [], year, month, household.name)}
                             title="Exportar a Excel/CSV"
                             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-emerald-400 rounded-xl text-xs font-semibold transition-all"
                           >
