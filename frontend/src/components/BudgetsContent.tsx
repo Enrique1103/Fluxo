@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Pencil, Loader2, Target, Copy } from 'lucide-react'
+import { Plus, Trash2, Pencil, Loader2, Target, Copy, ChevronDown, ChevronUp } from 'lucide-react'
 import { fetchBudgets, createBudget, updateBudget, deleteBudget, saveBudgetsBulk } from '../api/budgets'
 import type { Budget } from '../api/budgets'
 import { fetchCategories, fetchConcepts, kindAllows } from '../api/dashboard'
@@ -216,8 +216,10 @@ function AddForm({ onDone, currency, initialMonth, initialYear }: AddFormProps) 
 
 function BudgetRow({ budget, nested = false }: { budget: Budget; nested?: boolean }) {
   const qc = useQueryClient()
-  const [editing, setEditing] = useState(false)
-  const [amount, setAmount]   = useState(String(Number(budget.max_amount)))
+  const [editing,  setEditing]  = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [amount,   setAmount]   = useState(String(Number(budget.max_amount)))
+  const isMultiCat = !budget.concept_id && (budget.extra_category_ids?.length ?? 0) > 0
 
   const pct = budget.max_amount > 0 ? Math.min((budget.spent / budget.max_amount) * 100, 100) : 0
 
@@ -238,16 +240,25 @@ function BudgetRow({ budget, nested = false }: { budget: Budget; nested?: boolea
           <p className={`font-medium truncate ${nested ? 'text-xs text-slate-300' : 'text-sm text-slate-200'}`}>
             {budget.concept_name ?? budget.name ?? budgetDisplayName(budget)}
           </p>
-          <p className="text-[10px] text-slate-500 truncate">
+          <p className="text-[10px] text-slate-500">
             {budget.concept_id
               ? `Concepto · ${budget.category_name}`
-              : (budget.extra_category_ids?.length > 0
-                  ? [budget.category_name, ...budget.extra_category_names].join(' + ')
+              : (isMultiCat
+                  ? `${1 + budget.extra_category_ids.length} categorías`
                   : 'Toda la categoría')
             } · {budget.currency}
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {isMultiCat && (
+            <button
+              onClick={() => setExpanded(e => !e)}
+              title="Ver categorías"
+              className="p-1.5 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+            >
+              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          )}
           <button
             onClick={() => setEditing(e => !e)}
             className="p-1.5 rounded-lg text-slate-600 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
@@ -263,6 +274,16 @@ function BudgetRow({ budget, nested = false }: { budget: Budget; nested?: boolea
           </button>
         </div>
       </div>
+
+      {isMultiCat && expanded && (
+        <div className="mb-2 flex flex-wrap gap-1">
+          {[budget.category_name, ...budget.extra_category_names].map(name => (
+            <span key={name} className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] text-slate-400 border border-slate-700">
+              {name}
+            </span>
+          ))}
+        </div>
+      )}
 
       {editing ? (
         <div className="flex gap-2 mb-2">
