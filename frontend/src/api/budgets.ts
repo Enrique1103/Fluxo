@@ -44,8 +44,15 @@ export const createBudget = async (payload: BudgetCreate): Promise<Budget> => {
   return data
 }
 
-export const updateBudget = async (id: string, max_amount: number): Promise<Budget> => {
-  const { data } = await client.patch<Budget>(`/v1/budgets/${id}`, { max_amount })
+export interface BudgetUpdate {
+  max_amount: number
+  category_id?: string
+  extra_category_ids?: string[]
+  name?: string | null
+}
+
+export const updateBudget = async (id: string, payload: BudgetUpdate): Promise<Budget> => {
+  const { data } = await client.patch<Budget>(`/v1/budgets/${id}`, payload)
   return data
 }
 

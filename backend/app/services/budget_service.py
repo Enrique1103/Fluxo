@@ -232,7 +232,7 @@ def update(db: Session, user_id: uuid.UUID, budget_id: uuid.UUID, payload: Budge
     if budget.user_id != user_id:
         raise UnauthorizedBudgetAccess("Sin acceso a este presupuesto")
     try:
-        budget_crud.update(db, budget, payload.max_amount)
+        budget_crud.update(db, budget, payload.max_amount, payload.category_id, payload.extra_category_ids, payload.name)
         db.commit()
         db.refresh(budget)
         return _to_response(db, budget)

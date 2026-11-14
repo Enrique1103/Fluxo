@@ -52,8 +52,20 @@ def get_duplicate(
     return q.first()
 
 
-def update(db: Session, budget: Budget, max_amount) -> Budget:
+def update(db: Session, budget: Budget, max_amount, category_id=None, extra_category_ids=None, name=None) -> Budget:
+    import uuid as _uuid
     budget.max_amount = max_amount
+    if category_id is not None:
+        budget.category_id = category_id if isinstance(category_id, _uuid.UUID) else _uuid.UUID(str(category_id))
+    if extra_category_ids is not None:
+        from app.models.budget_models import BudgetCategory
+        for ec in list(budget.extra_categories):
+            db.delete(ec)
+        db.flush()
+        for cat_id in extra_category_ids:
+            db.add(BudgetCategory(budget_id=budget.id, category_id=cat_id if isinstance(cat_id, _uuid.UUID) else _uuid.UUID(str(cat_id))))
+    if name is not None:
+        budget.name = name if name.strip() else None
     db.flush()
     return budget
 

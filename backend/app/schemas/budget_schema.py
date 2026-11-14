@@ -48,6 +48,9 @@ class BudgetCreate(BaseModel):
 
 class BudgetUpdate(BaseModel):
     max_amount: Decimal
+    category_id: uuid.UUID | None = None
+    extra_category_ids: list[uuid.UUID] | None = None
+    name: str | None = None
 
     @field_validator("max_amount")
     @classmethod

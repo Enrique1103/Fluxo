@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Pencil, Loader2, Target, Copy, ChevronDown, ChevronUp } from 'lucide-react'
 import { fetchBudgets, createBudget, updateBudget, deleteBudget, saveBudgetsBulk } from '../api/budgets'
 import type { Budget } from '../api/budgets'
+import type { BudgetUpdate } from '../api/budgets'
 import { fetchCategories, fetchConcepts, kindAllows } from '../api/dashboard'
 import { useHomeCurrency } from '../hooks/useHomeCurrency'
 
@@ -216,16 +217,35 @@ function AddForm({ onDone, currency, initialMonth, initialYear }: AddFormProps) 
 
 function BudgetRow({ budget, nested = false }: { budget: Budget; nested?: boolean }) {
   const qc = useQueryClient()
-  const [editing,  setEditing]  = useState(false)
-  const [expanded, setExpanded] = useState(false)
-  const [amount,   setAmount]   = useState(String(Number(budget.max_amount)))
+  const [editing,       setEditing]       = useState(false)
+  const [expanded,      setExpanded]      = useState(false)
+  const [amount,        setAmount]        = useState(String(Number(budget.max_amount)))
+  const [editCatIds,    setEditCatIds]    = useState<string[]>([budget.category_id, ...budget.extra_category_ids])
+  const [editName,      setEditName]      = useState(budget.name ?? '')
   const isMultiCat = !budget.concept_id && (budget.extra_category_ids?.length ?? 0) > 0
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: fetchCategories,
+    enabled: editing && !budget.concept_id,
+  })
+  const expenseCats = categories.filter(c => !c.is_system && kindAllows(c.kind, 'expense'))
+  const toggleEditCat = (id: string) =>
+    setEditCatIds(prev => prev.includes(id) ? (prev.length > 1 ? prev.filter(x => x !== id) : prev) : [...prev, id])
 
   const pct = budget.max_amount > 0 ? Math.min((budget.spent / budget.max_amount) * 100, 100) : 0
 
   const updateMut = useMutation({
-    mutationFn: () => updateBudget(budget.id, parseFloat(amount)),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['budgets'] }); setEditing(false) },
+    mutationFn: () => {
+      const payload: BudgetUpdate = { max_amount: parseFloat(amount) }
+      if (!budget.concept_id && editCatIds.length > 0) {
+        payload.category_id = editCatIds[0]
+        payload.extra_category_ids = editCatIds.slice(1)
+        payload.name = editCatIds.length > 1 ? (editName.trim() || null) : null
+      }
+      return updateBudget(budget.id, payload)
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['budgets'] }); setEditing(false) },
   })
 
   const deleteMut = useMutation({
@@ -286,20 +306,54 @@ function BudgetRow({ budget, nested = false }: { budget: Budget; nested?: boolea
       )}
 
       {editing ? (
-        <div className="flex gap-2 mb-2">
-          <input
-            type="number"
-            value={amount}
-            onChange={e => setAmount(e.target.value)}
-            className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-500/60"
-          />
-          <button
-            onClick={() => updateMut.mutate()}
-            disabled={updateMut.isPending}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500 text-white hover:bg-indigo-400 disabled:opacity-50"
-          >
-            {updateMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Guardar'}
-          </button>
+        <div className="mb-2 space-y-2">
+          {!budget.concept_id && (
+            <div className="bg-slate-900/60 border border-slate-700/60 rounded-xl p-2.5">
+              <p className="text-[10px] text-slate-500 mb-1.5">Categorías</p>
+              <div className="flex flex-wrap gap-1">
+                {expenseCats.map(cat => {
+                  const checked = editCatIds.includes(cat.id)
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => toggleEditCat(cat.id)}
+                      className={`px-2 py-0.5 rounded-full text-[10px] border transition-colors ${
+                        checked
+                          ? 'bg-indigo-500/20 border-indigo-500/60 text-indigo-300'
+                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          {!budget.concept_id && editCatIds.length > 1 && (
+            <input
+              type="text"
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              placeholder="Nombre del presupuesto (opcional)"
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-500/60 placeholder:text-slate-600"
+            />
+          )}
+          <div className="flex gap-2">
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-500/60"
+            />
+            <button
+              onClick={() => updateMut.mutate()}
+              disabled={updateMut.isPending}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500 text-white hover:bg-indigo-400 disabled:opacity-50"
+            >
+              {updateMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Guardar'}
+            </button>
+          </div>
         </div>
       ) : null}
 
