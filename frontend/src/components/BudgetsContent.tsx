@@ -36,31 +36,44 @@ const inputCls = 'w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py
 
 function AddForm({ onDone, currency, initialMonth, initialYear }: AddFormProps) {
   const qc = useQueryClient()
-  const [categoryId,     setCategoryId]     = useState('')
-  const [extraCatIds,    setExtraCatIds]    = useState<string[]>([])
+  // For 'category' scope: ordered list of selected category IDs (first = category_id for backend)
+  const [selectedCatIds, setSelectedCatIds] = useState<string[]>([])
+  // For 'concept' scope: single category to filter concepts
+  const [singleCatId,    setSingleCatId]    = useState('')
   const [scope,          setScope]          = useState<'category' | 'concept'>('category')
   const [conceptId,      setConceptId]      = useState('')
   const [budgetName,     setBudgetName]     = useState('')
-  const [month,      setMonth]      = useState(initialMonth)
-  const [year,       setYear]       = useState(initialYear)
-  const [amount,     setAmount]     = useState('')
-  const [cur,        setCur]        = useState(currency)
-  const [error,      setError]      = useState<string | null>(null)
+  const [month,  setMonth]  = useState(initialMonth)
+  const [year,   setYear]   = useState(initialYear)
+  const [amount, setAmount] = useState('')
+  const [cur,    setCur]    = useState(currency)
+  const [error,  setError]  = useState<string | null>(null)
 
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories })
   const { data: concepts = [] }   = useQuery({ queryKey: ['concepts'],   queryFn: fetchConcepts })
 
   const expenseCategories = categories.filter(c => !c.is_system && kindAllows(c.kind, 'expense'))
   const categoryConcepts  = concepts
-    .filter(c => c.category_id === categoryId && !c.is_refund)
+    .filter(c => c.category_id === singleCatId && !c.is_refund)
     .sort((a, b) => a.name.localeCompare(b.name))
+
+  const toggleCat = (id: string) =>
+    setSelectedCatIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+  // first selected = category_id for backend; rest = extra_category_ids
+  const categoryId  = scope === 'category' ? (selectedCatIds[0] ?? '') : singleCatId
+  const extraCatIds = scope === 'category' ? selectedCatIds.slice(1) : []
+
+  const isValid = scope === 'concept'
+    ? (singleCatId && conceptId && amount)
+    : (selectedCatIds.length > 0 && amount)
 
   const mutation = useMutation({
     mutationFn: () => createBudget({
       category_id: categoryId,
-      extra_category_ids: scope === 'category' ? extraCatIds : [],
+      extra_category_ids: extraCatIds,
       concept_id: scope === 'concept' ? conceptId : null,
-      name: scope === 'category' && extraCatIds.length > 0 ? (budgetName || null) : null,
+      name: scope === 'category' && selectedCatIds.length > 1 ? (budgetName || null) : null,
       month, year,
       max_amount: parseFloat(amount),
       currency: cur,
@@ -79,32 +92,16 @@ function AddForm({ onDone, currency, initialMonth, initialYear }: AddFormProps) 
       <p className="text-xs font-semibold text-slate-300">Nuevo presupuesto</p>
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="col-span-2">
-          <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Categoría principal</label>
-          <select
-            value={categoryId}
-            onChange={e => { setCategoryId(e.target.value); setConceptId(''); setExtraCatIds([]) }}
-            className={inputCls}
-          >
-            <option value="">Seleccioná una categoría</option>
-            {expenseCategories.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-
+        {/* Scope toggle */}
         <div className="col-span-2">
           <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Aplicar a</label>
           <div className="grid grid-cols-2 gap-1 p-1 bg-slate-900 border border-slate-700 rounded-xl">
             {([['category', 'Categoría(s)'], ['concept', 'Un concepto']] as const).map(([v, label]) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => { setScope(v); if (v === 'concept') setExtraCatIds([]) }}
+              <button key={v} type="button"
+                onClick={() => { setScope(v); setSelectedCatIds([]); setSingleCatId(''); setConceptId('') }}
                 className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   scope === v ? 'bg-indigo-500/25 text-indigo-200' : 'text-slate-500 hover:text-slate-300'
-                }`}
-              >
+                }`}>
                 {label}
               </button>
             ))}
@@ -116,102 +113,83 @@ function AddForm({ onDone, currency, initialMonth, initialYear }: AddFormProps) 
           </p>
         </div>
 
-        {scope === 'category' && categoryId && expenseCategories.length > 1 && (
+        {/* Category scope: checkbox list (todas con igual importancia) */}
+        {scope === 'category' && (
           <div className="col-span-2">
             <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">
-              Agregar más categorías <span className="normal-case text-slate-600">(opcional)</span>
+              Categorías <span className="normal-case text-slate-600">(elegí una o más)</span>
             </label>
-            <div className="space-y-1 rounded-xl bg-slate-900 border border-slate-700 p-2 max-h-36 overflow-y-auto">
-              {expenseCategories.filter(c => c.id !== categoryId).map(c => (
+            <div className="space-y-1 rounded-xl bg-slate-900 border border-slate-700 p-2 max-h-40 overflow-y-auto">
+              {expenseCategories.map(c => (
                 <label key={c.id} className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer hover:text-slate-100">
-                  <input
-                    type="checkbox"
-                    checked={extraCatIds.includes(c.id)}
-                    onChange={e => setExtraCatIds(prev =>
-                      e.target.checked ? [...prev, c.id] : prev.filter(x => x !== c.id)
-                    )}
-                    className="accent-indigo-500"
-                  />
+                  <input type="checkbox" checked={selectedCatIds.includes(c.id)}
+                    onChange={() => toggleCat(c.id)} className="accent-indigo-500" />
                   {c.name}
                 </label>
               ))}
             </div>
-            {extraCatIds.length > 0 && (
+            {selectedCatIds.length > 1 && (
               <div className="mt-1.5">
                 <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">
                   Nombre del grupo <span className="normal-case text-slate-600">(opcional)</span>
                 </label>
-                <input
-                  type="text"
-                  value={budgetName}
-                  onChange={e => setBudgetName(e.target.value)}
-                  placeholder={`${expenseCategories.find(c => c.id === categoryId)?.name ?? ''} + ${extraCatIds.length} más`}
-                  maxLength={60}
-                  className={inputCls}
-                />
+                <input type="text" value={budgetName} onChange={e => setBudgetName(e.target.value)}
+                  placeholder={selectedCatIds.map(id => expenseCategories.find(c => c.id === id)?.name ?? '').join(' + ')}
+                  maxLength={60} className={inputCls} />
               </div>
             )}
           </div>
         )}
 
+        {/* Concept scope: single category dropdown + concept dropdown */}
         {scope === 'concept' && (
-          <div className="col-span-2">
-            <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Concepto</label>
-            <select
-              value={conceptId}
-              onChange={e => setConceptId(e.target.value)}
-              disabled={!categoryId}
-              className={`${inputCls} disabled:opacity-50`}
-            >
-              <option value="">{categoryId ? 'Seleccioná un concepto' : 'Elegí primero la categoría'}</option>
-              {categoryConcepts.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div className="col-span-2">
+              <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Categoría</label>
+              <select value={singleCatId}
+                onChange={e => { setSingleCatId(e.target.value); setConceptId('') }}
+                className={inputCls}>
+                <option value="">Seleccioná una categoría</option>
+                {expenseCategories.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Concepto</label>
+              <select value={conceptId} onChange={e => setConceptId(e.target.value)}
+                disabled={!singleCatId} className={`${inputCls} disabled:opacity-50`}>
+                <option value="">{singleCatId ? 'Seleccioná un concepto' : 'Elegí primero la categoría'}</option>
+                {categoryConcepts.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          </>
         )}
 
         <div>
           <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Mes</label>
-          <select
-            value={month}
-            onChange={e => setMonth(Number(e.target.value))}
-            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500/60"
-          >
+          <select value={month} onChange={e => setMonth(Number(e.target.value))}
+            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500/60">
             {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
           </select>
         </div>
-
         <div>
           <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Año</label>
-          <input
-            type="number"
-            value={year}
-            onChange={e => setYear(Number(e.target.value))}
-            min={2000}
-            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500/60"
-          />
+          <input type="number" value={year} onChange={e => setYear(Number(e.target.value))} min={2000}
+            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500/60" />
         </div>
-
         <div>
           <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Límite</label>
-          <input
-            type="number"
-            value={amount}
-            onChange={e => setAmount(e.target.value)}
-            placeholder="0"
-            min={1}
-            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500/60"
-          />
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
+            placeholder="0" min={1}
+            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500/60" />
         </div>
-
         <div>
           <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 block">Moneda</label>
-          <select
-            value={cur}
-            onChange={e => setCur(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500/60"
-          >
+          <select value={cur} onChange={e => setCur(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500/60">
             <option value="UYU">UYU</option>
             <option value="USD">USD</option>
           </select>
@@ -221,17 +199,13 @@ function AddForm({ onDone, currency, initialMonth, initialYear }: AddFormProps) 
       {error && <p className="text-[10px] text-rose-400">{error}</p>}
 
       <div className="flex gap-2">
-        <button
-          onClick={onDone}
-          className="flex-1 py-2 rounded-xl text-xs font-medium border border-slate-700 text-slate-500 hover:bg-slate-800"
-        >
+        <button onClick={onDone}
+          className="flex-1 py-2 rounded-xl text-xs font-medium border border-slate-700 text-slate-500 hover:bg-slate-800">
           Cancelar
         </button>
-        <button
-          onClick={() => { setError(null); mutation.mutate() }}
-          disabled={mutation.isPending || !categoryId || !amount || (scope === 'concept' && !conceptId)}
-          className="flex-1 py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-900 hover:bg-emerald-400 disabled:opacity-50 flex items-center justify-center gap-1"
-        >
+        <button onClick={() => { setError(null); mutation.mutate() }}
+          disabled={mutation.isPending || !isValid}
+          className="flex-1 py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-900 hover:bg-emerald-400 disabled:opacity-50 flex items-center justify-center gap-1">
           {mutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
           Guardar
         </button>
@@ -264,11 +238,11 @@ function BudgetRow({ budget, nested = false }: { budget: Budget; nested?: boolea
           <p className={`font-medium truncate ${nested ? 'text-xs text-slate-300' : 'text-sm text-slate-200'}`}>
             {budget.concept_name ?? budget.name ?? budgetDisplayName(budget)}
           </p>
-          <p className="text-[10px] text-slate-500">
+          <p className="text-[10px] text-slate-500 truncate">
             {budget.concept_id
-              ? 'Concepto'
+              ? `Concepto · ${budget.category_name}`
               : (budget.extra_category_ids?.length > 0
-                  ? `${1 + budget.extra_category_ids.length} categorías`
+                  ? [budget.category_name, ...budget.extra_category_names].join(' + ')
                   : 'Toda la categoría')
             } · {budget.currency}
           </p>
