@@ -1113,17 +1113,21 @@ export default function StatsDashboardPage() {
                           <div className="flex-1 min-w-0">
                             <span className="text-sm text-slate-300 truncate block">{cat.name}</span>
                             {budget && bActualPct !== null && !privacy && bChip && (
-                              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold border tabular-nums mt-0.5 inline-flex items-center gap-1 ${bChip.bg} ${bChip.text}`}>
+                              <div className="mt-0.5">
                                 {budget.extra_category_names.length > 0 && (
-                                  <span className="opacity-70 font-normal">{budget.name ?? budget.category_name} ·</span>
+                                  <span className="text-[10px] text-slate-500 block mb-0.5 truncate">
+                                    {budget.name ?? budget.category_name}
+                                  </span>
                                 )}
-                                {fmtMoney(budget.spent, currency)}/{fmtMoney(budget.max_amount, currency)}
-                                {' · '}
-                                {bActualPct > 100
-                                  ? <><span className="text-[13px]">+</span>{(bActualPct - 100).toFixed(0)}%</>
-                                  : `${bActualPct.toFixed(0)}%`
-                                }
-                              </span>
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold border tabular-nums inline-block ${bChip.bg} ${bChip.text}`}>
+                                  {fmtMoney(budget.spent, currency)}/{fmtMoney(budget.max_amount, currency)}
+                                  {' · '}
+                                  {bActualPct > 100
+                                    ? <><span className="text-[13px]">+</span>{(bActualPct - 100).toFixed(0)}%</>
+                                    : `${bActualPct.toFixed(0)}%`
+                                  }
+                                </span>
+                              </div>
                             )}
                           </div>
                           <span className="text-sm font-semibold text-slate-300 tabular-nums shrink-0">
