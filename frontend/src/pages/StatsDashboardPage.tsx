@@ -20,8 +20,6 @@ import {
   type CategoryStat,
   type PaymentMethod,
 } from '../api/dashboard'
-import { fetchBudgets } from '../api/budgets'
-import type { Budget } from '../api/budgets'
 import SettingsDrawer from '../components/SettingsDrawer'
 import TransactionModal from '../components/TransactionModal'
 import DeleteTransactionModal from '../components/DeleteTransactionModal'
@@ -730,10 +728,6 @@ export default function StatsDashboardPage() {
     queryFn:  () => fetchMonthlyBreakdown(prevMonthYear, prevMonthNum, currency),
   })
 
-  const { data: budgets = [] } = useQuery({
-    queryKey: ['budgets', month, year],
-    queryFn:  () => fetchBudgets({ month, year, currency }),
-  })
 
 
   function prevMonth() {
@@ -1093,43 +1087,11 @@ export default function StatsDashboardPage() {
                   {cats.map((cat: CategoryStat, i: number) => {
                     const pct    = total > 0 ? (cat.total / total) * 100 : 0
                     const sem    = donutMode === 'expense' ? semColor(cat.total / (breakdown.income || 1) * 100) : { badge: 'bg-emerald-500/15 text-emerald-400', bar: '#10b981' }
-                    const budget = (donutMode === 'expense' && groupBy === 'category')
-                      ? budgets.find((b: Budget) => !b.concept_id && [b.category_name, ...b.extra_category_names].includes(cat.name))
-                      : null
-                    const bActualPct = budget && budget.max_amount > 0 ? (budget.spent / budget.max_amount) * 100 : null
-                    const bChip = bActualPct !== null ? (
-                      bActualPct >= 100
-                        ? { text: 'text-red-400',    bg: 'bg-red-500/15 border-red-500/25' }
-                        : bActualPct >= 80
-                        ? { text: 'text-orange-400', bg: 'bg-orange-500/15 border-orange-500/25' }
-                        : bActualPct >= 60
-                        ? { text: 'text-amber-400',  bg: 'bg-amber-500/15 border-amber-500/25' }
-                        : { text: 'text-emerald-400', bg: 'bg-emerald-500/15 border-emerald-500/25' }
-                    ) : null
                     return (
                       <div key={cat.name}>
                         <div className="flex items-center gap-2 mb-1.5">
                           <span className="w-2.5 h-2.5 rounded-full shrink-0 self-start mt-1.5" style={{ background: catColor(i) }} />
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm text-slate-300 truncate block">{cat.name}</span>
-                            {budget && bActualPct !== null && !privacy && bChip && (
-                              <div className="mt-0.5">
-                                {budget.extra_category_names.length > 0 && (
-                                  <span className="text-[10px] text-slate-500 block mb-0.5 truncate">
-                                    {budget.name ?? budget.category_name}
-                                  </span>
-                                )}
-                                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold border tabular-nums inline-block ${bChip.bg} ${bChip.text}`}>
-                                  {fmtMoney(budget.spent, currency)}/{fmtMoney(budget.max_amount, currency)}
-                                  {' · '}
-                                  {bActualPct > 100
-                                    ? <><span className="text-[13px]">+</span>{(bActualPct - 100).toFixed(0)}%</>
-                                    : `${bActualPct.toFixed(0)}%`
-                                  }
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                          <span className="flex-1 min-w-0 text-sm text-slate-300 truncate">{cat.name}</span>
                           <span className="text-sm font-semibold text-slate-300 tabular-nums shrink-0">
                             {fmtMoney(cat.total, currency, privacy)}
                           </span>
