@@ -1094,7 +1094,7 @@ export default function StatsDashboardPage() {
                     const pct    = total > 0 ? (cat.total / total) * 100 : 0
                     const sem    = donutMode === 'expense' ? semColor(cat.total / (breakdown.income || 1) * 100) : { badge: 'bg-emerald-500/15 text-emerald-400', bar: '#10b981' }
                     const budget = (donutMode === 'expense' && groupBy === 'category')
-                      ? budgets.find((b: Budget) => b.category_name === cat.name && !b.concept_id)
+                      ? budgets.find((b: Budget) => !b.concept_id && [b.category_name, ...b.extra_category_names].includes(cat.name))
                       : null
                     const bActualPct = budget && budget.max_amount > 0 ? (budget.spent / budget.max_amount) * 100 : null
                     const bChip = bActualPct !== null ? (
